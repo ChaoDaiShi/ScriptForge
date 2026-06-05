@@ -20,7 +20,7 @@ fastapi-cli==0.0.22
 fastapi-cloud-cli==0.12.0
 fastar==0.11.0
 fastjsonschema==2.21.2
-filelock==3.19.1
+filelock==3.24.2
 findpython==0.7.1
 greenlet==3.2.5
 h11==0.16.0
@@ -82,4 +82,3 @@ websockets==15.0.1
 xattr==1.3.0
 zipp==3.23.1
 zstandard==0.25.0
-supbase

@@ -1,8 +1,3 @@
-"""
-ScriptForge — 数据库连接模块
-
-提供 SQLAlchemy 异步引擎和会话工厂，直连 Supabase PostgreSQL 云数据库。
-"""
 
 import os
 from dotenv import load_dotenv
@@ -12,14 +7,11 @@ from sqlalchemy.orm import DeclarativeBase
 
 load_dotenv()
 
-# ── 数据库连接字符串 ──────────────────────────────────────────────
-# 优先使用 DATABASE_URL 环境变量，否则 fallback 到从 SUPABASE_URL 拼接
 DATABASE_URL = os.getenv(
     "DATABASE_URL",
     "postgresql+asyncpg://postgres:[YOUR-PASSWORD]@db.chfraiixiyhfimgoysnj.supabase.co:5432/postgres",
 )
 
-# ── 异步引擎 ─────────────────────────────────────────────────────
 engine = create_async_engine(
     DATABASE_URL,
     echo=os.getenv("DB_ECHO", "false").lower() == "true",  # SQL 日志，调试用
@@ -27,7 +19,7 @@ engine = create_async_engine(
     max_overflow=int(os.getenv("DB_MAX_OVERFLOW", "20")),
 )
 
-# ── 会话工厂 ─────────────────────────────────────────────────────
+
 async_session_factory = async_sessionmaker(
     engine,
     class_=AsyncSession,
@@ -35,7 +27,7 @@ async_session_factory = async_sessionmaker(
 )
 
 
-# ── ORM 基类 ─────────────────────────────────────────────────────
+
 class Base(DeclarativeBase):
     pass
 
