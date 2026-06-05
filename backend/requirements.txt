@@ -9,7 +9,6 @@ certifi==2026.5.20
 cffi==2.0.0
 charset-normalizer==3.4.7
 cleo==2.1.0
-click>=8.2.1
 crashtest==0.4.1
 distlib==0.4.1
 dnspython==2.7.0
