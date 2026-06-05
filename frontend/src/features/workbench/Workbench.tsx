@@ -90,15 +90,15 @@ export default function Workbench() {
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-background text-foreground">
-      <section className="border-b border-white/10 px-4 py-4 md:px-6">
+      <section className="border-b border-[rgba(94,72,58,0.08)] px-4 py-4 md:px-6">
         <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
           <div className="space-y-2">
-            <div className="inline-flex items-center gap-2 rounded-full border border-[--line-soft] bg-white/5 px-3 py-1 text-xs font-medium uppercase tracking-[0.24em] text-[--text-subtle]">
+            <div className="inline-flex items-center gap-2 rounded-full border border-[--line-soft] bg-white/55 px-3 py-1 text-xs font-medium uppercase tracking-[0.24em] text-[--text-subtle] backdrop-blur-xl">
               <Sparkles className="h-3.5 w-3.5 text-[--accent-soft]" />
               AI 剧本工作台
             </div>
             <div>
-              <h1 className="font-serif text-3xl tracking-tight text-white">
+              <h1 className="font-serif text-3xl tracking-tight text-foreground">
                 Episode 01 · 潮汐以下
               </h1>
               <p className="mt-1 max-w-3xl text-sm text-[--text-subtle]">
@@ -131,7 +131,7 @@ export default function Workbench() {
       </section>
 
       <div className="min-h-0 flex-1 overflow-hidden px-3 pb-3 pt-3 md:px-4 md:pb-4">
-        <div className="h-full overflow-hidden rounded-[28px] border border-white/10 bg-[radial-gradient(circle_at_top,#1d2946_0%,#0f1522_32%,#090d16_72%)] shadow-[0_30px_90px_rgba(0,0,0,0.42)]">
+        <div className="h-full overflow-hidden rounded-[28px] border border-[rgba(94,72,58,0.1)] bg-[linear-gradient(180deg,rgba(255,255,255,0.76),rgba(255,255,255,0.42))] shadow-[0_30px_90px_rgba(94,72,58,0.12)] backdrop-blur-2xl">
           <Group orientation="horizontal" className="h-full">
             <Panel
               defaultSize={leftPaneWidth}
@@ -157,8 +157,8 @@ export default function Workbench() {
                           className={cn(
                             "rounded-2xl border px-4 py-3 transition-colors",
                             index === 1
-                              ? "border-[--accent-soft]/40 bg-[--accent-soft]/10 text-slate-100"
-                              : "border-white/8 bg-white/[0.03]",
+                              ? "border-[--accent-soft]/26 bg-[rgba(185,125,92,0.08)] text-foreground"
+                              : "border-[rgba(94,72,58,0.08)] bg-white/38 text-foreground",
                           )}
                         >
                           {paragraph}
@@ -173,11 +173,11 @@ export default function Workbench() {
                       {characterCards.map((character) => (
                         <div
                           key={character.name}
-                          className="rounded-2xl border border-white/8 bg-black/15 p-4"
+                          className="rounded-2xl border border-[rgba(94,72,58,0.08)] bg-white/38 p-4"
                         >
                           <div className="flex items-start justify-between gap-3">
                             <div>
-                              <h3 className="text-sm font-semibold text-slate-50">
+                              <h3 className="text-sm font-semibold text-foreground">
                                 {character.name}
                               </h3>
                               <p className="mt-1 text-xs uppercase tracking-[0.18em] text-[--text-faint]">
@@ -213,7 +213,7 @@ export default function Workbench() {
                             ) : null}
                           </div>
                           <div className="pb-4">
-                            <p className="text-sm font-medium text-slate-50">
+                            <p className="text-sm font-medium text-foreground">
                               {step.label}
                             </p>
                             <p className="mt-1 text-sm text-[--text-subtle]">
@@ -249,7 +249,7 @@ export default function Workbench() {
                       <p className="text-xs uppercase tracking-[0.22em] text-[--text-faint]">
                         Episode Container
                       </p>
-                      <h2 className="mt-2 font-serif text-2xl text-white">
+                      <h2 className="mt-2 font-serif text-2xl text-foreground">
                         冷开场 · 让危险先于答案出现
                       </h2>
                       <p className="mt-2 max-w-2xl text-sm text-[--text-subtle]">
@@ -286,7 +286,7 @@ export default function Workbench() {
                                 {scene.location}
                               </span>
                             </div>
-                            <h3 className="font-serif text-2xl text-white">
+                            <h3 className="font-serif text-2xl text-foreground">
                               {scene.title}
                             </h3>
                             <p className="max-w-2xl text-sm text-[--text-subtle]">
@@ -298,8 +298,8 @@ export default function Workbench() {
                             className={cn(
                               "inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs transition-opacity",
                               isHovered || isSelected
-                                ? "border-[--accent-soft]/40 bg-[--accent-soft]/10 text-[--accent-soft]"
-                                : "border-white/10 bg-white/[0.03] text-[--text-faint]",
+                                ? "border-[--accent-soft]/32 bg-[rgba(185,125,92,0.08)] text-[--accent-soft]"
+                                : "border-[rgba(94,72,58,0.08)] bg-white/36 text-[--text-faint]",
                             )}
                           >
                             <Bot className="h-3.5 w-3.5" />
@@ -314,8 +314,8 @@ export default function Workbench() {
                               className={cn(
                                 "rounded-2xl border px-4 py-4 transition-colors",
                                 index === 1
-                                  ? "border-[--accent-soft]/20 bg-[linear-gradient(135deg,rgba(154,245,214,0.12),rgba(154,245,214,0.03))]"
-                                  : "border-white/10 bg-white/[0.035]",
+                                  ? "border-[--accent-soft]/24 bg-[linear-gradient(135deg,rgba(255,255,255,0.82),rgba(240,223,211,0.54))]"
+                                  : "border-[rgba(94,72,58,0.08)] bg-white/42",
                               )}
                             >
                               <div className="flex items-center justify-between gap-3">
@@ -332,7 +332,7 @@ export default function Workbench() {
                               <p
                                 className={cn(
                                   "mt-3 text-sm leading-7",
-                                  index === 1 ? "text-slate-50" : "text-[--text-subtle]",
+                                  index === 1 ? "text-foreground" : "text-[--text-subtle]",
                                 )}
                               >
                                 {beat}
@@ -363,7 +363,7 @@ export default function Workbench() {
                   description="切换 AI 对话、底层结构与版本历史。"
                 />
 
-                <div className="mb-5 grid grid-cols-3 gap-2 rounded-2xl border border-white/10 bg-white/[0.03] p-1.5">
+                <div className="mb-5 grid grid-cols-3 gap-2 rounded-2xl border border-[rgba(94,72,58,0.08)] bg-white/44 p-1.5">
                   <InspectorTabButton
                     active={inspectorTab === "assistant"}
                     icon={<Bot className="h-4 w-4" />}
@@ -388,8 +388,8 @@ export default function Workbench() {
                   <div className="space-y-4">
                     <section className="panel-card">
                       <SectionLabel label="协同副驾" action={isGenerating ? "流式生成中" : "已待命"} />
-                      <div className="rounded-2xl border border-[--accent-soft]/20 bg-[linear-gradient(180deg,rgba(154,245,214,0.12),rgba(154,245,214,0.04))] p-4">
-                        <p className="text-sm leading-7 text-slate-100">
+                      <div className="rounded-2xl border border-[--accent-soft]/20 bg-[linear-gradient(180deg,rgba(255,255,255,0.78),rgba(240,223,211,0.44))] p-4">
+                        <p className="text-sm leading-7 text-foreground">
                           我建议先强化 Scene 01 中“脚步声靠近”的听觉焦虑，再把裴竞的登场压到最后一拍，这样悬念扣子会更利落。
                         </p>
                         <div className="mt-4 flex flex-wrap gap-2">
@@ -417,8 +417,8 @@ export default function Workbench() {
                             className={cn(
                               "w-full rounded-2xl border px-4 py-3 text-left text-sm transition",
                               activePrompt === suggestion
-                                ? "border-[--accent-soft]/40 bg-[--accent-soft]/10 text-slate-50"
-                                : "border-white/8 bg-black/10 text-[--text-subtle] hover:border-white/15 hover:bg-white/[0.04]",
+                                ? "border-[--accent-soft]/32 bg-[rgba(185,125,92,0.08)] text-foreground"
+                                : "border-[rgba(94,72,58,0.08)] bg-white/38 text-[--text-subtle] hover:border-[rgba(94,72,58,0.14)] hover:bg-white/56",
                             )}
                             onClick={() => setActivePrompt(suggestion)}
                           >
@@ -450,14 +450,14 @@ export default function Workbench() {
                   <div className="space-y-4">
                     <section className="panel-card">
                       <SectionLabel label="底层结构源" action="只展示当前集" />
-                      <pre className="overflow-x-auto rounded-2xl border border-white/10 bg-[#05070d] p-4 text-xs leading-6 text-slate-200">
+                      <pre className="overflow-x-auto rounded-2xl border border-[rgba(94,72,58,0.08)] bg-[rgba(255,255,255,0.62)] p-4 text-xs leading-6 text-foreground">
                         <code>{yamlSnippet}</code>
                       </pre>
                     </section>
 
                     <section className="panel-card">
                       <SectionLabel label="编译提示" action="JSON Schema" />
-                      <div className="rounded-2xl border border-amber-400/20 bg-amber-300/10 p-4 text-sm text-amber-50">
+                      <div className="rounded-2xl border border-amber-500/24 bg-amber-100/70 p-4 text-sm text-amber-900">
                         若手动编辑 YAML 出现缩进或字段缺失，右侧将即时标记并尝试自动修正，再同步回可视化卡片。
                       </div>
                     </section>
@@ -472,10 +472,10 @@ export default function Workbench() {
                         {revisions.map((revision) => (
                           <div
                             key={revision.title}
-                            className="rounded-2xl border border-white/8 bg-black/10 p-4"
+                            className="rounded-2xl border border-[rgba(94,72,58,0.08)] bg-white/38 p-4"
                           >
                             <div className="flex items-center justify-between gap-3">
-                              <p className="text-sm font-medium text-slate-50">
+                              <p className="text-sm font-medium text-foreground">
                                 {revision.title}
                               </p>
                               <span
@@ -521,12 +521,12 @@ function PaneTitle({
   return (
     <header className="mb-5">
       <div className="flex items-center gap-2 text-xs uppercase tracking-[0.24em] text-[--text-faint]">
-        <span className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-white/10 bg-white/[0.05] text-[--accent-soft]">
+        <span className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-[rgba(94,72,58,0.08)] bg-white/52 text-[--accent-soft]">
           {icon}
         </span>
         {eyebrow}
       </div>
-      <h2 className="mt-3 font-serif text-2xl text-white">{title}</h2>
+      <h2 className="mt-3 font-serif text-2xl text-foreground">{title}</h2>
       <p className="mt-1 text-sm text-[--text-subtle]">{description}</p>
     </header>
   );
@@ -559,12 +559,13 @@ function WorkbenchMetric({
       className={cn(
         "rounded-2xl border px-4 py-3",
         accent ? "border-[--accent-soft]/25 bg-[--accent-soft]/10" : "border-white/10 bg-white/[0.03]",
+        accent ? "border-[--accent-soft]/25 bg-[rgba(185,125,92,0.08)]" : "border-[rgba(94,72,58,0.08)] bg-white/42",
       )}
     >
       <p className="text-xs uppercase tracking-[0.22em] text-[--text-faint]">
         {label}
       </p>
-      <p className="mt-1 text-xl font-semibold text-white">{value}</p>
+      <p className="mt-1 text-xl font-semibold text-foreground">{value}</p>
       <p className="mt-1 text-xs text-[--text-subtle]">{hint}</p>
     </div>
   );
@@ -576,8 +577,8 @@ function Pill({ text, accent }: { text: string; accent?: boolean }) {
       className={cn(
         "inline-flex items-center justify-center rounded-full border px-3 py-2 text-xs font-medium",
         accent
-          ? "border-[--accent-soft]/30 bg-[--accent-soft]/12 text-[--accent-soft]"
-          : "border-white/10 bg-white/[0.04] text-[--text-subtle]",
+          ? "border-[--accent-soft]/30 bg-[rgba(185,125,92,0.08)] text-[--accent-soft]"
+          : "border-[rgba(94,72,58,0.08)] bg-white/42 text-[--text-subtle]",
       )}
     >
       {text}
@@ -602,7 +603,7 @@ function InspectorTabButton({
       onClick={onClick}
       className={cn(
         "inline-flex items-center justify-center gap-2 rounded-xl px-3 py-2 text-sm font-medium transition",
-        active ? "bg-[--accent-soft] text-[#091018]" : "text-[--text-subtle] hover:bg-white/[0.05] hover:text-white",
+        active ? "bg-[rgba(185,125,92,0.12)] text-foreground" : "text-[--text-subtle] hover:bg-white/60 hover:text-foreground",
       )}
     >
       {icon}
@@ -621,10 +622,10 @@ function StatusRow({
   detail: string;
 }) {
   return (
-    <div className="flex gap-3 rounded-2xl border border-white/8 bg-black/10 p-4">
+    <div className="flex gap-3 rounded-2xl border border-[rgba(94,72,58,0.08)] bg-white/38 p-4">
       <div className="mt-0.5">{icon}</div>
       <div>
-        <p className="text-sm font-medium text-slate-50">{title}</p>
+        <p className="text-sm font-medium text-foreground">{title}</p>
         <p className="mt-1 text-sm text-[--text-subtle]">{detail}</p>
       </div>
     </div>
@@ -633,13 +634,13 @@ function StatusRow({
 
 export function WorkbenchOverviewCard() {
   return (
-    <div className="rounded-[28px] border border-white/10 bg-[linear-gradient(135deg,rgba(154,245,214,0.16),rgba(17,24,39,0.24))] p-6 shadow-[0_24px_60px_rgba(0,0,0,0.28)]">
+    <div className="rounded-[28px] border border-[rgba(94,72,58,0.08)] bg-[linear-gradient(135deg,rgba(255,255,255,0.82),rgba(244,230,220,0.56))] p-6 shadow-[0_24px_60px_rgba(94,72,58,0.12)] backdrop-blur-xl">
       <div className="flex items-center justify-between gap-4">
         <div>
           <p className="text-xs uppercase tracking-[0.22em] text-[--text-faint]">
             导向入口
           </p>
-          <h3 className="mt-2 font-serif text-3xl text-white">
+          <h3 className="mt-2 font-serif text-3xl text-foreground">
             继续推进当前工作台
           </h3>
           <p className="mt-2 max-w-xl text-sm text-[--text-subtle]">

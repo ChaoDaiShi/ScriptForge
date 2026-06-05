@@ -36,40 +36,40 @@
 
 @layer base {
   :root {
-    --background: 221 39% 7%;
-    --foreground: 210 33% 96%;
+    --background: 32 36% 96%;
+    --foreground: 22 20% 16%;
 
-    --card: 224 31% 10%;
-    --card-foreground: 210 33% 96%;
+    --card: 0 0% 100%;
+    --card-foreground: 22 20% 16%;
 
-    --popover: 224 31% 10%;
-    --popover-foreground: 210 33% 96%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 22 20% 16%;
 
-    --primary: 168 80% 78%;
-    --primary-foreground: 222 47% 11%;
+    --primary: 23 41% 48%;
+    --primary-foreground: 0 0% 100%;
 
-    --secondary: 220 20% 16%;
-    --secondary-foreground: 210 33% 96%;
+    --secondary: 28 24% 90%;
+    --secondary-foreground: 22 20% 16%;
 
-    --muted: 221 18% 14%;
-    --muted-foreground: 216 17% 70%;
+    --muted: 30 20% 92%;
+    --muted-foreground: 23 11% 43%;
 
-    --accent: 168 80% 78%;
-    --accent-foreground: 222 47% 11%;
+    --accent: 29 45% 92%;
+    --accent-foreground: 22 20% 16%;
 
     --destructive: 0 72% 56%;
     --destructive-foreground: 210 40% 98%;
 
-    --border: 220 20% 18%;
-    --input: 220 20% 18%;
-    --ring: 168 80% 78%;
+    --border: 28 18% 82%;
+    --input: 28 18% 82%;
+    --ring: 23 41% 48%;
 
     --radius: 1rem;
-    --accent-soft: #9af5d6;
-    --accent-strong: #c4ffe9;
-    --text-subtle: #a6b2c8;
-    --text-faint: #6f7c95;
-    --line-soft: rgba(255, 255, 255, 0.08);
+    --accent-soft: #b97d5c;
+    --accent-strong: #c99672;
+    --text-subtle: #7e7067;
+    --text-faint: #a4958a;
+    --line-soft: rgba(94, 72, 58, 0.09);
   }
 }
 
@@ -78,10 +78,11 @@
     @apply border-border;
   }
   html {
-    color-scheme: dark;
+    color-scheme: light;
     background:
-      radial-gradient(circle at top left, rgba(77, 208, 225, 0.14), transparent 28%),
-      radial-gradient(circle at bottom right, rgba(154, 245, 214, 0.12), transparent 24%),
+      radial-gradient(circle at top left, rgba(255, 255, 255, 0.88), transparent 24%),
+      radial-gradient(circle at top right, rgba(230, 205, 185, 0.35), transparent 28%),
+      radial-gradient(circle at bottom left, rgba(255, 255, 255, 0.74), transparent 24%),
       hsl(var(--background));
   }
   body {
@@ -102,7 +103,7 @@
 @layer components {
   .app-shell {
     background:
-      linear-gradient(180deg, rgba(9, 13, 20, 0.98) 0%, rgba(11, 16, 24, 0.96) 100%),
+      linear-gradient(180deg, rgba(255, 253, 250, 0.92) 0%, rgba(244, 237, 230, 0.82) 100%),
       hsl(var(--background));
   }
 
@@ -112,28 +113,30 @@
     inset: 0;
     pointer-events: none;
     background-image:
-      linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+      linear-gradient(rgba(126, 112, 103, 0.06) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(126, 112, 103, 0.06) 1px, transparent 1px);
     background-size: 120px 120px;
-    opacity: 0.22;
+    opacity: 0.24;
   }
 
   .panel-shell {
     padding: 1.25rem;
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.015));
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.58), rgba(255, 255, 255, 0.34));
+    backdrop-filter: blur(24px);
   }
 
   .panel-card {
     border: 1px solid var(--line-soft);
-    background: rgba(255, 255, 255, 0.035);
+    background: rgba(255, 255, 255, 0.5);
     border-radius: 1.5rem;
     padding: 1rem;
-    backdrop-filter: blur(16px);
+    backdrop-filter: blur(18px);
+    box-shadow: 0 16px 40px rgba(94, 72, 58, 0.08);
   }
 
   .scene-card {
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.02));
+    border: 1px solid rgba(94, 72, 58, 0.1);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.62), rgba(255, 255, 255, 0.42));
     border-radius: 1.75rem;
     padding: 1.25rem;
     transition:
@@ -146,25 +149,26 @@
 
   .scene-card:hover {
     transform: translateY(-1px);
-    border-color: rgba(154, 245, 214, 0.25);
+    border-color: rgba(185, 125, 92, 0.25);
   }
 
   .scene-card-active {
-    border-color: rgba(154, 245, 214, 0.35);
-    box-shadow: inset 0 0 0 1px rgba(154, 245, 214, 0.12);
+    border-color: rgba(185, 125, 92, 0.35);
+    box-shadow: inset 0 0 0 1px rgba(185, 125, 92, 0.12);
   }
 
   .resize-handle {
     width: 8px;
     border-radius: 999px;
-    background: linear-gradient(180deg, transparent, rgba(255, 255, 255, 0.08), transparent);
+    background: linear-gradient(180deg, transparent, rgba(94, 72, 58, 0.12), transparent);
   }
 
   .surface-card {
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(94, 72, 58, 0.1);
     border-radius: 1.75rem;
-    background: linear-gradient(180deg, rgba(19, 24, 36, 0.96), rgba(11, 15, 24, 0.96));
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.68), rgba(255, 255, 255, 0.44));
     padding: 1.25rem;
-    box-shadow: 0 24px 70px rgba(0, 0, 0, 0.24);
+    backdrop-filter: blur(22px);
+    box-shadow: 0 24px 70px rgba(94, 72, 58, 0.1);
   }
 }

@@ -18,6 +18,7 @@ function App() {
       <Route path="/" element={<Layout />}>
         <Route index element={<Navigate to="/workbench" replace />} />
         <Route path="workbench" element={<Workbench />} />
+        <Route path="workbenc" element={<Navigate to="/workbench" replace />} />
         <Route path="tasks" element={<TasksPage />} />
         <Route path="assets" element={<AssetsPage />} />
         <Route
