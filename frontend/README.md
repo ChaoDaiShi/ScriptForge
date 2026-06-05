@@ -20,6 +20,9 @@ VITE_API_BASE_URL=/api
 
 If your backend routes already include `/api`, set `BACKEND_URL` and `VITE_BACKEND_URL` to `https://script-backend-ten.vercel.app/api`.
 
+For local end-to-end testing, start the Flask backend on port 5000 and run the
+Vite dev server. The default local proxy target is `http://127.0.0.1:5000`.
+
 Currently, two official plugins are available:
 
 - [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)

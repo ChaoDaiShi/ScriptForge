@@ -1,11 +1,41 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import reactLogo from './assets/react.svg'
 import viteLogo from './assets/vite.svg'
 import heroImg from './assets/hero.png'
+import { apiFetch, apiUrl } from './lib/api'
 import './App.css'
 
 function App() {
   const [count, setCount] = useState(0)
+  const [apiStatus, setApiStatus] = useState<'checking' | 'online' | 'offline'>('checking')
+  const [apiMessage, setApiMessage] = useState('Checking backend proxy...')
+
+  useEffect(() => {
+    let isMounted = true
+
+    async function checkBackend() {
+      try {
+        const response = await apiFetch('/health')
+        const data = (await response.json()) as { service?: string; status?: string }
+
+        if (isMounted) {
+          setApiStatus('online')
+          setApiMessage(`${data.service ?? 'Backend'} is ${data.status ?? 'reachable'}`)
+        }
+      } catch (error) {
+        if (isMounted) {
+          setApiStatus('offline')
+          setApiMessage(error instanceof Error ? error.message : 'Backend proxy is unavailable')
+        }
+      }
+    }
+
+    checkBackend()
+
+    return () => {
+      isMounted = false
+    }
+  }, [])
 
   return (
     <>
@@ -28,6 +58,14 @@ function App() {
         >
           Count is {count}
         </button>
+        <div className={`api-status api-status--${apiStatus}`}>
+          <span className="api-status__dot" aria-hidden="true"></span>
+          <div>
+            <strong>API proxy</strong>
+            <p>{apiMessage}</p>
+            <code>{apiUrl('/health')}</code>
+          </div>
+        </div>
       </section>
 
       <div className="ticks"></div>

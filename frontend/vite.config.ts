@@ -5,7 +5,8 @@ import babel from '@rolldown/plugin-babel'
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
-  const backendUrl = env.VITE_BACKEND_URL ?? 'https://script-backend-ten.vercel.app'
+  const backendUrl =
+    env.VITE_BACKEND_URL ?? env.BACKEND_URL ?? 'http://127.0.0.1:5000'
 
   return {
     plugins: [
