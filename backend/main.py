@@ -18,6 +18,7 @@ from api import (
     script_router,
 )
 from core import success_response
+from core.database import probe_supabase
 
 app = FastAPI(title="ScriptForge API", version="0.1.0")
 
@@ -45,6 +46,7 @@ def service_payload() -> dict:
     return {
         "service": "scriptforge-backend",
         "status": "ok",
+        "database": probe_supabase(),
         "endpoints": [
             "/health",
             "/api/health",
