@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { useScriptStore } from "@/store/useScriptStore";
 import { useProjectStore } from "@/store/useProjectStore";
+import { useNovelStore } from "@/store/useNovelStore";
 
 type AssistantTab = "chat" | "yaml" | "history";
 
@@ -71,14 +72,22 @@ export default function Workbench() {
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [isAiTyping, setIsAiTyping] = useState(false);
   const [copiedYaml, setCopiedYaml] = useState(false);
+  const [selectedChapterIndex, setSelectedChapterIndex] = useState<number | null>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const currentScript = useScriptStore((s) =>
     s.scripts.find((scr) => scr.id === s.currentScriptId),
   );
   const projects = useProjectStore((s) => s.projects);
   const activeProject = projects.find((p) => p.id === currentScript?.projectId);
+  
+  // 获取当前小说数据
+  const currentNovel = useNovelStore((s) => 
+    s.novels.find((n) => n.projectId === activeProject?.id)
+  );
+  const setSelectedChapter = useNovelStore((s) => s.setSelectedChapter);
 
   const hasData = !!currentScript && currentScript.episodes.length > 0;
+  const hasNovelData = !!currentNovel && currentNovel.chapters.length > 0;
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -186,7 +195,61 @@ episode:
             title="原著对照"
             icon={<FileText className="h-3 w-3" />}
           >
-            {hasData ? (
+            {hasNovelData ? (
+              <div className="space-y-2">
+                {/* 小说基本信息 */}
+                <div className="mb-3 rounded-lg border border-(--line-soft) bg-(--muted) p-3">
+                  <p className="text-sm font-medium text-foreground mb-1">
+                    {currentNovel.title}
+                  </p>
+                  <p className="text-xs text-(--text-subtle)">
+                    共 {currentNovel.totalChapters} 章 · {currentNovel.totalWordCount.toLocaleString()} 字
+                  </p>
+                </div>
+                
+                {/* 章节列表 */}
+                <div className="space-y-1.5 max-h-[300px] overflow-y-auto">
+                  {currentNovel.chapters.map((chapter) => (
+                    <button
+                      key={chapter.index}
+                      type="button"
+                      onClick={() => {
+                        setSelectedChapterIndex(chapter.index);
+                        setSelectedChapter(chapter.index);
+                      }}
+                      className={`w-full flex items-center gap-2 rounded-lg border px-3 py-2 text-sm transition-colors ${
+                        selectedChapterIndex === chapter.index
+                          ? "border-(--accent-soft) bg-(--accent-light) text-foreground"
+                          : "border-(--line-soft) hover:bg-(--muted) text-(--text-subtle)"
+                      }`}
+                    >
+                      <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded bg-(--accent-light) text-xs text-(--accent-soft)">
+                        {chapter.index}
+                      </span>
+                      <span className="flex-1 truncate text-xs">
+                        {chapter.title}
+                      </span>
+                      <span className="shrink-0 text-xs text-(--text-faint)">
+                        {chapter.wordCount.toLocaleString()}字
+                      </span>
+                    </button>
+                  ))}
+                </div>
+                
+                {/* 当前章节内容预览 */}
+                {selectedChapterIndex !== null && (
+                  <div className="mt-3 rounded-lg border border-(--line-soft) p-3">
+                    <p className="text-xs font-medium text-foreground mb-2">
+                      {currentNovel.chapters.find(c => c.index === selectedChapterIndex)?.title}
+                    </p>
+                    <p className="text-xs text-(--text-subtle) leading-5 max-h-[150px] overflow-y-auto">
+                      {currentNovel.chapters.find(c => c.index === selectedChapterIndex)?.content?.slice(0, 500) || "暂无内容"}
+                      {currentNovel.chapters.find(c => c.index === selectedChapterIndex)?.content?.length > 500 && "..."}
+                    </p>
+                  </div>
+                )}
+              </div>
+            ) : hasData ? (
               <div className="text-sm leading-6 text-(--text-subtle)">
                 <p className="text-foreground mb-2 font-medium">原著选段</p>
                 <p>

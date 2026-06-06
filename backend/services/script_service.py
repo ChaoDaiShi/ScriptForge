@@ -207,11 +207,13 @@ class ScriptService:
 
     @staticmethod
     async def _extract_dialogues(script: Script):
-        AIService.extract_dialogues(script.original_text)
+        ai_service = AIService()
+        await ai_service.extract_dialogues(script.original_text)
 
     @staticmethod
     async def _extract_characters(script: Script):
-        result = AIService.extract_characters(script.original_text)
+        ai_service = AIService()
+        result = await ai_service.extract_characters(script.original_text)
         script.characters = []
         for char_data in result["main_characters"]:
             script.characters.append(Character(**char_data))
@@ -220,11 +222,13 @@ class ScriptService:
 
     @staticmethod
     async def _extract_main_plot(script: Script):
-        script.main_plot = AIService.extract_main_plot(script.original_text)
+        ai_service = AIService()
+        script.main_plot = await ai_service.extract_main_plot(script.original_text)
 
     @staticmethod
     async def _tag_dialogue_speakers(script: Script):
-        AIService.tag_dialogue_speakers(
+        ai_service = AIService()
+        await ai_service.tag_dialogue_speakers(
             script.original_text,
             [character.model_dump() for character in script.characters],
         )
@@ -237,9 +241,10 @@ class ScriptService:
             if paragraph.strip()
         ]
         script.scenes = []
+        ai_service = AIService()
 
         for index, paragraph in enumerate(paragraphs[:5]):
-            scene_heading = AIService.analyze_scene(paragraph, index + 1)
+            scene_heading = await ai_service.analyze_scene(paragraph, index + 1)
             scene = Scene(
                 id=str(uuid4())[:8],
                 heading=SceneHeading(**scene_heading),
@@ -251,11 +256,12 @@ class ScriptService:
 
     @staticmethod
     async def _convert_psychology(script: Script):
+        ai_service = AIService()
         for scene in script.scenes:
             for index, description in enumerate(scene.descriptions):
                 if description.get("type") == "psychology":
                     character_name = description.get("subject_name", "某人")
-                    converted = AIService.convert_psychology(
+                    converted = await ai_service.convert_psychology(
                         description["content"],
                         character_name,
                     )
@@ -280,7 +286,8 @@ class ScriptService:
 
     @staticmethod
     async def _detect_useless_lines(script: Script) -> List[int]:
-        return AIService.detect_useless_lines(script.original_text)
+        ai_service = AIService()
+        return await ai_service.detect_useless_lines(script.original_text)
 
     @staticmethod
     async def _remove_useless_lines(script: Script, useless_lines: List[int]):
@@ -292,10 +299,11 @@ class ScriptService:
 
     @staticmethod
     async def _polish_script(script: Script):
+        ai_service = AIService()
         if script.processed_text:
-            script.processed_text = AIService.polish_script(script.processed_text)
+            script.processed_text = await ai_service.polish_script(script.processed_text)
         else:
-            script.processed_text = AIService.polish_script(script.original_text)
+            script.processed_text = await ai_service.polish_script(script.original_text)
 
     @staticmethod
     async def _update_task(task_id: str, **kwargs) -> Optional[ProcessingTask]:

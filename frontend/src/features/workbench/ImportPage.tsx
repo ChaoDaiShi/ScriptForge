@@ -22,6 +22,7 @@ import { useProjectStore } from "@/store/useProjectStore";
 import { useScriptStore } from "@/store/useScriptStore";
 import { useTaskStore } from "@/store/useTaskStore";
 import { useToastStore } from "@/store/useToastStore";
+import { useNovelStore } from "@/store/useNovelStore";
 import mammoth from "mammoth";
 
 type ImportStep = "upload" | "preview" | "configure" | "converting";
@@ -55,6 +56,8 @@ export default function ImportPage() {
   const addTask = useTaskStore((s) => s.addTask);
   const updateTask = useTaskStore((s) => s.updateTask);
   const addToast = useToastStore((s) => s.addToast);
+  const addNovel = useNovelStore((s) => s.addNovel);
+  const setCurrentNovel = useNovelStore((s) => s.setCurrentNovel);
 
   const mapBackendScriptToWorkbench = (
     script: Awaited<ReturnType<typeof createScript>>,
@@ -352,6 +355,7 @@ export default function ImportPage() {
     setConvertProgress(0);
 
     const projectId = `proj_${Date.now().toString(36)}`;
+    const novelId = `novel_${Date.now().toString(36)}`;
     const project = {
       id: projectId,
       title: `新项目 (${chapters.length}章)`,
@@ -363,6 +367,37 @@ export default function ImportPage() {
     };
     addProject(project);
     setCurrentProject(projectId);
+
+    // 提取每章的内容并保存到NovelStore
+    const lines = pasteContent.split('\n');
+    const chaptersWithContent = chapters.map((ch) => {
+      let content = '';
+      if (ch.startPos !== undefined && ch.endPos !== undefined) {
+        content = lines.slice(ch.startPos, ch.endPos).join('\n');
+      }
+      return {
+        index: ch.index,
+        title: ch.title,
+        wordCount: ch.wordCount,
+        content,
+        startPos: ch.startPos,
+        endPos: ch.endPos,
+      };
+    });
+
+    const novelData = {
+      id: novelId,
+      projectId,
+      title: project.title,
+      author: "未知作者",
+      totalChapters: chapters.length,
+      totalWordCount: pasteContent.length,
+      chapters: chaptersWithContent,
+      fullText: pasteContent,
+      createdAt: new Date().toISOString(),
+    };
+    addNovel(novelData);
+    setCurrentNovel(novelId);
 
     try {
       const script = await createScript({
