@@ -77,9 +77,6 @@ export default function Workbench() {
 
   const { isGenerating, setGenerating } = useAIStore();
   const {
-    leftPaneWidth,
-    centerPaneWidth,
-    rightPaneWidth,
     setLeftPaneWidth,
     setCenterPaneWidth,
     setRightPaneWidth,
@@ -90,10 +87,10 @@ export default function Workbench() {
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-background text-foreground">
-      <section className="border-b border-[rgba(94,72,58,0.08)] px-4 py-4 md:px-6">
+      <section className="border-b border-[rgba(94,72,58,0.08)] bg-gradient-to-b from-white/40 to-transparent px-5 py-5">
         <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
           <div className="space-y-2">
-            <div className="inline-flex items-center gap-2 rounded-full border border-[--line-soft] bg-white/55 px-3 py-1 text-xs font-medium uppercase tracking-[0.24em] text-[--text-subtle] backdrop-blur-xl">
+            <div className="inline-flex items-center gap-2 rounded-full border border-[var(--line-soft)] bg-white/60 px-3 py-1 text-xs font-medium uppercase tracking-[0.20em] text-[--text-subtle]">
               <Sparkles className="h-3.5 w-3.5 text-[--accent-soft]" />
               AI 剧本工作台
             </div>
@@ -101,17 +98,17 @@ export default function Workbench() {
               <h1 className="font-serif text-3xl tracking-tight text-foreground">
                 Episode 01 · 潮汐以下
               </h1>
-              <p className="mt-1 max-w-3xl text-sm text-[--text-subtle]">
+              <p className="mt-1.5 max-w-3xl text-sm leading-relaxed text-[--text-subtle]">
                 三栏联动编辑当前冷开场与前两场戏，左侧参考原著上下文，中间打磨节拍，右侧接管 AI 协作、YAML 结构与版本回溯。
               </p>
             </div>
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-2 xl:flex xl:items-center">
+          <div className="flex flex-wrap items-center gap-3">
             <WorkbenchMetric label="解析进度" value="68%" hint="9 / 13 场已结构化" accent />
             <WorkbenchMetric label="版本快照" value="10" hint="自动保留最近编辑记录" />
             <Button
-              className="h-11 rounded-full bg-[--accent-soft] px-5 text-[#091018] hover:bg-[--accent-strong]"
+              className="h-10 rounded-full bg-[--accent-soft] px-5 text-white shadow-[0_8px_20px_rgba(185,125,92,0.30)] hover:bg-[--accent-soft]/90 hover:shadow-[0_12px_28px_rgba(185,125,92,0.35)] transition-all duration-200"
               onClick={() => setGenerating(!isGenerating)}
             >
               {isGenerating ? (
@@ -130,16 +127,16 @@ export default function Workbench() {
         </div>
       </section>
 
-      <div className="min-h-0 flex-1 overflow-hidden px-3 pb-3 pt-3 md:px-4 md:pb-4">
-        <div className="h-full overflow-hidden rounded-[28px] border border-[rgba(94,72,58,0.1)] bg-[linear-gradient(180deg,rgba(255,255,255,0.76),rgba(255,255,255,0.42))] shadow-[0_30px_90px_rgba(94,72,58,0.12)] backdrop-blur-2xl">
-          <Group orientation="horizontal" className="h-full">
+      <div className="min-h-0 flex-1 overflow-hidden p-3 md:p-4">
+        <div className="h-full overflow-hidden rounded-2xl border border-[var(--line-medium)] bg-white/60 shadow-[var(--shadow-surface)]">
+          <Group orientation="horizontal" className="flex h-full">
             <Panel
-              defaultSize={leftPaneWidth}
-              minSize={16}
-              maxSize={28}
+              defaultSize={33.3}
+              minSize={18}
+              maxSize={45}
               onResize={(size) => setLeftPaneWidth(Number(size))}
             >
-              <div className="panel-shell h-full overflow-auto">
+              <div className="pane-shell">
                 <PaneTitle
                   icon={<FileText className="h-4 w-4" />}
                   eyebrow="Context"
@@ -147,8 +144,8 @@ export default function Workbench() {
                   description="只读参考区，维持信息完整与情绪一致。"
                 />
 
-                <div className="space-y-5">
-                  <section className="panel-card">
+                <div className="space-y-4">
+                  <section className="pane-card">
                     <SectionLabel label="原著映射" action="自动高亮" />
                     <div className="space-y-3 text-sm leading-7 text-[--text-subtle]">
                       {sourceParagraphs.map((paragraph, index) => (
@@ -167,7 +164,7 @@ export default function Workbench() {
                     </div>
                   </section>
 
-                  <section className="panel-card">
+                  <section className="pane-card">
                     <SectionLabel label="人物档案" action="3 角色在线" />
                     <div className="space-y-3">
                       {characterCards.map((character) => (
@@ -194,7 +191,7 @@ export default function Workbench() {
                     </div>
                   </section>
 
-                  <section className="panel-card">
+                  <section className="pane-card">
                     <SectionLabel label="四幕进度" action="Cold Open 进行中" />
                     <div className="space-y-3">
                       {outlineSteps.map((step, index) => (
@@ -231,11 +228,12 @@ export default function Workbench() {
             <Separator className="resize-handle" />
 
             <Panel
-              defaultSize={centerPaneWidth}
-              minSize={38}
+              defaultSize={33.3}
+              minSize={18}
+              maxSize={45}
               onResize={(size) => setCenterPaneWidth(Number(size))}
             >
-              <div className="panel-shell h-full overflow-auto">
+              <div className="pane-shell">
                 <PaneTitle
                   icon={<WandSparkles className="h-4 w-4" />}
                   eyebrow="Visual Editor"
@@ -243,7 +241,7 @@ export default function Workbench() {
                   description="以剧本原子化结构编辑集、场景与节拍。"
                 />
 
-                <section className="panel-card mb-5 overflow-hidden">
+                <section className="pane-card mb-5 overflow-hidden">
                   <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                     <div>
                       <p className="text-xs uppercase tracking-[0.22em] text-[--text-faint]">
@@ -350,12 +348,12 @@ export default function Workbench() {
             <Separator className="resize-handle" />
 
             <Panel
-              defaultSize={rightPaneWidth}
-              minSize={22}
-              maxSize={36}
+              defaultSize={33.4}
+              minSize={18}
+              maxSize={45}
               onResize={(size) => setRightPaneWidth(Number(size))}
             >
-              <div className="panel-shell h-full overflow-auto">
+              <div className="pane-shell">
                 <PaneTitle
                   icon={<MessageSquareText className="h-4 w-4" />}
                   eyebrow="Inspector"
@@ -386,7 +384,7 @@ export default function Workbench() {
 
                 {inspectorTab === "assistant" ? (
                   <div className="space-y-4">
-                    <section className="panel-card">
+                    <section className="pane-card">
                       <SectionLabel label="协同副驾" action={isGenerating ? "流式生成中" : "已待命"} />
                       <div className="rounded-2xl border border-[--accent-soft]/20 bg-[linear-gradient(180deg,rgba(255,255,255,0.78),rgba(240,223,211,0.44))] p-4">
                         <p className="text-sm leading-7 text-foreground">
@@ -407,7 +405,7 @@ export default function Workbench() {
                       </div>
                     </section>
 
-                    <section className="panel-card">
+                    <section className="pane-card">
                       <SectionLabel label="局部修改建议" action="点击即用" />
                       <div className="space-y-2.5">
                         {assistantSuggestions.map((suggestion) => (
@@ -428,7 +426,7 @@ export default function Workbench() {
                       </div>
                     </section>
 
-                    <section className="panel-card">
+                    <section className="pane-card">
                       <SectionLabel label="Schema 校验" action="自动修复开启" />
                       <div className="space-y-3 text-sm">
                         <StatusRow
@@ -448,14 +446,14 @@ export default function Workbench() {
 
                 {inspectorTab === "yaml" ? (
                   <div className="space-y-4">
-                    <section className="panel-card">
+                    <section className="pane-card">
                       <SectionLabel label="底层结构源" action="只展示当前集" />
                       <pre className="overflow-x-auto rounded-2xl border border-[rgba(94,72,58,0.08)] bg-[rgba(255,255,255,0.62)] p-4 text-xs leading-6 text-foreground">
                         <code>{yamlSnippet}</code>
                       </pre>
                     </section>
 
-                    <section className="panel-card">
+                    <section className="pane-card">
                       <SectionLabel label="编译提示" action="JSON Schema" />
                       <div className="rounded-2xl border border-amber-500/24 bg-amber-100/70 p-4 text-sm text-amber-900">
                         若手动编辑 YAML 出现缩进或字段缺失，右侧将即时标记并尝试自动修正，再同步回可视化卡片。
@@ -466,7 +464,7 @@ export default function Workbench() {
 
                 {inspectorTab === "history" ? (
                   <div className="space-y-4">
-                    <section className="panel-card">
+                    <section className="pane-card">
                       <SectionLabel label="最近 10 步" action="Diff 可回退" />
                       <div className="space-y-3">
                         {revisions.map((revision) => (

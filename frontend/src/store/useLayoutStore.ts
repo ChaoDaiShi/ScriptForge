@@ -14,10 +14,10 @@ interface LayoutState {
 export const useLayoutStore = create<LayoutState>((set) => ({
   sidebarOpen: true,
   toggleSidebar: () => set((state) => ({ sidebarOpen: !state.sidebarOpen })),
-  leftPaneWidth: 20,
+  leftPaneWidth: 33.3,
   setLeftPaneWidth: (width) => set({ leftPaneWidth: width }),
-  centerPaneWidth: 50,
+  centerPaneWidth: 33.3,
   setCenterPaneWidth: (width) => set({ centerPaneWidth: width }),
-  rightPaneWidth: 30,
+  rightPaneWidth: 33.4,
   setRightPaneWidth: (width) => set({ rightPaneWidth: width }),
 }));

@@ -17,21 +17,21 @@ export default function Sidebar() {
 
   return (
     <aside
-      className={`relative flex h-full flex-col border-r border-[rgba(94,72,58,0.1)] bg-[linear-gradient(180deg,rgba(255,255,255,0.66)_0%,rgba(255,255,255,0.38)_100%)] backdrop-blur-xl transition-all duration-300 ${
-        sidebarOpen ? "w-[18rem]" : "w-[5.25rem]"
+      className={`relative flex h-full flex-col border-r border-[var(--line-soft)] bg-gradient-to-b from-white/[0.70] to-white/[0.40] backdrop-blur-xl transition-all duration-300 ${
+        sidebarOpen ? "w-[17rem]" : "w-[4.5rem]"
       }`}
     >
-      <div className="flex items-center justify-between border-b border-[rgba(94,72,58,0.08)] px-4 py-4">
+      <div className="flex items-center justify-between border-b border-[var(--line-soft)] px-4 py-4">
         <div className="flex items-center gap-3 overflow-hidden">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[linear-gradient(135deg,#f5d6c1,#c8906d)] text-lg font-bold text-white shadow-[0_10px_24px_rgba(185,125,92,0.24)]">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-[#f0d0ba] to-[#c8906d] text-base font-bold text-white shadow-[0_8px_20px_rgba(185,125,92,0.25)]">
             S
           </div>
           {sidebarOpen ? (
             <div className="min-w-0">
-              <div className="truncate font-serif text-2xl text-foreground">
+              <div className="truncate font-serif text-xl text-foreground">
                 ScriptForge
               </div>
-              <div className="mt-0.5 text-xs uppercase tracking-[0.24em] text-[--text-faint]">
+              <div className="mt-0.5 text-[10px] uppercase tracking-[0.28em] text-[--text-faint]">
                 narrative os
               </div>
             </div>
@@ -40,7 +40,7 @@ export default function Sidebar() {
         <button
           type="button"
           onClick={toggleSidebar}
-          className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-[rgba(94,72,58,0.08)] bg-white/45 text-[--text-subtle] transition-colors hover:bg-white/70 hover:text-foreground"
+          className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-[var(--line-soft)] bg-white/50 text-[--text-subtle] transition-colors hover:bg-white/80 hover:text-foreground"
           aria-label={sidebarOpen ? "Collapse sidebar" : "Expand sidebar"}
         >
           <PanelLeftClose
@@ -50,7 +50,7 @@ export default function Sidebar() {
       </div>
 
       <div className="px-3 pt-4">
-        <div className="rounded-[24px] border border-[rgba(94,72,58,0.08)] bg-white/44 p-3 shadow-[0_12px_24px_rgba(94,72,58,0.08)] backdrop-blur-xl">
+        <div className="rounded-xl border border-[var(--line-soft)] bg-white/50 p-3">
           <div className="flex items-center gap-2 text-sm text-foreground">
             <Sparkles className="size-4 text-[--accent-soft]" />
             {sidebarOpen ? "Current sprint" : null}
@@ -66,7 +66,7 @@ export default function Sidebar() {
         </div>
       </div>
 
-      <nav className="mt-4 flex flex-1 flex-col gap-2 px-3">
+      <nav className="mt-4 flex flex-1 flex-col gap-1 px-3">
         <SidebarItem
           to="/workbench"
           icon={<LayoutDashboard size={20} />}
@@ -99,7 +99,7 @@ export default function Sidebar() {
         />
       </nav>
 
-      <div className="mt-auto border-t border-[rgba(94,72,58,0.08)] p-3">
+      <div className="mt-auto border-t border-[var(--line-soft)] p-3">
         <SidebarItem
           to="/settings"
           icon={<Settings size={20} />}
@@ -126,9 +126,9 @@ function SidebarItem({
     <NavLink
       to={to}
       className={({ isActive }) =>
-        `flex items-center gap-3 rounded-2xl px-3 py-3 transition-all ${
+        `flex items-center gap-3 rounded-xl px-3 py-2.5 transition-all ${
           isActive
-            ? "bg-[linear-gradient(135deg,rgba(255,255,255,0.82),rgba(255,244,236,0.64))] text-foreground shadow-[0_14px_32px_rgba(94,72,58,0.12)]"
+            ? "bg-gradient-to-r from-white/80 to-white/40 text-foreground shadow-[0_8px_20px_rgba(94,72,58,0.08)]"
             : "text-[--text-subtle] hover:bg-white/50 hover:text-foreground"
         }`
       }
