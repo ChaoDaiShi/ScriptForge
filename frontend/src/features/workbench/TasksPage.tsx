@@ -1,256 +1,249 @@
-import type { ReactNode } from "react";
 import {
-  Activity,
-  AlertTriangle,
-  ArrowRight,
-  Bot,
+  CheckSquare,
+  Clock,
+  AlertCircle,
   CheckCircle2,
-  HardDriveUpload,
-  Link2,
+  Loader2,
+  Trash2,
+  RefreshCw,
 } from "lucide-react";
+import { useEffect, useState } from "react";
+import { deleteTask, fetchTasks, retryTask } from "@/lib/api";
+import { useTaskStore, type TaskItem } from "@/store/useTaskStore";
+import { useToastStore } from "@/store/useToastStore";
 
-import { queueMetrics, taskColumns } from "./workbench-data";
+const statusConfig = {
+  queued: { icon: Clock, label: "排队中", color: "text-(--text-faint)" },
+  running: { icon: Loader2, label: "运行中", color: "text-(--accent-soft)" },
+  review: { icon: AlertCircle, label: "待审核", color: "text-amber-500" },
+  done: { icon: CheckCircle2, label: "已完成", color: "text-emerald-500" },
+  failed: { icon: AlertCircle, label: "失败", color: "text-red-400" },
+};
 
-const priorityStyles = {
-  P0: "bg-rose-300/14 text-rose-100",
-  P1: "bg-[--accent-soft]/14 text-[--accent-soft]",
-  P2: "bg-white/10 text-[--text-subtle]",
-} as const;
+const columns: { key: TaskItem["status"]; label: string; count: number }[] = [
+  { key: "queued", label: "排队中", count: 0 },
+  { key: "running", label: "运行中", count: 0 },
+  { key: "review", label: "待审核", count: 0 },
+  { key: "done", label: "已完成", count: 0 },
+];
 
-export default function TasksPage() {
+function TaskCard({ task }: { task: TaskItem }) {
+  const removeTask = useTaskStore((s) => s.removeTask);
+  const addTask = useTaskStore((s) => s.addTask);
+  const addToast = useToastStore((s) => s.addToast);
+  const status = statusConfig[task.status];
+  const StatusIcon = status.icon;
+
+  const handleRetry = async () => {
+    try {
+      const nextTask = await retryTask(task.id);
+      addTask(nextTask);
+      addToast({ type: "success", title: "已重新创建任务" });
+    } catch (error) {
+      addToast({
+        type: "error",
+        title: "重试失败",
+        message: error instanceof Error ? error.message : "未知错误",
+      });
+    }
+  };
+
+  const handleDelete = async () => {
+    try {
+      await deleteTask(task.id);
+      removeTask(task.id);
+      addToast({ type: "success", title: "任务已删除" });
+    } catch (error) {
+      addToast({
+        type: "error",
+        title: "删除失败",
+        message: error instanceof Error ? error.message : "未知错误",
+      });
+    }
+  };
+
   return (
-    <PageFrame
-      eyebrow="Task Center"
-      title="任务调度中心"
-      description="面向 B 端团队的批处理大盘，追踪排队、推理、校验与人工接力状态。"
-      badge="批处理模式"
-    >
-      <div className="grid gap-4 md:grid-cols-3">
-        {queueMetrics.map((metric, index) => (
-          <MetricCard
-            key={metric.label}
-            label={metric.label}
-            value={metric.value}
-            detail={metric.detail}
-            accent={index === 1}
-          />
-        ))}
-      </div>
-
-      <div className="mt-5 grid gap-4 xl:grid-cols-4">
-        {taskColumns.map((column) => (
-          <section key={column.key} className="surface-card flex min-h-[20rem] flex-col">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <h2 className="text-lg font-semibold text-white">{column.label}</h2>
-                <p className="mt-1 text-xs uppercase tracking-[0.22em] text-[--text-faint]">
-                  {column.count} items
-                </p>
-              </div>
-              <span className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-xs text-[--text-subtle]">
-                {column.key === "running" ? "live" : "board"}
-              </span>
-            </div>
-
-            <div className="mt-4 flex flex-1 flex-col gap-3">
-              {column.items.map((task) => (
-                <article
-                  key={task.id}
-                  className="rounded-[24px] border border-white/8 bg-black/10 p-4 transition hover:border-white/14 hover:bg-white/[0.04]"
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <h3 className="text-sm font-medium leading-6 text-white">
-                      {task.title}
-                    </h3>
-                    <span
-                      className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${priorityStyles[task.priority]}`}
-                    >
-                      {task.priority}
-                    </span>
-                  </div>
-
-                  <div className="mt-4 flex items-center justify-between text-xs text-[--text-subtle]">
-                    <span className="inline-flex items-center gap-1.5">
-                      <Activity className="h-3.5 w-3.5" />
-                      {task.owner}
-                    </span>
-                    <span>{task.eta}</span>
-                  </div>
-                </article>
-              ))}
-            </div>
-          </section>
-        ))}
-      </div>
-
-      <section className="surface-card mt-5">
-        <SectionHeader
-          icon={<HardDriveUpload className="h-4 w-4" />}
-          title="故障反馈与重排队"
-          detail="集中查看容错日志、回调状态和异常任务重试入口。"
-          action="打开处理日志"
-        />
-
-        <div className="mt-5 grid gap-4 lg:grid-cols-2">
-          <StatusCard
-            icon={<CheckCircle2 className="h-4 w-4 text-emerald-300" />}
-            title="Queue health stable"
-            detail="最近 6 次运行都在阈值范围内，平均延迟保持在 4.2 分钟左右。"
-          />
-          <StatusCard
-            icon={<AlertTriangle className="h-4 w-4 text-amber-300" />}
-            title="1 个任务等待重试"
-            detail="《无声回廊》YAML 导出在 Schema 校验阶段失败，可一键重排队列。"
-          />
+    <div className="rounded-xl border border-(--line-soft) bg-white px-4 py-3 text-sm shadow-sm transition-all hover:shadow-md hover:border-(--line-medium) animate-scale-in">
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0 flex-1">
+          <p className="font-medium text-foreground truncate">{task.title}</p>
+          <p className="mt-1 text-xs text-(--text-subtle) capitalize">
+            {task.type === "convert"
+              ? "AI 转换"
+              : task.type === "export"
+                ? "导出"
+                : "润色"}
+          </p>
         </div>
-
-        <div className="mt-4 rounded-[24px] border border-white/8 bg-black/10 p-4">
-          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-            <div className="flex items-center gap-3">
-              <span className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.04] text-[--accent-soft]">
-                <Link2 className="h-4 w-4" />
-              </span>
-              <div>
-                <p className="text-sm font-medium text-white">
-                  Webhook 回调链路
-                </p>
-                <p className="mt-1 text-sm text-[--text-subtle]">
-                  生产回调成功率 99.1%，最近一次失败已进入自动重试。
-                </p>
-              </div>
-            </div>
+        <div className="flex items-center gap-1 shrink-0">
+          {(task.status === "review" || task.status === "failed") && (
             <button
               type="button"
-              className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-4 py-2 text-sm text-[--text-subtle] transition hover:bg-white/[0.08] hover:text-white"
+              onClick={handleRetry}
+              className="rounded-md p-1 text-(--text-faint) hover:text-(--accent-soft) hover:bg-(--accent-light) transition-colors"
+              title="重新排队"
             >
-              查看回调详情
-              <ArrowRight className="h-4 w-4" />
+              <RefreshCw className="h-3.5 w-3.5" />
             </button>
+          )}
+          <button
+            type="button"
+            onClick={handleDelete}
+            className="rounded-md p-1 text-(--text-faint) hover:text-red-400 hover:bg-red-50 transition-colors"
+            title="删除任务"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      </div>
+
+      {task.status === "running" && task.progress > 0 && (
+        <div className="mt-3">
+          <div className="flex items-center justify-between text-xs text-(--text-subtle) mb-1">
+            <span>进度</span>
+            <span>{task.progress}%</span>
+          </div>
+          <div className="h-1.5 overflow-hidden rounded-full bg-(--muted)">
+            <div
+              className="h-full rounded-full bg-(--accent-soft) transition-all duration-500"
+              style={{ width: `${task.progress}%` }}
+            />
           </div>
         </div>
-      </section>
-    </PageFrame>
+      )}
+
+      {task.status === "failed" && (
+        <p className="mt-2 text-xs text-red-400">处理失败，可点击重试</p>
+      )}
+
+      <div className="mt-3 flex items-center gap-2 text-xs text-(--text-faint)">
+        <StatusIcon
+          className={`h-3 w-3 ${status.color} ${task.status === "running" ? "animate-spin" : ""}`}
+        />
+        <span className={status.color}>{status.label}</span>
+      </div>
+    </div>
   );
 }
 
-function PageFrame({
-  eyebrow,
-  title,
-  description,
-  badge,
-  children,
-}: {
-  eyebrow: string;
-  title: string;
-  description: string;
-  badge: string;
-  children: ReactNode;
-}) {
+export default function TasksPage() {
+  const [isLoading, setIsLoading] = useState(true);
+  const tasks = useTaskStore((s) => s.tasks);
+  const setTasks = useTaskStore((s) => s.setTasks);
+  const addToast = useToastStore((s) => s.addToast);
+
+  useEffect(() => {
+    let active = true;
+
+    const loadTasks = async () => {
+      try {
+        const payload = await fetchTasks();
+        if (active) {
+          setTasks(payload.tasks);
+        }
+      } catch (error) {
+        if (active) {
+          addToast({
+            type: "error",
+            title: "加载任务失败",
+            message: error instanceof Error ? error.message : "未知错误",
+          });
+        }
+      } finally {
+        if (active) {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    void loadTasks();
+    const interval = window.setInterval(loadTasks, 3000);
+
+    return () => {
+      active = false;
+      window.clearInterval(interval);
+    };
+  }, [addToast, setTasks]);
+
+  const statCards = [
+    {
+      label: "排队中",
+      value: tasks.filter((t) => t.status === "queued").length,
+      desc: "等待处理",
+    },
+    {
+      label: "运行中",
+      value: tasks.filter((t) => t.status === "running").length,
+      desc: "正在转换",
+    },
+    {
+      label: "待审核",
+      value: tasks.filter((t) => t.status === "review").length,
+      desc: "等待人工确认",
+    },
+    {
+      label: "已完成",
+      value: tasks.filter((t) => t.status === "done").length,
+      desc: "本次会话",
+    },
+  ];
+
   return (
-    <div className="min-h-full overflow-auto bg-background px-4 py-5 md:px-6 md:py-6">
-      <div className="mx-auto max-w-[1520px]">
-        <header className="surface-card mb-5">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-            <div>
-              <p className="text-xs uppercase tracking-[0.24em] text-[--text-faint]">
-                {eyebrow}
-              </p>
-              <h1 className="mt-2 font-serif text-3xl text-white">{title}</h1>
-              <p className="mt-2 max-w-3xl text-sm text-[--text-subtle]">
-                {description}
-              </p>
-            </div>
-            <div className="inline-flex items-center gap-2 self-start rounded-full border border-[--accent-soft]/25 bg-[--accent-soft]/10 px-4 py-2 text-sm text-[--accent-soft]">
-              <Bot className="h-4 w-4" />
-              {badge}
-            </div>
+    <div className="page-container animate-fade-in">
+      <header className="page-header">
+        <p className="page-header-eyebrow">Task Center</p>
+        <h1 className="page-header-title">任务调度中心</h1>
+        <p className="page-header-description">
+          追踪排队、推理、校验与人工接力状态。
+          {isLoading ? "正在同步后端任务..." : tasks.length > 0 && `当前共 ${tasks.length} 个任务`}
+        </p>
+      </header>
+
+      {/* Stat Cards */}
+      <div className="grid gap-4 md:grid-cols-4 mb-6">
+        {statCards.map((m) => (
+          <div key={m.label} className="card animate-fade-in-up">
+            <p className="text-xs uppercase tracking-[0.22em] text-(--text-faint)">
+              {m.label}
+            </p>
+            <p className="mt-2 font-serif text-2xl text-foreground">
+              {m.value}
+            </p>
+            <p className="mt-1 text-xs text-(--text-subtle)">{m.desc}</p>
           </div>
-        </header>
-
-        {children}
+        ))}
       </div>
-    </div>
-  );
-}
 
-function MetricCard({
-  label,
-  value,
-  detail,
-  accent,
-}: {
-  label: string;
-  value: string;
-  detail: string;
-  accent?: boolean;
-}) {
-  return (
-    <div
-      className={`surface-card ${accent ? "bg-[linear-gradient(135deg,rgba(154,245,214,0.16),rgba(13,18,29,0.96))]" : ""}`}
-    >
-      <p className="text-xs uppercase tracking-[0.22em] text-[--text-faint]">
-        {label}
-      </p>
-      <div className="mt-3 flex items-end justify-between gap-4">
-        <span className="font-serif text-4xl text-white">{value}</span>
-        <span className="text-xs text-[--text-subtle]">{detail}</span>
-      </div>
-    </div>
-  );
-}
+      {/* Kanban Board */}
+      <div className="grid gap-4 md:grid-cols-4">
+        {columns.map((col) => {
+          const colTasks = tasks.filter((t) => t.status === col.key);
+          return (
+            <div key={col.key} className="card min-h-[200px] flex flex-col">
+              <div className="flex items-center justify-between mb-4">
+                <p className="text-sm font-medium text-foreground">
+                  {col.label}
+                </p>
+                <span className="text-xs text-(--text-faint)">
+                  {colTasks.length} 项
+                </span>
+              </div>
 
-function SectionHeader({
-  icon,
-  title,
-  detail,
-  action,
-}: {
-  icon: ReactNode;
-  title: string;
-  detail: string;
-  action?: string;
-}) {
-  return (
-    <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-      <div className="flex items-start gap-3">
-        <span className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-white/8 bg-white/[0.05] text-[--accent-soft]">
-          {icon}
-        </span>
-        <div>
-          <h2 className="text-lg font-semibold text-white">{title}</h2>
-          <p className="mt-1 text-sm text-[--text-subtle]">{detail}</p>
-        </div>
-      </div>
-      {action ? (
-        <button
-          type="button"
-          className="inline-flex items-center gap-2 self-start rounded-full border border-white/10 bg-white/[0.04] px-4 py-2 text-sm text-[--text-subtle] transition hover:bg-white/[0.08] hover:text-white"
-        >
-          {action}
-          <ArrowRight className="h-4 w-4" />
-        </button>
-      ) : null}
-    </div>
-  );
-}
-
-function StatusCard({
-  icon,
-  title,
-  detail,
-}: {
-  icon: ReactNode;
-  title: string;
-  detail: string;
-}) {
-  return (
-    <div className="rounded-[24px] border border-white/8 bg-black/10 p-4">
-      <div className="flex items-start gap-3">
-        <span className="mt-0.5">{icon}</span>
-        <div>
-          <p className="text-sm font-medium text-white">{title}</p>
-          <p className="mt-1 text-sm text-[--text-subtle]">{detail}</p>
-        </div>
+              <div className="flex-1 space-y-3">
+                {colTasks.length > 0 ? (
+                  colTasks.map((task) => <TaskCard key={task.id} task={task} />)
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-8 text-center">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-(--muted) mb-2">
+                      <CheckSquare className="h-4 w-4 text-(--text-faint)" />
+                    </div>
+                    <p className="text-xs text-(--text-faint)">暂无任务</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })}
       </div>
     </div>
   );

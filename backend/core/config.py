@@ -22,6 +22,8 @@ class Settings(BaseSettings):
 
     # Database settings
     database_url: Optional[str] = None
+    supabase_url: Optional[str] = None
+    supabase_key: Optional[str] = None
 
     # AI API settings
     ai_api_key: Optional[str] = None

@@ -23,7 +23,7 @@ async def create_script(request: ScriptCreateRequest):
     """
     try:
         script = await ScriptService.create_script(request)
-        return success_response(data=script.dict(), message="剧本创建成功")
+        return success_response(data=script.model_dump(mode="json"), message="剧本创建成功")
     except Exception as e:
         return error_response(message=str(e), code=500)
 
@@ -37,7 +37,7 @@ async def list_scripts(
     - type: 可选，按类型筛选
     """
     scripts = await ScriptService.list_scripts(type)
-    return success_response(data=[s.dict() for s in scripts])
+    return success_response(data=[s.model_dump(mode="json") for s in scripts])
 
 
 @router.get("/{script_id}", summary="获取剧本详情")
@@ -48,7 +48,7 @@ async def get_script(script_id: str):
     script = await ScriptService.get_script(script_id)
     if not script:
         return error_response(message="剧本不存在", code=404)
-    return success_response(data=script.dict())
+    return success_response(data=script.model_dump(mode="json"))
 
 
 @router.delete("/{script_id}", summary="删除剧本")
@@ -79,7 +79,7 @@ async def start_processing(script_id: str, background_tasks: BackgroundTasks):
         background_tasks.add_task(ScriptService.process_script, script_id, task.id)
         
         return success_response(
-            data=task.dict(),
+            data=task.model_dump(mode="json"),
             message="处理任务已启动"
         )
     except Exception as e:
@@ -92,7 +92,7 @@ async def get_tasks(script_id: str):
     获取剧本的所有处理任务
     """
     tasks = await ScriptService.get_tasks(script_id)
-    return success_response(data=[t.dict() for t in tasks])
+    return success_response(data=[t.model_dump(mode="json") for t in tasks])
 
 
 @router.get("/tasks/{task_id}", summary="获取单个处理任务")
@@ -103,7 +103,7 @@ async def get_task(task_id: str):
     task = await ScriptService.get_task(task_id)
     if not task:
         return error_response(message="任务不存在", code=404)
-    return success_response(data=task.dict())
+    return success_response(data=task.model_dump(mode="json"))
 
 
 @router.get("/{script_id}/export/json", summary="导出剧本为JSON格式")

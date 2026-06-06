@@ -1,631 +1,615 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import type { ReactNode } from "react";
 import {
-  AlertCircle,
-  ArrowRight,
-  Bot,
-  CheckCircle2,
-  Clock3,
-  Code2,
+  Sparkles,
   FileText,
+  Users,
+  ListTree,
+  WandSparkles,
+  Bot,
+  Code2,
   History,
   MessageSquareText,
-  Play,
-  Sparkles,
-  Users,
-  WandSparkles,
+  ChevronDown,
+  ChevronRight,
+  Send,
+  Lightbulb,
+  RotateCcw,
+  Copy,
+  Check,
+  Plus,
 } from "lucide-react";
-import { Group, Panel, Separator } from "react-resizable-panels";
-
-import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
-import { useAIStore } from "@/store/useAIStore";
-import { useLayoutStore } from "@/store/useLayoutStore";
 import { useScriptStore } from "@/store/useScriptStore";
-import { scenes } from "./workbench-data";
+import { useProjectStore } from "@/store/useProjectStore";
 
-type InspectorTab = "assistant" | "yaml" | "history";
+type AssistantTab = "chat" | "yaml" | "history";
 
-const sourceParagraphs = [
-  "凌晨四点，海港的雾把整座城压成一张未显影的底片。林澈抱着旧录音机站在第七码头尽头，像在等一个早已错过的人。",
-  "她知道今晚会有人来取走录音带，但那卷磁带里除了父亲留下的交易名单，还藏着一段被剪掉的求救。",
-  "码头广播在头顶沙沙作响，集装箱之间的脚步声越来越近。她抬头，看见巡逻灯切过海面，像一把迟到的刀。",
-];
+function CollapsibleSection({
+  title,
+  icon,
+  children,
+  defaultOpen = true,
+}: {
+  title: string;
+  icon: ReactNode;
+  children: ReactNode;
+  defaultOpen?: boolean;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <div className="mb-4">
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        className="flex w-full items-center gap-2 text-xs uppercase tracking-[0.22em] text-(--text-faint) mb-2"
+      >
+        {open ? (
+          <ChevronDown className="h-3 w-3" />
+        ) : (
+          <ChevronRight className="h-3 w-3" />
+        )}
+        <span className="inline-flex items-center gap-1.5">
+          {icon}
+          {title}
+        </span>
+      </button>
+      {open && children}
+    </div>
+  );
+}
 
-const characterCards = [
-  { name: "林澈", role: "女主 / 调查记者", trait: "克制、敏锐、善于逼近真相" },
-  { name: "周放", role: "刑警队长", trait: "理性、迟疑、与女主互信未明" },
-  { name: "裴竞", role: "反派代理人", trait: "优雅、危险、情绪难以预测" },
-];
-
-const outlineSteps = [
-  { label: "Cold Open", detail: "海港录音带交接失败", current: true },
-  { label: "Act 1", detail: "林澈确认泄密名单" },
-  { label: "Act 2", detail: "周放追查港口监控" },
-  { label: "Act 3", detail: "裴竞反向布局" },
-];
-
-const assistantSuggestions = [
-  "增强 Scene 01 的听觉焦虑，但保留女主的职业冷静。",
-  "把 Scene 02 的信息揭示改成更影视化的动作，而不是口头解释。",
-  "给裴竞增加一次不露脸的威胁性出场，放在 Cold Open 尾部。",
-];
-
-const yamlSnippet = `episode:
-  id: ep-01
-  title: 潮汐以下
-  cold_open:
-    objective: 让危险先于答案出现
-  scenes:
-    - id: scene-01
-      heading: EXT. 第七码头 - 黎明前
-      hook: 探照灯切开海面，反派抵达
-    - id: scene-02
-      heading: INT. 港务档案室 - 清晨
-      reveal: 名单被人为擦除`;
-
-const revisions = [
-  { time: "2 分钟前", title: "接受 AI 对 Scene 01 的情绪增强", status: "saved" },
-  { time: "11 分钟前", title: "手动调整 Cold Open 节奏", status: "saved" },
-  { time: "24 分钟前", title: "YAML 自动修复缩进错误", status: "warning" },
-];
+// AI Chat Message type
+interface ChatMessage {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+}
 
 export default function Workbench() {
-  const [inspectorTab, setInspectorTab] = useState<InspectorTab>("assistant");
-  const [hoveredSceneId, setHoveredSceneId] = useState<string | null>(null);
-  const [activePrompt, setActivePrompt] = useState(assistantSuggestions[0]);
+  const [assistantTab, setAssistantTab] = useState<AssistantTab>("chat");
+  const [chatInput, setChatInput] = useState("");
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [isAiTyping, setIsAiTyping] = useState(false);
+  const [copiedYaml, setCopiedYaml] = useState(false);
+  const chatEndRef = useRef<HTMLDivElement>(null);
+  const currentScript = useScriptStore((s) =>
+    s.scripts.find((scr) => scr.id === s.currentScriptId),
+  );
+  const projects = useProjectStore((s) => s.projects);
+  const activeProject = projects.find((p) => p.id === currentScript?.projectId);
 
-  const { isGenerating, setGenerating } = useAIStore();
-  const {
-    leftPaneWidth,
-    centerPaneWidth,
-    rightPaneWidth,
-    setLeftPaneWidth,
-    setCenterPaneWidth,
-    setRightPaneWidth,
-  } = useLayoutStore();
-  const { selectedSceneId, setSelectedSceneId } = useScriptStore();
+  const hasData = !!currentScript && currentScript.episodes.length > 0;
 
-  const currentScene = scenes.find((scene) => scene.id === selectedSceneId) ?? scenes[0];
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [chatMessages]);
+
+  const handleSendMessage = () => {
+    if (!chatInput.trim() || isAiTyping) return;
+    const userMsg: ChatMessage = {
+      id: `msg_${Date.now()}`,
+      role: "user",
+      content: chatInput.trim(),
+    };
+    setChatMessages((prev) => [...prev, userMsg]);
+    setChatInput("");
+    setIsAiTyping(true);
+
+    // Simulate AI response
+    const responses = [
+      "我建议在冷开场部分增加一个悬念钩子，比如让主角在开头发现一个异常信号，为后续情节埋下伏笔。",
+      "第三场景的情绪张力可以再强化一些。当前的对白偏叙述性，建议转换为更具冲突感的对话。",
+      "已分析当前节拍结构。检测到 Act 1 和 Act 2 之间的节奏过渡偏快，建议在中间增加一个过渡场景。",
+      "根据当前人物档案，反派的动机线尚未充分展开。建议在 Scene 4 增加一段内心独白来丰富角色层次。",
+    ];
+    setTimeout(
+      () => {
+        const aiMsg: ChatMessage = {
+          id: `msg_${Date.now()}_ai`,
+          role: "assistant",
+          content: responses[Math.floor(Math.random() * responses.length)],
+        };
+        setChatMessages((prev) => [...prev, aiMsg]);
+        setIsAiTyping(false);
+      },
+      1200 + Math.random() * 1000,
+    );
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      handleSendMessage();
+    }
+  };
+
+  const demoYaml = `# Episode 01 · 潮汐以下
+episode:
+  id: ep_01
+  title: "潮汐以下"
+  cold_open:
+    intent: "让危险先于答案出现"
+    scenes:
+      - id: sc_001
+        type: INT.
+        location: "深海勘探站 · 主控室"
+        time: "夜晚"
+        summary: "主角发现异常信号"
+        beats:
+          - type: action
+            description: "监控屏幕闪烁，警报灯旋转"
+          - type: dialogue
+            character: "林深"
+            line: "这个频率...不像是已知的海洋生物。"
+`;
 
   return (
-    <div className="flex h-full min-h-0 flex-col bg-background text-foreground">
-      <section className="border-b border-white/10 px-4 py-4 md:px-6">
-        <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-          <div className="space-y-2">
-            <div className="inline-flex items-center gap-2 rounded-full border border-[--line-soft] bg-white/5 px-3 py-1 text-xs font-medium uppercase tracking-[0.24em] text-[--text-subtle]">
-              <Sparkles className="h-3.5 w-3.5 text-[--accent-soft]" />
+    <div className="flex h-full min-h-0 flex-col">
+      {/* Header */}
+      <div className="border-b border-(--line-soft) px-6 py-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="flex items-center gap-1.5 text-xs uppercase tracking-[0.22em] text-(--text-faint)">
+              <Sparkles className="h-3 w-3 text-(--accent-soft)" />
               AI 剧本工作台
-            </div>
-            <div>
-              <h1 className="font-serif text-3xl tracking-tight text-white">
-                Episode 01 · 潮汐以下
-              </h1>
-              <p className="mt-1 max-w-3xl text-sm text-[--text-subtle]">
-                三栏联动编辑当前冷开场与前两场戏，左侧参考原著上下文，中间打磨节拍，右侧接管 AI 协作、YAML 结构与版本回溯。
+            </p>
+            <h1 className="mt-1 font-serif text-2xl text-foreground">
+              {activeProject?.title ?? "Episode 01 · 潮汐以下"}
+            </h1>
+          </div>
+          <div className="flex items-center gap-2">
+            {hasData ? (
+              <>
+                <span className="badge badge-primary">Cold Open</span>
+                <span className="badge badge-muted">
+                  {currentScript.episodes.reduce(
+                    (acc, ep) => acc + ep.scenes.length,
+                    0,
+                  )}{" "}
+                  场景
+                </span>
+              </>
+            ) : (
+              <>
+                <span className="badge badge-muted">等待导入</span>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* 3-Panel Grid */}
+      <div className="flex min-h-0 flex-1 gap-px bg-(--line-soft)">
+        {/* ===== Left Panel - Context ===== */}
+        <div className="flex w-72 flex-col overflow-y-auto bg-white p-4">
+          <CollapsibleSection
+            title="原著对照"
+            icon={<FileText className="h-3 w-3" />}
+          >
+            {hasData ? (
+              <div className="text-sm leading-6 text-(--text-subtle)">
+                <p className="text-foreground mb-2 font-medium">原著选段</p>
+                <p>
+                  "深海勘探站收到一组异常的声纳信号，频率模式不在任何已知数据库中。林深盯着屏幕，眉头紧锁。"
+                </p>
+              </div>
+            ) : (
+              <p className="text-sm leading-6 text-(--text-subtle)">
+                导入小说源文本后，此处将显示原始章节内容。
               </p>
+            )}
+          </CollapsibleSection>
+
+          <CollapsibleSection
+            title="人物档案"
+            icon={<Users className="h-3 w-3" />}
+          >
+            {hasData ? (
+              <div className="space-y-2">
+                {[
+                  "林深 · 海洋声呐工程师",
+                  "苏晚晴 · 深海生物学家",
+                  "陈默 · 勘探站站长",
+                ].map((name) => (
+                  <div
+                    key={name}
+                    className="flex items-center gap-2 rounded-lg border border-(--line-soft) px-3 py-2 text-sm"
+                  >
+                    <div className="flex h-6 w-6 items-center justify-center rounded-full bg-(--accent-light) text-xs text-(--accent-soft)">
+                      {name[0]}
+                    </div>
+                    <span className="text-xs text-foreground">{name}</span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm leading-6 text-(--text-subtle)">
+                AI 将从文本中自动提取人物角色及其关系。
+              </p>
+            )}
+          </CollapsibleSection>
+
+          <CollapsibleSection
+            title="故事大纲"
+            icon={<ListTree className="h-3 w-3" />}
+          >
+            <div className="space-y-3">
+              {["Cold Open", "Act 1", "Act 2", "Act 3"].map((step, i) => (
+                <div key={step} className="flex gap-3">
+                  <div className="flex flex-col items-center">
+                    <span
+                      className={`mt-1 h-2.5 w-2.5 rounded-full ${
+                        i === 0 && hasData
+                          ? "bg-(--accent-soft)"
+                          : "bg-(--line-medium)"
+                      }`}
+                    />
+                    {i < 3 && (
+                      <span className="mt-1.5 h-8 w-px bg-(--line-soft)" />
+                    )}
+                  </div>
+                  <div>
+                    <p className="text-sm text-foreground">{step}</p>
+                    <p className="text-xs text-(--text-subtle)">
+                      {hasData && i === 0 ? "3 场景" : "等待 AI 分析"}
+                    </p>
+                  </div>
+                </div>
+              ))}
             </div>
+          </CollapsibleSection>
+        </div>
+
+        {/* ===== Center Panel - Editor ===== */}
+        <div className="flex flex-1 flex-col overflow-y-auto bg-white p-4">
+          <div className="mb-4">
+            <p className="text-xs uppercase tracking-[0.22em] text-(--text-faint) mb-1">
+              Visual Editor
+            </p>
+            <h2 className="font-serif text-xl text-foreground">可视化编剧台</h2>
+            <p className="mt-0.5 text-sm text-(--text-subtle)">
+              以剧本原子化结构编辑集、场景与节拍。
+            </p>
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-2 xl:flex xl:items-center">
-            <WorkbenchMetric label="解析进度" value="68%" hint="9 / 13 场已结构化" accent />
-            <WorkbenchMetric label="版本快照" value="10" hint="自动保留最近编辑记录" />
-            <Button
-              className="h-11 rounded-full bg-[--accent-soft] px-5 text-[#091018] hover:bg-[--accent-strong]"
-              onClick={() => setGenerating(!isGenerating)}
-            >
-              {isGenerating ? (
+          {/* Episode Card */}
+          <div className="card mb-4">
+            <div className="flex items-center justify-between mb-3">
+              <div>
+                <p className="text-xs uppercase tracking-[0.22em] text-(--text-faint)">
+                  Episode Container
+                </p>
+                <p className="mt-1 text-sm text-foreground">
+                  {hasData ? "冷开场 · 让危险先于答案出现" : "暂无活跃项目"}
+                </p>
+              </div>
+              <span
+                className={`badge ${hasData ? "badge-primary" : "badge-muted"}`}
+              >
+                {hasData ? "已启用" : "等待导入"}
+              </span>
+            </div>
+
+            {hasData ? (
+              <div className="space-y-3 mt-4">
+                {["监控室异常信号", "深海取样遭遇", "通信中断危机"].map(
+                  (scene, i) => (
+                    <div
+                      key={scene}
+                      className="group flex items-start gap-3 rounded-xl border border-(--line-soft) px-4 py-3 hover:bg-(--muted) transition-colors cursor-pointer"
+                    >
+                      <span className="mt-1 flex h-5 w-5 shrink-0 items-center justify-center rounded bg-(--accent-light) text-xs text-(--accent-soft)">
+                        {i + 1}
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm text-foreground">{scene}</p>
+                        <p className="mt-0.5 text-xs text-(--text-subtle)">
+                          INT. 勘探站 · 3 节拍 · {120 + i * 30}s
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        className="mt-0.5 rounded-md p-1 text-(--text-faint) opacity-0 group-hover:opacity-100 hover:text-foreground hover:bg-white transition-all"
+                      >
+                        <Plus className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  ),
+                )}
+              </div>
+            ) : (
+              <p className="text-sm text-(--text-subtle) leading-6">
+                完成文本导入和 AI 转换后，场景结构将在此展示。
+              </p>
+            )}
+          </div>
+
+          {/* Empty or Scene Detail */}
+          {hasData ? (
+            <div className="flex-1 space-y-3">
+              {/* Current Scene Detail */}
+              <div className="rounded-xl border border-(--accent-soft)/30 bg-(--accent-light) px-4 py-3">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-xs font-medium text-(--accent-soft)">
+                    INT. 深海勘探站 · 主控室
+                  </span>
+                  <span className="text-xs text-(--text-faint)">夜晚</span>
+                </div>
+                <p className="text-sm text-foreground leading-6">
+                  林深盯着屏幕上跳动的波形，瞳孔微缩。这种频率...不像是已知的海洋生物。
+                </p>
+                <div className="mt-3 flex items-center gap-2">
+                  <button
+                    type="button"
+                    className="inline-flex items-center gap-1 rounded-md border border-(--line-soft) px-2.5 py-1 text-xs text-(--text-subtle) hover:text-foreground hover:bg-white transition-colors"
+                  >
+                    <WandSparkles className="h-3 w-3" />
+                    AI 润色
+                  </button>
+                  <button
+                    type="button"
+                    className="inline-flex items-center gap-1 rounded-md border border-(--line-soft) px-2.5 py-1 text-xs text-(--text-subtle) hover:text-foreground hover:bg-white transition-colors"
+                  >
+                    <Lightbulb className="h-3 w-3" />
+                    建议情绪
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="flex flex-1 items-center justify-center rounded-xl border-2 border-dashed border-(--line-soft) p-8">
+              <div className="text-center">
+                <WandSparkles className="mx-auto h-8 w-8 text-(--text-faint)" />
+                <p className="mt-3 text-sm text-(--text-subtle)">
+                  暂无场景数据
+                </p>
+                <p className="mt-1 text-xs text-(--text-faint)">
+                  通过"导入文本"开始新项目，或从已有项目继续编辑
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* ===== Right Panel - Assistant ===== */}
+        <div className="flex w-72 flex-col overflow-y-auto bg-white p-4">
+          {/* Tabs */}
+          <div className="mb-4 flex rounded-lg bg-(--muted) p-0.5">
+            {[
+              {
+                key: "chat" as const,
+                icon: <MessageSquareText className="h-3.5 w-3.5" />,
+                label: "AI",
+              },
+              {
+                key: "yaml" as const,
+                icon: <Code2 className="h-3.5 w-3.5" />,
+                label: "YAML",
+              },
+              {
+                key: "history" as const,
+                icon: <History className="h-3.5 w-3.5" />,
+                label: "历史",
+              },
+            ].map((tab) => (
+              <button
+                key={tab.key}
+                type="button"
+                onClick={() => setAssistantTab(tab.key)}
+                className={`flex flex-1 items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+                  assistantTab === tab.key
+                    ? "bg-white text-foreground shadow-sm"
+                    : "text-(--text-subtle) hover:text-foreground"
+                }`}
+              >
+                {tab.icon}
+                {tab.label}
+              </button>
+            ))}
+          </div>
+
+          {/* AI Chat Tab */}
+          {assistantTab === "chat" && (
+            <div className="flex flex-1 flex-col min-h-0">
+              <div className="flex-1 space-y-3 overflow-y-auto pr-1">
+                {chatMessages.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-8 text-center">
+                    <Bot className="h-8 w-8 text-(--text-faint) mb-2" />
+                    <p className="text-xs text-(--text-subtle) leading-5">
+                      AI 编剧助手将在此提供场景改写建议、情绪增强和结构优化。
+                    </p>
+                    {/* Suggested prompts */}
+                    <div className="mt-4 space-y-1.5 w-full">
+                      {[
+                        "分析当前场景节奏",
+                        "建议情绪增强点",
+                        "检查对白自然度",
+                      ].map((p) => (
+                        <button
+                          key={p}
+                          type="button"
+                          onClick={() => {
+                            setChatMessages([
+                              {
+                                id: `msg_${Date.now()}`,
+                                role: "user",
+                                content: p,
+                              },
+                            ]);
+                            setIsAiTyping(true);
+                            setTimeout(() => {
+                              setChatMessages((prev) => [
+                                ...prev,
+                                {
+                                  id: `msg_${Date.now()}_ai`,
+                                  role: "assistant",
+                                  content: `好的，我来${p.toLowerCase()}。根据当前剧本结构，建议在关键情节点增加视觉化的动作描写来替代部分内心独白，以增强画面感。`,
+                                },
+                              ]);
+                              setIsAiTyping(false);
+                            }, 1000);
+                          }}
+                          className="w-full rounded-lg border border-(--line-soft) px-3 py-2 text-xs text-(--text-subtle) hover:text-foreground hover:bg-(--muted) transition-colors text-left"
+                        >
+                          {p}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  chatMessages.map((msg) => (
+                    <div
+                      key={msg.id}
+                      className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"} animate-fade-in`}
+                    >
+                      <div
+                        className={`max-w-[85%] rounded-xl px-3 py-2 text-xs leading-5 ${
+                          msg.role === "user"
+                            ? "bg-(--accent-soft) text-white"
+                            : "bg-(--muted) text-foreground"
+                        }`}
+                      >
+                        {msg.content}
+                      </div>
+                    </div>
+                  ))
+                )}
+                {isAiTyping && (
+                  <div className="flex justify-start animate-fade-in">
+                    <div className="rounded-xl bg-(--muted) px-3 py-2 text-xs">
+                      <div className="flex gap-1">
+                        <span
+                          className="h-1.5 w-1.5 rounded-full bg-(--text-faint) animate-bounce"
+                          style={{ animationDelay: "0ms" }}
+                        />
+                        <span
+                          className="h-1.5 w-1.5 rounded-full bg-(--text-faint) animate-bounce"
+                          style={{ animationDelay: "200ms" }}
+                        />
+                        <span
+                          className="h-1.5 w-1.5 rounded-full bg-(--text-faint) animate-bounce"
+                          style={{ animationDelay: "400ms" }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+                <div ref={chatEndRef} />
+              </div>
+
+              {/* Chat Input */}
+              <div className="mt-3 flex items-end gap-2">
+                <textarea
+                  value={chatInput}
+                  onChange={(e) => setChatInput(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  placeholder="输入指令..."
+                  rows={1}
+                  className="flex-1 resize-none rounded-xl border border-(--line-medium) bg-white px-3 py-2 text-xs text-foreground placeholder:text-(--text-subtle) focus:outline-none focus:ring-2 focus:ring-(--accent-soft)/30 focus:border-(--accent-soft)"
+                />
+                <button
+                  type="button"
+                  onClick={handleSendMessage}
+                  disabled={!chatInput.trim() || isAiTyping}
+                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-(--accent-soft) text-white hover:bg-(--accent-soft)/90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  <Send className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* YAML Tab */}
+          {assistantTab === "yaml" && (
+            <div className="flex flex-1 flex-col min-h-0">
+              {hasData ? (
                 <>
-                  <Clock3 className="h-4 w-4" />
-                  生成中
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-xs text-(--text-subtle)">
+                      episode_01.yaml
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        navigator.clipboard.writeText(demoYaml);
+                        setCopiedYaml(true);
+                        setTimeout(() => setCopiedYaml(false), 2000);
+                      }}
+                      className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs text-(--text-subtle) hover:text-foreground hover:bg-(--muted) transition-colors"
+                    >
+                      {copiedYaml ? (
+                        <Check className="h-3 w-3 text-green-500" />
+                      ) : (
+                        <Copy className="h-3 w-3" />
+                      )}
+                      {copiedYaml ? "已复制" : "复制"}
+                    </button>
+                  </div>
+                  <pre className="flex-1 overflow-auto rounded-xl bg-[#0d1117] p-4 text-xs leading-5">
+                    <code className="text-[#e6edf3] font-mono">{demoYaml}</code>
+                  </pre>
                 </>
               ) : (
-                <>
-                  <Play className="h-4 w-4" />
-                  继续流式生成
-                </>
+                <div className="flex flex-1 items-center justify-center">
+                  <p className="text-xs text-(--text-subtle) leading-5">
+                    YAML 结构源代码视图。完成 AI
+                    转换后，剧本的底层数据结构将在此展示。
+                  </p>
+                </div>
               )}
-            </Button>
-          </div>
-        </div>
-      </section>
+            </div>
+          )}
 
-      <div className="min-h-0 flex-1 overflow-hidden px-3 pb-3 pt-3 md:px-4 md:pb-4">
-        <div className="h-full overflow-hidden rounded-[28px] border border-white/10 bg-[radial-gradient(circle_at_top,#1d2946_0%,#0f1522_32%,#090d16_72%)] shadow-[0_30px_90px_rgba(0,0,0,0.42)]">
-          <Group orientation="horizontal" className="h-full">
-            <Panel
-              defaultSize={leftPaneWidth}
-              minSize={16}
-              maxSize={28}
-              onResize={(size) => setLeftPaneWidth(Number(size))}
-            >
-              <div className="panel-shell h-full overflow-auto">
-                <PaneTitle
-                  icon={<FileText className="h-4 w-4" />}
-                  eyebrow="Context"
-                  title="原著与世界观"
-                  description="只读参考区，维持信息完整与情绪一致。"
-                />
-
-                <div className="space-y-5">
-                  <section className="panel-card">
-                    <SectionLabel label="原著映射" action="自动高亮" />
-                    <div className="space-y-3 text-sm leading-7 text-[--text-subtle]">
-                      {sourceParagraphs.map((paragraph, index) => (
-                        <p
-                          key={paragraph}
-                          className={cn(
-                            "rounded-2xl border px-4 py-3 transition-colors",
-                            index === 1
-                              ? "border-[--accent-soft]/40 bg-[--accent-soft]/10 text-slate-100"
-                              : "border-white/8 bg-white/[0.03]",
-                          )}
-                        >
-                          {paragraph}
+          {/* History Tab */}
+          {assistantTab === "history" && (
+            <div className="flex flex-1 flex-col min-h-0">
+              {hasData ? (
+                <div className="space-y-2">
+                  {[
+                    {
+                      version: "v1.3",
+                      time: "10 分钟前",
+                      desc: "Scene 3 情绪基调调整",
+                    },
+                    {
+                      version: "v1.2",
+                      time: "25 分钟前",
+                      desc: "Act 1 对白润色",
+                    },
+                    {
+                      version: "v1.1",
+                      time: "1 小时前",
+                      desc: "Cold Open 节拍重组",
+                    },
+                  ].map((v) => (
+                    <div
+                      key={v.version}
+                      className="flex items-center gap-3 rounded-xl border border-(--line-soft) px-3 py-2.5 hover:bg-(--muted) transition-colors cursor-pointer"
+                    >
+                      <div className="flex h-7 w-7 items-center justify-center rounded-md bg-(--accent-light) text-xs text-(--accent-soft) font-mono">
+                        {v.version}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs text-foreground truncate">
+                          {v.desc}
                         </p>
-                      ))}
+                        <p className="text-xs text-(--text-faint)">{v.time}</p>
+                      </div>
+                      <RotateCcw className="h-3 w-3 shrink-0 text-(--text-faint)" />
                     </div>
-                  </section>
-
-                  <section className="panel-card">
-                    <SectionLabel label="人物档案" action="3 角色在线" />
-                    <div className="space-y-3">
-                      {characterCards.map((character) => (
-                        <div
-                          key={character.name}
-                          className="rounded-2xl border border-white/8 bg-black/15 p-4"
-                        >
-                          <div className="flex items-start justify-between gap-3">
-                            <div>
-                              <h3 className="text-sm font-semibold text-slate-50">
-                                {character.name}
-                              </h3>
-                              <p className="mt-1 text-xs uppercase tracking-[0.18em] text-[--text-faint]">
-                                {character.role}
-                              </p>
-                            </div>
-                            <Users className="h-4 w-4 text-[--accent-soft]" />
-                          </div>
-                          <p className="mt-3 text-sm text-[--text-subtle]">
-                            {character.trait}
-                          </p>
-                        </div>
-                      ))}
-                    </div>
-                  </section>
-
-                  <section className="panel-card">
-                    <SectionLabel label="四幕进度" action="Cold Open 进行中" />
-                    <div className="space-y-3">
-                      {outlineSteps.map((step, index) => (
-                        <div key={step.label} className="flex gap-3">
-                          <div className="flex flex-col items-center">
-                            <span
-                              className={cn(
-                                "mt-1 h-3 w-3 rounded-full",
-                                step.current
-                                  ? "bg-[--accent-soft] shadow-[0_0_20px_rgba(154,245,214,0.55)]"
-                                  : "bg-white/20",
-                              )}
-                            />
-                            {index !== outlineSteps.length - 1 ? (
-                              <span className="mt-2 h-10 w-px bg-white/10" />
-                            ) : null}
-                          </div>
-                          <div className="pb-4">
-                            <p className="text-sm font-medium text-slate-50">
-                              {step.label}
-                            </p>
-                            <p className="mt-1 text-sm text-[--text-subtle]">
-                              {step.detail}
-                            </p>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </section>
+                  ))}
                 </div>
-              </div>
-            </Panel>
-
-            <Separator className="resize-handle" />
-
-            <Panel
-              defaultSize={centerPaneWidth}
-              minSize={38}
-              onResize={(size) => setCenterPaneWidth(Number(size))}
-            >
-              <div className="panel-shell h-full overflow-auto">
-                <PaneTitle
-                  icon={<WandSparkles className="h-4 w-4" />}
-                  eyebrow="Visual Editor"
-                  title="可视化编剧台"
-                  description="以剧本原子化结构编辑集、场景与节拍。"
-                />
-
-                <section className="panel-card mb-5 overflow-hidden">
-                  <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-                    <div>
-                      <p className="text-xs uppercase tracking-[0.22em] text-[--text-faint]">
-                        Episode Container
-                      </p>
-                      <h2 className="mt-2 font-serif text-2xl text-white">
-                        冷开场 · 让危险先于答案出现
-                      </h2>
-                      <p className="mt-2 max-w-2xl text-sm text-[--text-subtle]">
-                        片头目标是让观众先被环境威胁抓住，再通过录音带信息抛出“删除名单”的核心悬念。
-                      </p>
-                    </div>
-                    <div className="grid gap-2 sm:grid-cols-2">
-                      <Pill text="Cold Open 已启用" accent />
-                      <Pill text="悬念扣子密度：高" />
-                    </div>
-                  </div>
-                </section>
-
-                <div className="space-y-4">
-                  {scenes.map((scene) => {
-                    const isSelected = currentScene.id === scene.id;
-                    const isHovered = hoveredSceneId === scene.id;
-
-                    return (
-                      <article
-                        key={scene.id}
-                        className={cn("scene-card", isSelected && "scene-card-active")}
-                        onClick={() => setSelectedSceneId(scene.id)}
-                        onMouseEnter={() => setHoveredSceneId(scene.id)}
-                        onMouseLeave={() => setHoveredSceneId(null)}
-                      >
-                        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                          <div className="space-y-2">
-                            <div className="flex items-center gap-3">
-                              <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.24em] text-[--text-faint]">
-                                {scene.code}
-                              </span>
-                              <span className="text-xs text-[--text-subtle]">
-                                {scene.location}
-                              </span>
-                            </div>
-                            <h3 className="font-serif text-2xl text-white">
-                              {scene.title}
-                            </h3>
-                            <p className="max-w-2xl text-sm text-[--text-subtle]">
-                              {scene.intent}
-                            </p>
-                          </div>
-
-                          <div
-                            className={cn(
-                              "inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs transition-opacity",
-                              isHovered || isSelected
-                                ? "border-[--accent-soft]/40 bg-[--accent-soft]/10 text-[--accent-soft]"
-                                : "border-white/10 bg-white/[0.03] text-[--text-faint]",
-                            )}
-                          >
-                            <Bot className="h-3.5 w-3.5" />
-                            Inline Action 已就绪
-                          </div>
-                        </div>
-
-                        <div className="mt-6 space-y-3">
-                          {scene.beats.map((beat, index) => (
-                            <div
-                              key={`${scene.id}-${index}`}
-                              className={cn(
-                                "rounded-2xl border px-4 py-4 transition-colors",
-                                index === 1
-                                  ? "border-[--accent-soft]/20 bg-[linear-gradient(135deg,rgba(154,245,214,0.12),rgba(154,245,214,0.03))]"
-                                  : "border-white/10 bg-white/[0.035]",
-                              )}
-                            >
-                              <div className="flex items-center justify-between gap-3">
-                                <span className="text-[11px] uppercase tracking-[0.24em] text-[--text-faint]">
-                                  Beat {index + 1}
-                                </span>
-                                {(isHovered || isSelected) && index === 1 ? (
-                                  <div className="inline-flex items-center gap-2 text-xs text-[--accent-soft]">
-                                    <Sparkles className="h-3.5 w-3.5" />
-                                    AI 增写剧烈情绪
-                                  </div>
-                                ) : null}
-                              </div>
-                              <p
-                                className={cn(
-                                  "mt-3 text-sm leading-7",
-                                  index === 1 ? "text-slate-50" : "text-[--text-subtle]",
-                                )}
-                              >
-                                {beat}
-                              </p>
-                            </div>
-                          ))}
-                        </div>
-                      </article>
-                    );
-                  })}
+              ) : (
+                <div className="flex flex-1 items-center justify-center">
+                  <p className="text-xs text-(--text-subtle) leading-5">
+                    版本历史将追踪你对剧本的每一次修改，支持 Diff
+                    对比与一键回退。
+                  </p>
                 </div>
-              </div>
-            </Panel>
-
-            <Separator className="resize-handle" />
-
-            <Panel
-              defaultSize={rightPaneWidth}
-              minSize={22}
-              maxSize={36}
-              onResize={(size) => setRightPaneWidth(Number(size))}
-            >
-              <div className="panel-shell h-full overflow-auto">
-                <PaneTitle
-                  icon={<MessageSquareText className="h-4 w-4" />}
-                  eyebrow="Inspector"
-                  title="AI 协作与追溯"
-                  description="切换 AI 对话、底层结构与版本历史。"
-                />
-
-                <div className="mb-5 grid grid-cols-3 gap-2 rounded-2xl border border-white/10 bg-white/[0.03] p-1.5">
-                  <InspectorTabButton
-                    active={inspectorTab === "assistant"}
-                    icon={<Bot className="h-4 w-4" />}
-                    label="AI"
-                    onClick={() => setInspectorTab("assistant")}
-                  />
-                  <InspectorTabButton
-                    active={inspectorTab === "yaml"}
-                    icon={<Code2 className="h-4 w-4" />}
-                    label="YAML"
-                    onClick={() => setInspectorTab("yaml")}
-                  />
-                  <InspectorTabButton
-                    active={inspectorTab === "history"}
-                    icon={<History className="h-4 w-4" />}
-                    label="历史"
-                    onClick={() => setInspectorTab("history")}
-                  />
-                </div>
-
-                {inspectorTab === "assistant" ? (
-                  <div className="space-y-4">
-                    <section className="panel-card">
-                      <SectionLabel label="协同副驾" action={isGenerating ? "流式生成中" : "已待命"} />
-                      <div className="rounded-2xl border border-[--accent-soft]/20 bg-[linear-gradient(180deg,rgba(154,245,214,0.12),rgba(154,245,214,0.04))] p-4">
-                        <p className="text-sm leading-7 text-slate-100">
-                          我建议先强化 Scene 01 中“脚步声靠近”的听觉焦虑，再把裴竞的登场压到最后一拍，这样悬念扣子会更利落。
-                        </p>
-                        <div className="mt-4 flex flex-wrap gap-2">
-                          <Button size="sm" className="rounded-full bg-[--accent-soft] text-[#091018] hover:bg-[--accent-strong]">
-                            接受改写
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="rounded-full border-white/12 bg-transparent text-slate-200 hover:bg-white/8"
-                          >
-                            生成替代版本
-                          </Button>
-                        </div>
-                      </div>
-                    </section>
-
-                    <section className="panel-card">
-                      <SectionLabel label="局部修改建议" action="点击即用" />
-                      <div className="space-y-2.5">
-                        {assistantSuggestions.map((suggestion) => (
-                          <button
-                            key={suggestion}
-                            type="button"
-                            className={cn(
-                              "w-full rounded-2xl border px-4 py-3 text-left text-sm transition",
-                              activePrompt === suggestion
-                                ? "border-[--accent-soft]/40 bg-[--accent-soft]/10 text-slate-50"
-                                : "border-white/8 bg-black/10 text-[--text-subtle] hover:border-white/15 hover:bg-white/[0.04]",
-                            )}
-                            onClick={() => setActivePrompt(suggestion)}
-                          >
-                            {suggestion}
-                          </button>
-                        ))}
-                      </div>
-                    </section>
-
-                    <section className="panel-card">
-                      <SectionLabel label="Schema 校验" action="自动修复开启" />
-                      <div className="space-y-3 text-sm">
-                        <StatusRow
-                          icon={<CheckCircle2 className="h-4 w-4 text-emerald-300" />}
-                          title="当前片段结构有效"
-                          detail="Scene 01 和 Scene 02 均通过节拍字段校验。"
-                        />
-                        <StatusRow
-                          icon={<AlertCircle className="h-4 w-4 text-amber-300" />}
-                          title="发现 1 处命名可优化"
-                          detail="建议把 cold_open.objective 压缩为更可执行的拍摄目标。"
-                        />
-                      </div>
-                    </section>
-                  </div>
-                ) : null}
-
-                {inspectorTab === "yaml" ? (
-                  <div className="space-y-4">
-                    <section className="panel-card">
-                      <SectionLabel label="底层结构源" action="只展示当前集" />
-                      <pre className="overflow-x-auto rounded-2xl border border-white/10 bg-[#05070d] p-4 text-xs leading-6 text-slate-200">
-                        <code>{yamlSnippet}</code>
-                      </pre>
-                    </section>
-
-                    <section className="panel-card">
-                      <SectionLabel label="编译提示" action="JSON Schema" />
-                      <div className="rounded-2xl border border-amber-400/20 bg-amber-300/10 p-4 text-sm text-amber-50">
-                        若手动编辑 YAML 出现缩进或字段缺失，右侧将即时标记并尝试自动修正，再同步回可视化卡片。
-                      </div>
-                    </section>
-                  </div>
-                ) : null}
-
-                {inspectorTab === "history" ? (
-                  <div className="space-y-4">
-                    <section className="panel-card">
-                      <SectionLabel label="最近 10 步" action="Diff 可回退" />
-                      <div className="space-y-3">
-                        {revisions.map((revision) => (
-                          <div
-                            key={revision.title}
-                            className="rounded-2xl border border-white/8 bg-black/10 p-4"
-                          >
-                            <div className="flex items-center justify-between gap-3">
-                              <p className="text-sm font-medium text-slate-50">
-                                {revision.title}
-                              </p>
-                              <span
-                                className={cn(
-                                  "rounded-full px-2.5 py-1 text-[11px] uppercase tracking-[0.22em]",
-                                  revision.status === "saved"
-                                    ? "bg-emerald-300/10 text-emerald-200"
-                                    : "bg-amber-300/10 text-amber-100",
-                                )}
-                              >
-                                {revision.status}
-                              </span>
-                            </div>
-                            <p className="mt-2 text-sm text-[--text-subtle]">
-                              {revision.time}
-                            </p>
-                          </div>
-                        ))}
-                      </div>
-                    </section>
-                  </div>
-                ) : null}
-              </div>
-            </Panel>
-          </Group>
+              )}
+            </div>
+          )}
         </div>
-      </div>
-    </div>
-  );
-}
-
-function PaneTitle({
-  icon,
-  eyebrow,
-  title,
-  description,
-}: {
-  icon: ReactNode;
-  eyebrow: string;
-  title: string;
-  description: string;
-}) {
-  return (
-    <header className="mb-5">
-      <div className="flex items-center gap-2 text-xs uppercase tracking-[0.24em] text-[--text-faint]">
-        <span className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-white/10 bg-white/[0.05] text-[--accent-soft]">
-          {icon}
-        </span>
-        {eyebrow}
-      </div>
-      <h2 className="mt-3 font-serif text-2xl text-white">{title}</h2>
-      <p className="mt-1 text-sm text-[--text-subtle]">{description}</p>
-    </header>
-  );
-}
-
-function SectionLabel({ label, action }: { label: string; action: string }) {
-  return (
-    <div className="mb-4 flex items-center justify-between gap-3">
-      <p className="text-xs uppercase tracking-[0.22em] text-[--text-faint]">
-        {label}
-      </p>
-      <p className="text-xs text-[--text-subtle]">{action}</p>
-    </div>
-  );
-}
-
-function WorkbenchMetric({
-  label,
-  value,
-  hint,
-  accent,
-}: {
-  label: string;
-  value: string;
-  hint: string;
-  accent?: boolean;
-}) {
-  return (
-    <div
-      className={cn(
-        "rounded-2xl border px-4 py-3",
-        accent ? "border-[--accent-soft]/25 bg-[--accent-soft]/10" : "border-white/10 bg-white/[0.03]",
-      )}
-    >
-      <p className="text-xs uppercase tracking-[0.22em] text-[--text-faint]">
-        {label}
-      </p>
-      <p className="mt-1 text-xl font-semibold text-white">{value}</p>
-      <p className="mt-1 text-xs text-[--text-subtle]">{hint}</p>
-    </div>
-  );
-}
-
-function Pill({ text, accent }: { text: string; accent?: boolean }) {
-  return (
-    <span
-      className={cn(
-        "inline-flex items-center justify-center rounded-full border px-3 py-2 text-xs font-medium",
-        accent
-          ? "border-[--accent-soft]/30 bg-[--accent-soft]/12 text-[--accent-soft]"
-          : "border-white/10 bg-white/[0.04] text-[--text-subtle]",
-      )}
-    >
-      {text}
-    </span>
-  );
-}
-
-function InspectorTabButton({
-  active,
-  icon,
-  label,
-  onClick,
-}: {
-  active: boolean;
-  icon: ReactNode;
-  label: string;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cn(
-        "inline-flex items-center justify-center gap-2 rounded-xl px-3 py-2 text-sm font-medium transition",
-        active ? "bg-[--accent-soft] text-[#091018]" : "text-[--text-subtle] hover:bg-white/[0.05] hover:text-white",
-      )}
-    >
-      {icon}
-      {label}
-    </button>
-  );
-}
-
-function StatusRow({
-  icon,
-  title,
-  detail,
-}: {
-  icon: ReactNode;
-  title: string;
-  detail: string;
-}) {
-  return (
-    <div className="flex gap-3 rounded-2xl border border-white/8 bg-black/10 p-4">
-      <div className="mt-0.5">{icon}</div>
-      <div>
-        <p className="text-sm font-medium text-slate-50">{title}</p>
-        <p className="mt-1 text-sm text-[--text-subtle]">{detail}</p>
       </div>
     </div>
   );
@@ -633,21 +617,19 @@ function StatusRow({
 
 export function WorkbenchOverviewCard() {
   return (
-    <div className="rounded-[28px] border border-white/10 bg-[linear-gradient(135deg,rgba(154,245,214,0.16),rgba(17,24,39,0.24))] p-6 shadow-[0_24px_60px_rgba(0,0,0,0.28)]">
-      <div className="flex items-center justify-between gap-4">
-        <div>
-          <p className="text-xs uppercase tracking-[0.22em] text-[--text-faint]">
-            导向入口
-          </p>
-          <h3 className="mt-2 font-serif text-3xl text-white">
-            继续推进当前工作台
-          </h3>
-          <p className="mt-2 max-w-xl text-sm text-[--text-subtle]">
-            当前集已完成 68% 结构化。继续进入三栏沉浸式工作台，处理 AI 回写、YAML 校验与节拍润色。
-          </p>
-        </div>
-        <ArrowRight className="hidden h-10 w-10 text-[--accent-soft] md:block" />
+    <div className="card flex items-center justify-between gap-4 p-5 card-hover cursor-pointer">
+      <div>
+        <p className="text-xs uppercase tracking-[0.22em] text-(--text-faint)">
+          导向入口
+        </p>
+        <h3 className="mt-2 font-serif text-xl text-foreground">
+          继续推进当前工作台
+        </h3>
+        <p className="mt-1 max-w-xl text-sm text-(--text-subtle)">
+          进入沉浸式工作台，处理 AI 回写、YAML 校验与节拍润色。
+        </p>
       </div>
+      <Sparkles className="hidden h-8 w-8 text-(--accent-soft) md:block" />
     </div>
   );
 }

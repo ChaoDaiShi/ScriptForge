@@ -12,6 +12,7 @@ pydantic>=2.0.0
 # File handling
 python-multipart>=0.0.5
 pyyaml>=6.0.0
+<<<<<<< HEAD
 
 # Optional: Database support
 # supabase>=2.0.0
@@ -28,3 +29,6 @@ pyyaml>=6.0.0
 # black>=23.0.0
 # flake8>=6.0.0
 # isort>=5.12.0
+=======
+supabase>=2.5.1
+>>>>>>> 1a19f677ce4b02d919b7325195d2ecd7c223e003

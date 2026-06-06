@@ -116,3 +116,48 @@ class ScriptCreateRequest(BaseModel):
     title: str = Field(..., min_length=1, max_length=255, description="剧本标题")
     type: ScriptType = Field(..., description="剧本类型")
     text: str = Field(..., min_length=1, description="原始文本")
+
+
+class TaskListItem(BaseModel):
+    """任务列表项"""
+    id: str = Field(..., description="任务唯一标识")
+    script_id: str = Field(..., description="关联剧本ID")
+    script_title: str = Field(..., description="关联剧本标题")
+    title: str = Field(..., description="任务标题")
+    type: str = Field(default="convert", description="任务类型")
+    status: str = Field(..., description="前端展示状态")
+    progress: int = Field(..., ge=0, le=100, description="任务进度")
+    current_step: Optional[str] = Field(None, description="当前执行步骤")
+    error_message: Optional[str] = Field(None, description="错误信息")
+    created_at: datetime = Field(default_factory=datetime.now, description="创建时间")
+    updated_at: datetime = Field(default_factory=datetime.now, description="更新时间")
+
+
+class TaskPagination(BaseModel):
+    """分页信息"""
+    page: int = Field(..., ge=1)
+    size: int = Field(..., ge=1)
+    total: int = Field(..., ge=0)
+    pages: int = Field(..., ge=0)
+
+
+class TaskListResponse(BaseModel):
+    """任务列表响应数据"""
+    tasks: List[TaskListItem] = Field(default_factory=list)
+    pagination: TaskPagination
+
+
+class TaskDetailResponse(BaseModel):
+    """任务详情响应数据"""
+    task: TaskListItem
+
+
+class TaskCreateRequest(BaseModel):
+    """创建任务请求"""
+    script_id: str = Field(..., min_length=1, description="关联剧本ID")
+
+
+class TaskUpdateRequest(BaseModel):
+    """更新任务请求"""
+    status: Optional[str] = Field(None, description="任务状态")
+    priority: Optional[int] = Field(None, ge=0, description="预留优先级字段")
