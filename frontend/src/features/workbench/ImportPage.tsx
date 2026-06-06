@@ -125,7 +125,6 @@ export default function ImportPage() {
       /^[一二三四五六七八九十百千零\d]+[章节部回卷集]\s+.*/,
       // 日文格式
       /^[一二三四五六七八九十百千零\d]+[章節部回巻集]/,
-      /^\[[一二三四五六七八九十百千零\d]+[章節部回巻集]\]/,
       // 英文格式
       /^Chapter\s+\d+/i,
       /^Part\s+\d+/i,
@@ -139,26 +138,46 @@ export default function ImportPage() {
       // 简写格式
       /^[Cc]h\.\s*\d+/,
       /^[Vv]ol\.\s*\d+/,
-      // 括号包裹的章节
-      /^\([一二三四五六七八九十百千零\d]+\)/,
-      /^\([\d]+\)/,
-      /^\[[一二三四五六七八九十百千零\d]+\]/,
-      /^\[[\d]+\]/,
       // 数字开头的格式
       /^\d+\s*[章节部回卷集]/,
       /^\d+[\.\-\s][章节部回卷集]?/,
     ];
     
+    // 需要过滤的关键词
+    const filterKeywords = [
+      '插图', '插图页', 'color', 'COLOR', 'illustration', 'Illustration',
+      'postscript', 'Postscript', '后记', '序', '序章', '前言',
+      '目录', 'contents', 'Contents', 'CONTENTS',
+      '作者简介', '作者紹介', 'about the author'
+    ];
+    
     const detected: ChapterPreview[] = [];
     let currentChapter: ChapterPreview | null = null;
 
-    lines.forEach((line) => {
+    lines.forEach((line, lineIndex) => {
       const trimmed = line.trim();
       
       // 检查是否匹配任何章节模式
-      const isChapter = chapterPatterns.some((pattern) => pattern.test(trimmed));
+      const matchesPattern = chapterPatterns.some((pattern) => pattern.test(trimmed));
       
-      if (isChapter) {
+      // 额外的验证规则
+      const isValidChapter = matchesPattern && 
+        // 检查是否包含过滤关键词
+        !filterKeywords.some(keyword => trimmed.includes(keyword)) &&
+        // 检查是否包含特殊引号（如 『第一章』这种情况）
+        !/[『「【（『“”""]/.test(trimmed) &&
+        // 检查长度
+        trimmed.length <= 100 &&
+        // 检查是否为纯章节标题格式（避免误匹配普通文本）
+        (
+          // 明确有章节关键词的情况
+          /第[一二三四五六七八九十百千零\d]+[章节部回卷集]/.test(trimmed) ||
+          /[卷部篇][一二三四五六七八九十百千零\d]+/.test(trimmed) ||
+          /Chapter\s+\d+/i.test(trimmed) ||
+          /Volume\s+\d+/i.test(trimmed)
+        );
+      
+      if (isValidChapter) {
         // 保存前一个章节的字数
         if (currentChapter) {
           currentChapter.wordCount = currentChapter.wordCount;
@@ -167,7 +186,7 @@ export default function ImportPage() {
         // 开始新章节
         currentChapter = {
           index: detected.length + 1,
-          title: trimmed.slice(0, 60),
+          title: trimmed.slice(0, 80),
           wordCount: 0,
         };
         detected.push(currentChapter);

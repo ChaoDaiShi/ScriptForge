@@ -81,12 +81,41 @@ class LongTextProcessing(BaseModel):
             re.IGNORECASE
         )
         
+        # 需要过滤的关键词
+        filter_keywords = [
+            '插图', '插图页', 'color', 'COLOR', 'illustration', 'Illustration',
+            'postscript', 'Postscript', '后记', '序', '序章', '前言',
+            '目录', 'contents', 'Contents', 'CONTENTS',
+            '作者简介', '作者紹介', 'about the author'
+        ]
+        
         chapters = []
         current_chapter = None
         
         for i, line in enumerate(lines):
             trimmed = line.strip()
-            if chapter_regex.match(trimmed):
+            
+            # 检查是否匹配章节模式
+            matches_pattern = chapter_regex.match(trimmed)
+            
+            # 额外的验证规则
+            is_valid = matches_pattern and (
+                # 检查是否包含过滤关键词
+                not any(keyword in trimmed for keyword in filter_keywords) and
+                # 检查是否包含特殊引号
+                not any(char in trimmed for char in ['『', '「', '【', '（', '“', '"']) and
+                # 检查长度
+                len(trimmed) <= 100 and
+                # 检查是否为纯章节标题格式（避免误匹配普通文本）
+                (
+                    re.search(r'第[一二三四五六七八九十百千零\d]+[章节部回卷集]', trimmed) or
+                    re.search(r'[卷部篇][一二三四五六七八九十百千零\d]+', trimmed) or
+                    re.search(r'Chapter\s+\d+', trimmed, re.IGNORECASE) or
+                    re.search(r'Volume\s+\d+', trimmed, re.IGNORECASE)
+                )
+            )
+            
+            if is_valid:
                 # 保存前一个章节的字数
                 if current_chapter is not None:
                     current_chapter['word_count'] = current_chapter['end_pos'] - current_chapter['start_pos']
@@ -95,7 +124,7 @@ class LongTextProcessing(BaseModel):
                 # 开始新章节
                 current_chapter = {
                     'index': len(chapters) + 1,
-                    'title': trimmed[:40],  # 限制标题长度
+                    'title': trimmed[:80],  # 限制标题长度
                     'start_pos': i,
                     'end_pos': i,
                     'word_count': 0
