@@ -1,6 +1,6 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 
-const DEFAULT_BACKEND_URL = "http://127.0.0.1:5000";
+const DEFAULT_BACKEND_URL = "http://127.0.0.1:8000";
 
 type ProxyRequest = IncomingMessage & {
   method?: string;
@@ -21,6 +21,14 @@ function resolveBackendUrl() {
     DEFAULT_BACKEND_URL;
 
   return rawUrl.replace(/\/+$/, "");
+}
+
+function resolveBackendApiPrefix() {
+  return (
+    process.env.BACKEND_API_PREFIX ??
+    process.env.VITE_BACKEND_API_PREFIX ??
+    "/api"
+  ).replace(/\/+$/, "");
 }
 
 function resolveTargetPath(pathParam: string | string[] | undefined) {
@@ -55,6 +63,7 @@ export default async function handler(
   response: ProxyResponse,
 ) {
   const backendUrl = resolveBackendUrl();
+  const backendApiPrefix = resolveBackendApiPrefix();
   const path = resolveTargetPath(request.query.path);
   const query = new URLSearchParams();
 
@@ -67,7 +76,7 @@ export default async function handler(
     values.forEach((item) => query.append(key, item));
   });
 
-  const targetUrl = new URL(`${backendUrl}${path}`);
+  const targetUrl = new URL(`${backendUrl}${backendApiPrefix}${path}`);
   query.forEach((value, key) => {
     targetUrl.searchParams.append(key, value);
   });

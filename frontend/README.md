@@ -14,13 +14,17 @@ Copy [`frontend/.env.example`](/Users/allure/Desktop/ScriptForge/frontend/.env.e
 
 ```env
 VITE_API_BASE_URL=/api
-VITE_BACKEND_URL=http://127.0.0.1:5000
-BACKEND_URL=http://127.0.0.1:5000
+VITE_BACKEND_URL=http://127.0.0.1:8000
+VITE_BACKEND_API_PREFIX=/api
+BACKEND_URL=http://127.0.0.1:8000
+BACKEND_API_PREFIX=/api
 ```
 
 Rules:
 
 - `VITE_API_BASE_URL` is the base URL used by browser code. In this repo it should normally stay `/api`.
 - `VITE_BACKEND_URL` is used by the local Vite dev proxy.
+- `VITE_BACKEND_API_PREFIX` is the backend route prefix expected by the FastAPI service. In this repo it should stay `/api`.
 - `BACKEND_URL` is used by the Vercel serverless proxy.
+- `BACKEND_API_PREFIX` is the backend route prefix used by the Vercel proxy.
 - If the backend itself already exposes routes under `/api`, point both backend URLs to that exact base, for example `https://your-backend.example.com/api`.
