@@ -23,7 +23,9 @@ export default function DashboardPage() {
             <p className="text-xs uppercase tracking-[0.22em] text-(--text-faint)">
               {s.label}
             </p>
-            <p className="mt-2 font-serif text-3xl text-foreground">{s.value}</p>
+            <p className="mt-2 font-serif text-3xl text-foreground">
+              {s.value}
+            </p>
             <p className="mt-1 text-xs text-(--text-subtle)">{s.detail}</p>
           </div>
         ))}
@@ -36,7 +38,9 @@ export default function DashboardPage() {
           </div>
           <div>
             <p className="text-sm font-medium text-foreground">API 密钥</p>
-            <p className="text-xs text-(--text-subtle) mt-0.5">在设置页面创建和管理 API 密钥</p>
+            <p className="text-xs text-(--text-subtle) mt-0.5">
+              在设置页面创建和管理 API 密钥
+            </p>
           </div>
         </div>
       </div>
@@ -48,7 +52,9 @@ export default function DashboardPage() {
           </div>
           <div>
             <p className="text-sm font-medium text-foreground">Webhook 回调</p>
-            <p className="text-xs text-(--text-subtle) mt-0.5">配置转换完成后的回调通知地址</p>
+            <p className="text-xs text-(--text-subtle) mt-0.5">
+              配置转换完成后的回调通知地址
+            </p>
           </div>
         </div>
       </div>

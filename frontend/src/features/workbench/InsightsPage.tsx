@@ -23,7 +23,9 @@ export default function InsightsPage() {
             <p className="text-xs uppercase tracking-[0.22em] text-(--text-faint)">
               {m.label}
             </p>
-            <p className="mt-2 font-serif text-3xl text-foreground">{m.value}</p>
+            <p className="mt-2 font-serif text-3xl text-foreground">
+              {m.value}
+            </p>
             <p className="mt-1 text-xs text-(--text-subtle)">{m.detail}</p>
           </div>
         ))}
@@ -33,7 +35,8 @@ export default function InsightsPage() {
         <BarChart3 className="empty-state-icon" />
         <h2 className="empty-state-title">暂无评估数据</h2>
         <p className="empty-state-description">
-          导入并完成 AI 转换后，系统将自动生成 IP 改编潜力评估报告，包括冲突密度分析、人物关系图谱和商业价值预测。
+          导入并完成 AI 转换后，系统将自动生成 IP
+          改编潜力评估报告，包括冲突密度分析、人物关系图谱和商业价值预测。
         </p>
       </div>
     </div>

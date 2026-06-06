@@ -66,12 +66,12 @@
 
     --radius: 0.75rem;
 
-    --accent-soft: #7BB8E8;
-    --accent-light: rgba(123, 184, 232, 0.10);
+    --accent-soft: #7bb8e8;
+    --accent-light: rgba(123, 184, 232, 0.1);
     --text-subtle: #999999;
-    --text-faint: #BBBBBB;
+    --text-faint: #bbbbbb;
     --line-soft: rgba(0, 0, 0, 0.06);
-    --line-medium: rgba(0, 0, 0, 0.10);
+    --line-medium: rgba(0, 0, 0, 0.1);
     --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.04);
     --shadow-surface: 0 2px 8px rgba(0, 0, 0, 0.04);
   }
@@ -86,13 +86,20 @@
     background: hsl(var(--background));
   }
   body {
-    font-family: "DM Sans", system-ui, -apple-system, sans-serif;
+    font-family:
+      "DM Sans",
+      system-ui,
+      -apple-system,
+      sans-serif;
     @apply bg-background text-foreground antialiased;
   }
   #root {
     @apply h-screen;
   }
-  h1, h2, h3, .font-serif {
+  h1,
+  h2,
+  h3,
+  .font-serif {
     font-family: "Fraunces", serif;
   }
 
@@ -187,7 +194,9 @@
     background: hsl(var(--card));
     padding: 1.25rem;
     box-shadow: var(--shadow-card);
-    transition: box-shadow 0.2s ease, border-color 0.2s ease;
+    transition:
+      box-shadow 0.2s ease,
+      border-color 0.2s ease;
   }
 
   .card:hover {

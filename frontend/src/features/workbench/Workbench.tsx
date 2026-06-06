@@ -35,7 +35,11 @@ function CollapsibleSection({
         onClick={() => setOpen(!open)}
         className="flex w-full items-center gap-2 text-xs uppercase tracking-[0.22em] text-(--text-faint) mb-2"
       >
-        {open ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+        {open ? (
+          <ChevronDown className="h-3 w-3" />
+        ) : (
+          <ChevronRight className="h-3 w-3" />
+        )}
         <span className="inline-flex items-center gap-1.5">
           {icon}
           {title}
@@ -74,19 +78,28 @@ export default function Workbench() {
       <div className="flex min-h-0 flex-1 gap-px bg-(--line-soft)">
         {/* Left Panel - Context */}
         <div className="flex w-72 flex-col overflow-y-auto bg-white p-4">
-          <CollapsibleSection title="原著对照" icon={<FileText className="h-3 w-3" />}>
+          <CollapsibleSection
+            title="原著对照"
+            icon={<FileText className="h-3 w-3" />}
+          >
             <p className="text-sm leading-6 text-(--text-subtle)">
               导入小说源文本后，此处将显示原始章节内容。当前无活跃项目。
             </p>
           </CollapsibleSection>
 
-          <CollapsibleSection title="人物档案" icon={<Users className="h-3 w-3" />}>
+          <CollapsibleSection
+            title="人物档案"
+            icon={<Users className="h-3 w-3" />}
+          >
             <p className="text-sm leading-6 text-(--text-subtle)">
               AI 将从文本中自动提取人物角色及其关系。暂无数据。
             </p>
           </CollapsibleSection>
 
-          <CollapsibleSection title="故事大纲" icon={<ListTree className="h-3 w-3" />}>
+          <CollapsibleSection
+            title="故事大纲"
+            icon={<ListTree className="h-3 w-3" />}
+          >
             <div className="space-y-3">
               {["Cold Open", "Act 1", "Act 2", "Act 3"].map((step, i) => (
                 <div key={step} className="flex gap-3">
@@ -96,7 +109,9 @@ export default function Workbench() {
                         i === 0 ? "bg-(--accent-soft)" : "bg-(--line-medium)"
                       }`}
                     />
-                    {i < 3 && <span className="mt-1.5 h-8 w-px bg-(--line-soft)" />}
+                    {i < 3 && (
+                      <span className="mt-1.5 h-8 w-px bg-(--line-soft)" />
+                    )}
                   </div>
                   <div>
                     <p className="text-sm text-foreground">{step}</p>
@@ -133,16 +148,15 @@ export default function Workbench() {
               <span className="badge badge-primary">已启用</span>
             </div>
             <p className="text-sm text-(--text-subtle) leading-6">
-              完成文本导入和 AI 转换后，场景结构将在此展示。你可以对每个场景进行编辑、润色和重新排序。
+              完成文本导入和 AI
+              转换后，场景结构将在此展示。你可以对每个场景进行编辑、润色和重新排序。
             </p>
           </div>
 
           <div className="flex flex-1 items-center justify-center rounded-xl border-2 border-dashed border-(--line-soft) p-8">
             <div className="text-center">
               <WandSparkles className="mx-auto h-8 w-8 text-(--text-faint)" />
-              <p className="mt-3 text-sm text-(--text-subtle)">
-                暂无场景数据
-              </p>
+              <p className="mt-3 text-sm text-(--text-subtle)">暂无场景数据</p>
               <p className="mt-1 text-xs text-(--text-faint)">
                 通过"导入文本"开始新项目，或从已有项目继续编辑
               </p>
@@ -154,9 +168,21 @@ export default function Workbench() {
         <div className="flex w-72 flex-col overflow-y-auto bg-white p-4">
           <div className="mb-4 flex rounded-lg bg-(--muted) p-0.5">
             {[
-              { key: "chat", icon: <MessageSquareText className="h-3.5 w-3.5" />, label: "AI" },
-              { key: "yaml", icon: <Code2 className="h-3.5 w-3.5" />, label: "YAML" },
-              { key: "history", icon: <History className="h-3.5 w-3.5" />, label: "历史" },
+              {
+                key: "chat",
+                icon: <MessageSquareText className="h-3.5 w-3.5" />,
+                label: "AI",
+              },
+              {
+                key: "yaml",
+                icon: <Code2 className="h-3.5 w-3.5" />,
+                label: "YAML",
+              },
+              {
+                key: "history",
+                icon: <History className="h-3.5 w-3.5" />,
+                label: "历史",
+              },
             ].map((tab) => (
               <button
                 key={tab.key}
@@ -177,7 +203,8 @@ export default function Workbench() {
           {assistantTab === "chat" && (
             <div className="flex flex-1 flex-col">
               <p className="text-xs text-(--text-subtle) leading-5">
-                AI 编剧助手将在此提供场景改写建议、情绪增强和结构优化。开始导入文本以启用协作。
+                AI
+                编剧助手将在此提供场景改写建议、情绪增强和结构优化。开始导入文本以启用协作。
               </p>
             </div>
           )}
@@ -185,7 +212,9 @@ export default function Workbench() {
           {assistantTab === "yaml" && (
             <div className="flex flex-1 flex-col">
               <p className="text-xs text-(--text-subtle) leading-5">
-                YAML 结构源代码视图。完成 AI 转换后，剧本的底层数据结构将在此展示，支持手动编辑与 Schema 校验。
+                YAML 结构源代码视图。完成 AI
+                转换后，剧本的底层数据结构将在此展示，支持手动编辑与 Schema
+                校验。
               </p>
             </div>
           )}

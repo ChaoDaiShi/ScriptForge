@@ -40,7 +40,9 @@ export default function SettingsPage() {
             </div>
             <div>
               <p className="text-sm font-medium text-foreground">账户信息</p>
-              <p className="text-xs text-(--text-subtle)">登录后可查看账户详情</p>
+              <p className="text-xs text-(--text-subtle)">
+                登录后可查看账户详情
+              </p>
             </div>
           </div>
         </div>
@@ -54,9 +56,7 @@ export default function SettingsPage() {
               <div
                 key={plan.name}
                 className={`card relative ${
-                  plan.recommended
-                    ? "ring-1 ring-(--accent-soft)"
-                    : ""
+                  plan.recommended ? "ring-1 ring-(--accent-soft)" : ""
                 }`}
               >
                 {plan.recommended && (
@@ -64,11 +64,18 @@ export default function SettingsPage() {
                     推荐
                   </span>
                 )}
-                <p className="text-sm font-medium text-foreground">{plan.name}</p>
-                <p className="mt-2 font-serif text-2xl text-foreground">{plan.price}</p>
+                <p className="text-sm font-medium text-foreground">
+                  {plan.name}
+                </p>
+                <p className="mt-2 font-serif text-2xl text-foreground">
+                  {plan.price}
+                </p>
                 <ul className="mt-4 space-y-2">
                   {plan.features.map((f) => (
-                    <li key={f} className="flex items-center gap-2 text-xs text-(--text-subtle)">
+                    <li
+                      key={f}
+                      className="flex items-center gap-2 text-xs text-(--text-subtle)"
+                    >
                       <span className="text-(--accent-soft)">✓</span>
                       {f}
                     </li>
@@ -82,7 +89,11 @@ export default function SettingsPage() {
                       : "border border-(--line-medium) text-foreground hover:bg-(--muted)"
                   }`}
                 >
-                  {plan.recommended ? "升级到专业版" : plan.name === "企业版" ? "联系销售" : "当前方案"}
+                  {plan.recommended
+                    ? "升级到专业版"
+                    : plan.name === "企业版"
+                      ? "联系销售"
+                      : "当前方案"}
                 </button>
               </div>
             ))}

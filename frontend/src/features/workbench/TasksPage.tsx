@@ -1,4 +1,10 @@
-import { CheckSquare, Clock, AlertCircle, CheckCircle2, ArrowRight } from "lucide-react";
+import {
+  CheckSquare,
+  Clock,
+  AlertCircle,
+  CheckCircle2,
+  ArrowRight,
+} from "lucide-react";
 
 const statusConfig = {
   queued: { icon: Clock, label: "排队中", color: "text-(--text-faint)" },
@@ -37,7 +43,9 @@ export default function TasksPage() {
             <p className="text-xs uppercase tracking-[0.22em] text-(--text-faint)">
               {m.label}
             </p>
-            <p className="mt-2 font-serif text-2xl text-foreground">{m.value}</p>
+            <p className="mt-2 font-serif text-2xl text-foreground">
+              {m.value}
+            </p>
             <p className="mt-1 text-xs text-(--text-subtle)">{m.desc}</p>
           </div>
         ))}
@@ -48,7 +56,9 @@ export default function TasksPage() {
           <div key={col.key} className="card min-h-50">
             <div className="flex items-center justify-between mb-4">
               <p className="text-sm font-medium text-foreground">{col.label}</p>
-              <span className="text-xs text-(--text-faint)">{col.count} 项</span>
+              <span className="text-xs text-(--text-faint)">
+                {col.count} 项
+              </span>
             </div>
 
             <div className="flex flex-1 items-center justify-center py-8">

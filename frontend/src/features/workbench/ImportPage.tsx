@@ -22,7 +22,8 @@ export default function ImportPage() {
         </p>
         <h1 className="page-header-title">导入小说源文本</h1>
         <p className="page-header-description">
-          支持 TXT 文件上传或直接粘贴小说内容。系统将自动识别章节结构，最少需要 3 个章节才能进行转换。
+          支持 TXT 文件上传或直接粘贴小说内容。系统将自动识别章节结构，最少需要
+          3 个章节才能进行转换。
         </p>
       </header>
 
@@ -62,7 +63,9 @@ export default function ImportPage() {
               <div className="w-full border-t border-(--line-soft)" />
             </div>
             <div className="relative flex justify-center">
-              <span className="bg-white px-3 text-xs text-(--text-subtle)">或者</span>
+              <span className="bg-white px-3 text-xs text-(--text-subtle)">
+                或者
+              </span>
             </div>
           </div>
 
@@ -75,7 +78,9 @@ export default function ImportPage() {
               placeholder="将你的小说段落粘贴在此处，至少包含 3 个章节..."
             />
             <div className="mt-2 flex justify-between items-center">
-              <span className="text-xs text-(--text-subtle)">检测到 0 个章节</span>
+              <span className="text-xs text-(--text-subtle)">
+                检测到 0 个章节
+              </span>
               <button
                 type="button"
                 onClick={() => setStep("preview")}
@@ -113,9 +118,7 @@ export default function ImportPage() {
                   <span className="flex h-6 w-6 items-center justify-center rounded-md bg-(--muted) text-xs text-(--text-subtle)">
                     {i + 1}
                   </span>
-                  <span className="flex-1 text-foreground">
-                    第 {i + 1} 章
-                  </span>
+                  <span className="flex-1 text-foreground">第 {i + 1} 章</span>
                   <span className="text-xs text-(--text-subtle)">
                     {Math.floor(800 + Math.random() * 1200)} 字
                   </span>
@@ -142,7 +145,9 @@ export default function ImportPage() {
                     >
                       <p className="font-medium">{type}</p>
                       <p className="mt-1 text-xs text-(--text-subtle)">
-                        {type === "竖屏短剧" ? "快节奏、强冲突、每集 1-3 分钟" : "多线叙事、人物关系复杂、每集 10-15 分钟"}
+                        {type === "竖屏短剧"
+                          ? "快节奏、强冲突、每集 1-3 分钟"
+                          : "多线叙事、人物关系复杂、每集 10-15 分钟"}
                       </p>
                     </button>
                   ))}
