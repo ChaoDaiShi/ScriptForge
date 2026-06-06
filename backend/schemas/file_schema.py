@@ -31,13 +31,37 @@ class TextFileUpload(BaseModel):
     
     @property
     def decoded_content(self) -> str:
+        # 尝试多种编码解码，确保正确解析中文文本
+        encodings_to_try = [
+            self.encoding,
+            'utf-8',
+            'gbk',
+            'gb2312',
+            'gb18030',
+            'big5',
+            'utf-16',
+            'cp1252'
+        ]
+        
+        for encoding in encodings_to_try:
+            try:
+                decoded = self.content.decode(encoding)
+                # 验证解码结果是否合理（不含大量替换字符）
+                if decoded.count('\ufffd') < len(decoded) * 0.1:
+                    return decoded
+            except (UnicodeDecodeError, LookupError):
+                continue
+        
+        # 如果所有编码都失败，使用chardet检测
         try:
-            return self.content.decode(self.encoding)
-        except UnicodeDecodeError:
             import chardet
             result = chardet.detect(self.content)
             detected_encoding = result['encoding'] or 'utf-8'
-            return self.content.decode(detected_encoding, errors='ignore')
+            decoded = self.content.decode(detected_encoding, errors='replace')
+            return decoded
+        except:
+            # 最后的兜底方案
+            return self.content.decode('utf-8', errors='replace')
     
     @property
     def content_hash(self) -> str:
