@@ -22,6 +22,7 @@ import { useProjectStore } from "@/store/useProjectStore";
 import { useScriptStore } from "@/store/useScriptStore";
 import { useTaskStore } from "@/store/useTaskStore";
 import { useToastStore } from "@/store/useToastStore";
+import mammoth from "mammoth";
 
 type ImportStep = "upload" | "preview" | "configure" | "converting";
 
@@ -75,7 +76,7 @@ export default function ImportPage() {
           intent:
             typeof scene.descriptions[0]?.content === "string"
               ? String(scene.descriptions[0].content)
-              : scene.dialogues[0]?.content ?? "待补充场景意图",
+              : (scene.dialogues[0]?.content ?? "待补充场景意图"),
           beats: scene.dialogues.map((dialogue) => ({
             id: dialogue.id,
             description: dialogue.content,
@@ -129,14 +130,16 @@ export default function ImportPage() {
 
     // 如果没有检测到足够章节，尝试基于段落或其他方式创建虚拟章节
     if (detected.length < 3 && text.trim().length > 0) {
-      const paragraphs = text.split(/\n\s*\n/).filter(p => p.trim().length > 0);
+      const paragraphs = text
+        .split(/\n\s*\n/)
+        .filter((p) => p.trim().length > 0);
       if (paragraphs.length > 0) {
         // 将文本平均分成 3 个虚拟章节
         const chunkSize = Math.ceil(paragraphs.length / 3);
         for (let i = 0; i < 3; i++) {
           const start = i * chunkSize;
           const end = Math.min(start + chunkSize, paragraphs.length);
-          const chapterText = paragraphs.slice(start, end).join('\n\n');
+          const chapterText = paragraphs.slice(start, end).join("\n\n");
           detected.push({
             index: i + 1,
             title: `第 ${i + 1} 部分`,
@@ -149,27 +152,69 @@ export default function ImportPage() {
     return detected;
   };
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const ALLOWED_EXTENSIONS = [".txt", ".md", ".doc", ".docx"];
+
+  const isValidFileType = (filename: string): boolean => {
+    const ext = filename.toLowerCase().split(".").pop();
+    return ext ? ALLOWED_EXTENSIONS.includes(`.${ext}`) : false;
+  };
+
+  const readFileContent = async (file: File): Promise<string> => {
+    const ext = file.name.toLowerCase().split(".").pop();
+
+    if (ext === "docx") {
+      const arrayBuffer = await file.arrayBuffer();
+      const result = await mammoth.extractRawText({ arrayBuffer });
+      return result.value;
+    }
+
+    // txt, md, doc 等纯文本格式
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (evt) => resolve(evt.target?.result as string);
+      reader.onerror = () => reject(new Error("文件读取失败"));
+      reader.readAsText(file);
+    });
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (evt) => {
-      const text = evt.target?.result as string;
+
+    if (!isValidFileType(file.name)) {
+      addToast({
+        type: "error",
+        title: "文件格式非法",
+        message: `仅支持 ${ALLOWED_EXTENSIONS.join(", ")} 格式的文件`,
+      });
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      return;
+    }
+
+    try {
+      const text = await readFileContent(file);
       handleTextContent(text);
-    };
-    reader.readAsText(file);
+    } catch {
+      addToast({
+        type: "error",
+        title: "文件读取失败",
+        message: "无法读取文件内容，请确认文件未损坏",
+      });
+    }
   };
 
   const handleTextContent = (text: string) => {
     const detected = detectChapters(text);
     const textLength = text.trim().length;
-    
+
     // 如果没有检测到 3 个章节，但文本足够长（超过 1000 字），也允许通过
     if (detected.length < 3 && textLength < 1000) {
-      alert("至少需要 3 个章节或文本超过 1000 字才能进行转换，请补充更多内容。");
+      alert(
+        "至少需要 3 个章节或文本超过 1000 字才能进行转换，请补充更多内容。",
+      );
       return;
     }
-    
+
     setPasteContent(text); // 确保文本内容被保存
     setChapters(detected);
     setStep("preview");
@@ -272,8 +317,9 @@ export default function ImportPage() {
         </p>
         <h1 className="page-header-title">导入小说源文本</h1>
         <p className="page-header-description">
-          支持 TXT 文件上传或直接粘贴小说内容。系统将自动识别章节结构，最少需要
-          3 个章节或文本超过 1000 字才能进行转换。
+          支持 TXT、MD、DOC、DOCX
+          文件上传或直接粘贴小说内容。系统将自动识别章节结构，最少需要 3
+          个章节或文本超过 1000 字才能进行转换。
         </p>
       </header>
 
@@ -290,16 +336,29 @@ export default function ImportPage() {
               setDragOver(true);
             }}
             onDragLeave={() => setDragOver(false)}
-            onDrop={(e) => {
+            onDrop={async (e) => {
               e.preventDefault();
               setDragOver(false);
               const file = e.dataTransfer.files[0];
               if (file) {
-                const reader = new FileReader();
-                reader.onload = (evt) => {
-                  handleTextContent(evt.target?.result as string);
-                };
-                reader.readAsText(file);
+                if (!isValidFileType(file.name)) {
+                  addToast({
+                    type: "error",
+                    title: "文件格式非法",
+                    message: `仅支持 ${ALLOWED_EXTENSIONS.join(", ")} 格式的文件`,
+                  });
+                  return;
+                }
+                try {
+                  const text = await readFileContent(file);
+                  handleTextContent(text);
+                } catch {
+                  addToast({
+                    type: "error",
+                    title: "文件读取失败",
+                    message: "无法读取文件内容，请确认文件未损坏",
+                  });
+                }
               }
             }}
             onClick={() => fileInputRef.current?.click()}
@@ -307,7 +366,7 @@ export default function ImportPage() {
             <input
               ref={fileInputRef}
               type="file"
-              accept=".txt,.epub"
+              accept=".txt,.md,.doc,.docx"
               className="hidden"
               onChange={handleFileUpload}
             />
@@ -318,7 +377,7 @@ export default function ImportPage() {
               点击上传或拖拽文件到此区域
             </p>
             <p className="mt-1 text-xs text-(--text-subtle)">
-              支持 TXT、EPUB 格式，最大 500KB
+              支持 TXT、MD、DOC、DOCX 格式，最大 10MB
             </p>
           </div>
 
