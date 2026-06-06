@@ -30,6 +30,8 @@ interface ChapterPreview {
   index: number;
   title: string;
   wordCount: number;
+  startPos?: number;
+  endPos?: number;
 }
 
 export default function ImportPage() {
@@ -108,48 +110,124 @@ export default function ImportPage() {
 
   const detectChapters = (text: string): ChapterPreview[] => {
     const lines = text.split("\n");
-    // 更全面的章节检测正则表达式，支持更多格式
-    const chapterRegex =
-      /^(第[一二三四五六七八九十百千零\d]+[章节部回卷]|Chapter\s+\d+|VOLUME\s*\d+|卷[一二三四五六七八九十百千零\d]+|第\s*[一二三四五六七八九十百千零\d]+\s*[章节部回卷]|Ep\.\s*\d+|Episode\s+\d+)/i;
+    
+    // 更全面的章节检测正则表达式，支持多种语言和格式
+    const chapterPatterns = [
+      // 中文格式 - 支持更多变体
+      /^第[一二三四五六七八九十百千零\d]+[章节部回卷集]/,
+      /^第\s*[一二三四五六七八九十百千零\d]+\s*[章节部回卷集]/,
+      /^[一二三四五六七八九十百千零\d]+[章节部回卷集]/,  // 不带"第"字的格式
+      /^第[一二三四五六七八九十百千零\d]+[\s\-_][章节部回卷集]?/,  // 带分隔符的格式
+      /^卷[一二三四五六七八九十百千零\d]+/,  // "卷一"格式
+      /^[卷部篇][一二三四五六七八九十百千零\d]+/,  // "卷一"、"部一"格式
+      // 带标题的格式
+      /^第[一二三四五六七八九十百千零\d]+[章节部回卷集]\s+.*/,
+      /^[一二三四五六七八九十百千零\d]+[章节部回卷集]\s+.*/,
+      // 日文格式
+      /^[一二三四五六七八九十百千零\d]+[章節部回巻集]/,
+      /^\[[一二三四五六七八九十百千零\d]+[章節部回巻集]\]/,
+      // 英文格式
+      /^Chapter\s+\d+/i,
+      /^Part\s+\d+/i,
+      /^Volume\s+\d+/i,
+      /^VOLUME\s+\d+/i,
+      /^Book\s+\d+/i,
+      /^Episode\s+\d+/i,
+      /^Ep\.\s*\d+/i,
+      /^Act\s+\d+/i,
+      /^Section\s+\d+/i,
+      // 简写格式
+      /^[Cc]h\.\s*\d+/,
+      /^[Vv]ol\.\s*\d+/,
+      // 括号包裹的章节
+      /^\([一二三四五六七八九十百千零\d]+\)/,
+      /^\([\d]+\)/,
+      /^\[[一二三四五六七八九十百千零\d]+\]/,
+      /^\[[\d]+\]/,
+      // 数字开头的格式
+      /^\d+\s*[章节部回卷集]/,
+      /^\d+[\.\-\s][章节部回卷集]?/,
+    ];
+    
     const detected: ChapterPreview[] = [];
-    let currentChapter = 0;
+    let currentChapter: ChapterPreview | null = null;
 
     lines.forEach((line) => {
       const trimmed = line.trim();
-      if (chapterRegex.test(trimmed)) {
-        currentChapter++;
-        detected.push({
-          index: currentChapter,
-          title: trimmed.slice(0, 40),
+      
+      // 检查是否匹配任何章节模式
+      const isChapter = chapterPatterns.some((pattern) => pattern.test(trimmed));
+      
+      if (isChapter) {
+        // 保存前一个章节的字数
+        if (currentChapter) {
+          currentChapter.wordCount = currentChapter.wordCount;
+        }
+        
+        // 开始新章节
+        currentChapter = {
+          index: detected.length + 1,
+          title: trimmed.slice(0, 60),
           wordCount: 0,
-        });
-      } else if (currentChapter > 0 && detected.length > 0) {
-        detected[detected.length - 1].wordCount += trimmed.length;
+        };
+        detected.push(currentChapter);
+      } else if (currentChapter) {
+        // 累加当前章节的字数
+        currentChapter.wordCount += trimmed.length;
       }
     });
 
-    // 如果没有检测到足够章节，尝试基于段落或其他方式创建虚拟章节
-    if (detected.length < 3 && text.trim().length > 0) {
+    // 如果检测到的章节不足3个且文本较长，尝试其他方式
+    if (detected.length < 3 && text.trim().length > 1000) {
+      // 基于换行段落来智能分段
       const paragraphs = text
-        .split(/\n\s*\n/)
-        .filter((p) => p.trim().length > 0);
-      if (paragraphs.length > 0) {
-        // 将文本平均分成 3 个虚拟章节
-        const chunkSize = Math.ceil(paragraphs.length / 3);
+        .split(/\n\n+/)
+        .filter((p) => p.trim().length > 100); // 只保留超过100字的段落
+      
+      if (paragraphs.length >= 3) {
+        // 将长段落分成3个虚拟章节
+        const chapterSize = Math.ceil(paragraphs.length / 3);
+        const newChapters: ChapterPreview[] = [];
+        
         for (let i = 0; i < 3; i++) {
-          const start = i * chunkSize;
-          const end = Math.min(start + chunkSize, paragraphs.length);
-          const chapterText = paragraphs.slice(start, end).join("\n\n");
-          detected.push({
-            index: i + 1,
-            title: `第 ${i + 1} 部分`,
-            wordCount: chapterText.length,
-          });
+          const start = i * chapterSize;
+          const end = Math.min(start + chapterSize, paragraphs.length);
+          const chapterParagraphs = paragraphs.slice(start, end);
+          
+          if (chapterParagraphs.length > 0) {
+            const chapterText = chapterParagraphs.join("\n\n");
+            newChapters.push({
+              index: i + 1,
+              title: `第 ${i + 1} 部分（约 ${chapterParagraphs.length} 段）`,
+              wordCount: chapterText.length,
+            });
+          }
+        }
+        
+        // 如果成功创建了章节，替换检测到的章节
+        if (newChapters.length >= 3) {
+          return newChapters;
         }
       }
     }
 
     return detected;
+  };
+
+  // 调试函数：分析文本中可能的章节标题
+  const analyzeChapterPatterns = (text: string): string[] => {
+    const lines = text.split("\n");
+    const potentialChapters: string[] = [];
+    
+    lines.forEach((line, idx) => {
+      const trimmed = line.trim();
+      // 查找包含数字开头的行
+      if (/^[第卷ChapterVolVolume一二三四五六七八九十百千零\d]/.test(trimmed) && trimmed.length < 50) {
+        potentialChapters.push(`行 ${idx + 1}: ${trimmed}`);
+      }
+    });
+    
+    return potentialChapters.slice(0, 20); // 只返回前20个
   };
 
   const ALLOWED_EXTENSIONS = [".txt", ".md", ".doc", ".docx"];
@@ -168,7 +246,26 @@ export default function ImportPage() {
       return result.value;
     }
 
-    // txt, md, doc 等纯文本格式
+    // txt, md, doc 等纯文本格式 - 尝试多种编码
+    const arrayBuffer = await file.arrayBuffer();
+    const encodings = ["UTF-8", "GBK", "GB2312", "GB18030", "Big5"];
+    
+    for (const encoding of encodings) {
+      try {
+        const textDecoder = new TextDecoder(encoding, { fatal: true });
+        const text = textDecoder.decode(arrayBuffer);
+        // 检查是否有大量替换字符（表示解码失败）
+        const replacementCharCount = (text.match(/\uFFFD/g) || []).length;
+        if (replacementCharCount < text.length * 0.1) {
+          return text;
+        }
+      } catch {
+        // 编码不匹配，尝试下一个
+        continue;
+      }
+    }
+
+    // 如果所有编码都失败，使用默认方式读取
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = (evt) => resolve(evt.target?.result as string);
@@ -206,6 +303,7 @@ export default function ImportPage() {
   const handleTextContent = (text: string) => {
     const detected = detectChapters(text);
     const textLength = text.trim().length;
+    const potentialChapters = analyzeChapterPatterns(text);
 
     // 如果没有检测到 3 个章节，但文本足够长（超过 1000 字），也允许通过
     if (detected.length < 3 && textLength < 1000) {
@@ -213,6 +311,13 @@ export default function ImportPage() {
         "至少需要 3 个章节或文本超过 1000 字才能进行转换，请补充更多内容。",
       );
       return;
+    }
+
+    // 如果检测到的章节数少于预期，显示警告信息
+    if (detected.length < 3 && potentialChapters.length > 0) {
+      const warning = `检测到 ${detected.length} 个章节，但文本中似乎有 ${potentialChapters.length} 个可能的章节标题。\n\n可能的章节标题：\n${potentialChapters.slice(0, 5).join('\n')}${potentialChapters.length > 5 ? '\n...' : ''}\n\n如果您的小说确实有更多章节，请检查章节标题格式是否符合系统支持的格式。`;
+      console.warn(warning);
+      // 这里不阻止上传，只是记录警告
     }
 
     setPasteContent(text); // 确保文本内容被保存
@@ -458,6 +563,37 @@ export default function ImportPage() {
 
       {step === "preview" && (
         <div className="space-y-6 animate-fade-in-up">
+          {/* 总体统计信息 */}
+          <div className="grid grid-cols-3 gap-4">
+            <div className="card p-4">
+              <p className="text-xs uppercase tracking-[0.22em] text-(--text-faint) mb-1">
+                总章节数
+              </p>
+              <p className="text-2xl font-bold text-foreground">
+                {chapters.length}
+              </p>
+            </div>
+            <div className="card p-4">
+              <p className="text-xs uppercase tracking-[0.22em] text-(--text-faint) mb-1">
+                总字数
+              </p>
+              <p className="text-2xl font-bold text-foreground">
+                {pasteContent.length.toLocaleString()}
+              </p>
+            </div>
+            <div className="card p-4">
+              <p className="text-xs uppercase tracking-[0.22em] text-(--text-faint) mb-1">
+                平均每章
+              </p>
+              <p className="text-2xl font-bold text-foreground">
+                {chapters.length > 0
+                  ? Math.round(pasteContent.length / chapters.length).toLocaleString()
+                  : 0}
+              </p>
+            </div>
+          </div>
+
+          {/* 章节预览列表 */}
           <div className="card">
             <div className="flex items-center justify-between mb-4">
               <div>
@@ -475,23 +611,50 @@ export default function ImportPage() {
               </span>
             </div>
 
-            <div className="space-y-1.5 max-h-[360px] overflow-y-auto pr-1">
-              {chapters.map((ch) => (
-                <div
-                  key={ch.index}
-                  className="flex items-center gap-3 rounded-xl border border-(--line-soft) px-4 py-3 text-sm hover:bg-(--muted) transition-colors"
-                >
-                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-(--muted) text-xs text-(--text-subtle)">
-                    {ch.index}
-                  </span>
-                  <span className="flex-1 truncate text-foreground">
-                    {ch.title}
-                  </span>
-                  <span className="shrink-0 text-xs text-(--text-subtle)">
-                    {ch.wordCount.toLocaleString()} 字
-                  </span>
-                </div>
-              ))}
+            <div className="mb-4 rounded-lg border border-(--line-soft) bg-(--accent-light)/30 p-3">
+              <p className="text-xs text-(--text-subtle) leading-relaxed">
+                <span className="font-medium">识别说明：</span>
+                系统通过识别章节标题（如"第X章"、"Chapter X"、"卷X"等）来自动划分章节。
+                每个章节下方显示的字数为该章节的字符总数，右侧百分比表示该章节占总字数的比例。
+              </p>
+            </div>
+
+            <div className="space-y-2 max-h-[400px] overflow-y-auto pr-1">
+              {chapters.map((ch, idx) => {
+                const percentage = chapters.length > 0 
+                  ? Math.round((ch.wordCount / pasteContent.length) * 100) 
+                  : 0;
+                
+                return (
+                  <div
+                    key={ch.index}
+                    className="group rounded-xl border border-(--line-soft) bg-white px-4 py-3 hover:border-(--accent-soft)/50 hover:bg-(--accent-light)/30 transition-all"
+                  >
+                    <div className="flex items-center gap-3 mb-2">
+                      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-(--accent-light) text-sm font-medium text-(--accent-soft)">
+                        {ch.index}
+                      </span>
+                      <span className="flex-1 truncate font-medium text-foreground">
+                        {ch.title}
+                      </span>
+                      <span className="shrink-0 text-sm font-medium text-(--accent-soft)">
+                        {ch.wordCount.toLocaleString()} 字
+                      </span>
+                    </div>
+                    
+                    {/* 字数进度条 */}
+                    <div className="relative h-1.5 w-full overflow-hidden rounded-full bg-(--muted)">
+                      <div 
+                        className="h-full rounded-full bg-gradient-to-r from-(--accent-soft) to-(--accent-soft)/70 transition-all duration-500"
+                        style={{ width: `${percentage}%` }}
+                      />
+                    </div>
+                    <p className="mt-1.5 text-xs text-(--text-faint) text-right">
+                      占比 {percentage}%
+                    </p>
+                  </div>
+                );
+              })}
             </div>
           </div>
 

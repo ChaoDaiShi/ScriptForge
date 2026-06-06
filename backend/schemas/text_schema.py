@@ -66,6 +66,72 @@ class LongTextProcessing(BaseModel):
             "avg_word_length": sum(len(word) for word in re.findall(r'\b\w+\b', text)) / max(1, len(re.findall(r'\b\w+\b', text))),
         }
     
+    def detect_chapters(self) -> List[Dict[str, Any]]:
+        """识别文本中的章节结构"""
+        lines = self.text.split('\n')
+        # 更全面的章节检测正则表达式
+        chapter_regex = re.compile(
+            r'^(第[一二三四五六七八九十百千零\d]+[章节部回卷]|'
+            r'Chapter\s+\d+|'
+            r'VOLUME\s*\d+|'
+            r'卷[一二三四五六七八九十百千零\d]+|'
+            r'第\s*[一二三四五六七八九十百零\d]+\s*[章节部回卷]|'
+            r'Ep\.\s*\d+|'
+            r'Episode\s+\d+)',
+            re.IGNORECASE
+        )
+        
+        chapters = []
+        current_chapter = None
+        
+        for i, line in enumerate(lines):
+            trimmed = line.strip()
+            if chapter_regex.match(trimmed):
+                # 保存前一个章节的字数
+                if current_chapter is not None:
+                    current_chapter['word_count'] = current_chapter['end_pos'] - current_chapter['start_pos']
+                    chapters.append(current_chapter)
+                
+                # 开始新章节
+                current_chapter = {
+                    'index': len(chapters) + 1,
+                    'title': trimmed[:40],  # 限制标题长度
+                    'start_pos': i,
+                    'end_pos': i,
+                    'word_count': 0
+                }
+            elif current_chapter is not None:
+                current_chapter['end_pos'] = i + 1
+        
+        # 保存最后一个章节
+        if current_chapter is not None:
+            current_chapter['word_count'] = current_chapter['end_pos'] - current_chapter['start_pos']
+            chapters.append(current_chapter)
+        
+        # 计算每章的实际字符数
+        for chapter in chapters:
+            start = chapter['start_pos']
+            end = chapter['end_pos']
+            chapter_text = '\n'.join(lines[start:end])
+            chapter['word_count'] = len(chapter_text)
+        
+        # 如果检测到的章节不足3个，尝试基于段落创建虚拟章节
+        if len(chapters) < 3 and len(self.text) > 0:
+            paragraphs = [p for p in self.text.split('\n\n') if p.strip()]
+            if len(paragraphs) >= 3:
+                chapters = []
+                chunk_size = max(1, len(paragraphs) // 3)
+                for i in range(0, len(paragraphs), chunk_size):
+                    chunk = paragraphs[i:i+chunk_size]
+                    chapter_text = '\n\n'.join(chunk)
+                    chapters.append({
+                        'index': len(chapters) + 1,
+                        'title': f'第 {len(chapters) + 1} 部分',
+                        'word_count': len(chapter_text)
+                    })
+        
+        return chapters
+    
     def truncate(self, max_length: Optional[int] = None) -> str:
         max_len = max_length or self.max_length
         if len(self.text) <= max_len:
