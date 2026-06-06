@@ -27,9 +27,15 @@ class Settings(BaseSettings):
     ai_api_key: Optional[str] = None
     ai_api_base: Optional[str] = None
 
-    class Config:
-        env_file = ".env"
-        case_sensitive = False
+    # Supabase settings (for backward compatibility)
+    supabase_url: Optional[str] = None
+    supabase_key: Optional[str] = None
+
+    model_config = {
+        "env_file": ".env",
+        "case_sensitive": False,
+        "extra": "ignore",  # Allow extra fields from .env
+    }
 
 
 # Create settings instance
