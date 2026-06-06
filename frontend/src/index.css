@@ -1,4 +1,4 @@
-@import url("https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=IBM+Plex+Sans:wght@400;500;600&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&display=swap");
 @import "tailwindcss";
 
 @theme {
@@ -36,42 +36,44 @@
 
 @layer base {
   :root {
-    --background: 32 36% 96%;
-    --foreground: 22 20% 16%;
+    --background: 0 0% 100%;
+    --foreground: 0 0% 7%;
 
     --card: 0 0% 100%;
-    --card-foreground: 22 20% 16%;
+    --card-foreground: 0 0% 7%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 22 20% 16%;
+    --popover-foreground: 0 0% 7%;
 
-    --primary: 23 41% 48%;
+    --primary: 204 80% 62%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 28 24% 90%;
-    --secondary-foreground: 22 20% 16%;
+    --secondary: 0 0% 96%;
+    --secondary-foreground: 0 0% 7%;
 
-    --muted: 30 20% 92%;
-    --muted-foreground: 23 11% 43%;
+    --muted: 0 0% 96%;
+    --muted-foreground: 0 0% 50%;
 
-    --accent: 29 45% 92%;
-    --accent-foreground: 22 20% 16%;
+    --accent: 204 80% 62%;
+    --accent-foreground: 0 0% 100%;
 
     --destructive: 0 72% 56%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive-foreground: 0 0% 100%;
 
-    --border: 28 18% 82%;
-    --input: 28 18% 82%;
-    --ring: 23 41% 48%;
+    --border: 0 0% 90%;
+    --input: 0 0% 90%;
+    --ring: 204 80% 62%;
 
-    --radius: 1rem;
-    --accent-soft: #b97d5c;
-    --text-subtle: #7e7067;
-    --text-faint: #a4958a;
-    --line-soft: rgba(94, 72, 58, 0.09);
-    --line-medium: rgba(94, 72, 58, 0.12);
-    --shadow-card: 0 12px 40px rgba(94, 72, 58, 0.08);
-    --shadow-surface: 0 20px 56px rgba(94, 72, 58, 0.1);
+    --radius: 0.75rem;
+
+    --accent-soft: #7BB8E8;
+    --accent-light: rgba(123, 184, 232, 0.10);
+    --text-subtle: #999999;
+    --text-faint: #BBBBBB;
+    --line-soft: rgba(0, 0, 0, 0.06);
+    --line-medium: rgba(0, 0, 0, 0.10);
+    --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.04);
+    --shadow-surface: 0 2px 8px rgba(0, 0, 0, 0.04);
   }
 }
 
@@ -84,165 +86,132 @@
     background: hsl(var(--background));
   }
   body {
-    font-family: "IBM Plex Sans", sans-serif;
+    font-family: "DM Sans", system-ui, -apple-system, sans-serif;
     @apply bg-background text-foreground antialiased;
   }
   #root {
     @apply h-screen;
   }
-  h1,
-  h2,
-  h3,
-  .font-serif {
+  h1, h2, h3, .font-serif {
     font-family: "Fraunces", serif;
   }
 
-  /* Subtle scrollbar */
   ::-webkit-scrollbar {
-    width: 5px;
+    width: 4px;
   }
   ::-webkit-scrollbar-track {
     background: transparent;
   }
   ::-webkit-scrollbar-thumb {
-    background: rgba(94, 72, 58, 0.15);
+    background: rgba(0, 0, 0, 0.08);
     border-radius: 999px;
   }
   ::-webkit-scrollbar-thumb:hover {
-    background: rgba(94, 72, 58, 0.25);
+    background: rgba(0, 0, 0, 0.15);
   }
 }
 
 @layer components {
   .app-shell {
-    position: relative;
-    background:
-      linear-gradient(
-        180deg,
-        rgba(255, 253, 250, 0.95) 0%,
-        rgba(244, 237, 230, 0.85) 100%
-      ),
-      hsl(var(--background));
+    background: hsl(var(--background));
   }
 
-  .app-shell::before {
-    content: "";
-    position: absolute;
-    inset: 0;
-    pointer-events: none;
-    background-image:
-      linear-gradient(rgba(126, 112, 103, 0.05) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(126, 112, 103, 0.05) 1px, transparent 1px);
-    background-size: 80px 80px;
+  .page-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 2rem 2rem 2.5rem;
   }
 
-  .pane-shell {
-    height: 100%;
-    padding: 1.25rem;
-    overflow: auto;
-    background: linear-gradient(
-      180deg,
-      rgba(255, 255, 255, 0.5),
-      rgba(255, 255, 255, 0.28)
-    );
+  .page-header {
+    margin-bottom: 2rem;
   }
 
-  .pane-card {
+  .page-header-eyebrow {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.24em;
+    color: var(--text-faint);
+    margin-bottom: 0.5rem;
+  }
+
+  .page-header-title {
+    font-family: "Fraunces", serif;
+    font-size: 2rem;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    color: hsl(var(--foreground));
+    line-height: 1.2;
+  }
+
+  .page-header-description {
+    margin-top: 0.5rem;
+    max-width: 36rem;
+    font-size: 0.875rem;
+    line-height: 1.6;
+    color: var(--text-subtle);
+  }
+
+  .empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 4rem 2rem;
+    text-align: center;
+  }
+
+  .empty-state-icon {
+    width: 2.5rem;
+    height: 2.5rem;
+    color: var(--text-faint);
+    margin-bottom: 1rem;
+  }
+
+  .empty-state-title {
+    font-family: "Fraunces", serif;
+    font-size: 1.25rem;
+    color: hsl(var(--foreground));
+    margin-bottom: 0.5rem;
+  }
+
+  .empty-state-description {
+    font-size: 0.875rem;
+    color: var(--text-subtle);
+    max-width: 24rem;
+    line-height: 1.6;
+  }
+
+  .card {
     border: 1px solid var(--line-soft);
-    background: rgba(255, 255, 255, 0.52);
-    border-radius: 1.25rem;
-    padding: 1rem;
-    box-shadow: 0 4px 16px rgba(94, 72, 58, 0.04);
-    transition:
-      box-shadow 200ms ease,
-      border-color 200ms ease;
+    border-radius: 1rem;
+    background: hsl(var(--card));
+    padding: 1.25rem;
+    box-shadow: var(--shadow-card);
+    transition: box-shadow 0.2s ease, border-color 0.2s ease;
   }
 
-  .pane-card:hover {
+  .card:hover {
     border-color: var(--line-medium);
-    box-shadow: 0 8px 24px rgba(94, 72, 58, 0.06);
-  }
-
-  .scene-card {
-    border: 1px solid var(--line-soft);
-    background: linear-gradient(
-      180deg,
-      rgba(255, 255, 255, 0.64),
-      rgba(255, 255, 255, 0.44)
-    );
-    border-radius: 1.5rem;
-    padding: 1.25rem;
-    transition:
-      border-color 200ms ease,
-      box-shadow 200ms ease;
-    cursor: pointer;
-  }
-
-  .scene-card:hover {
-    border-color: rgba(185, 125, 92, 0.22);
-    box-shadow: 0 8px 28px rgba(94, 72, 58, 0.06);
-  }
-
-  .scene-card-active {
-    border-color: rgba(185, 125, 92, 0.3);
-    box-shadow:
-      0 0 0 1px rgba(185, 125, 92, 0.1),
-      0 8px 32px rgba(94, 72, 58, 0.07);
-  }
-
-  .resize-handle {
-    position: relative;
-    width: 6px;
-    margin: 0 -1px;
-    border-radius: 999px;
-    background: transparent;
-    transition: background 200ms ease;
-    z-index: 10;
-    flex-shrink: 0;
-  }
-
-  .resize-handle::after {
-    content: "";
-    position: absolute;
-    inset: 0 3px;
-    border-radius: 999px;
-    background: linear-gradient(
-      180deg,
-      transparent,
-      rgba(94, 72, 58, 0.08),
-      transparent
-    );
-    transition: background 200ms ease;
-  }
-
-  .resize-handle:hover::after,
-  .resize-handle[data-resize-handle-active]::after {
-    background: linear-gradient(
-      180deg,
-      transparent,
-      rgba(185, 125, 92, 0.3),
-      transparent
-    );
-  }
-
-  .resize-handle[data-resize-handle-active]::after {
-    background: linear-gradient(
-      180deg,
-      transparent,
-      rgba(185, 125, 92, 0.45),
-      transparent
-    );
-  }
-
-  .surface-card {
-    border: 1px solid var(--line-soft);
-    border-radius: 1.5rem;
-    background: linear-gradient(
-      180deg,
-      rgba(255, 255, 255, 0.7),
-      rgba(255, 255, 255, 0.46)
-    );
-    padding: 1.25rem;
     box-shadow: var(--shadow-surface);
+  }
+
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.25rem 0.75rem;
+    border-radius: 9999px;
+    font-size: 0.75rem;
+    font-weight: 500;
+  }
+
+  .badge-primary {
+    background: var(--accent-light);
+    color: var(--accent-soft);
+  }
+
+  .badge-muted {
+    background: hsl(var(--muted));
+    color: hsl(var(--muted-foreground));
   }
 }
