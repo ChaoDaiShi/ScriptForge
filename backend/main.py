@@ -1,9 +1,23 @@
 import os
+import sys
+from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from supabase_client import probe_supabase
+sys.path.append(str(Path(__file__).parent))
+
+from api import (
+    text_router,
+    workbench_router,
+    assets_router,
+    tasks_router,
+    insights_router,
+    dashboard_router,
+    settings_router,
+    script_router,
+)
+from core import success_response
 
 app = FastAPI(title="ScriptForge API", version="0.1.0")
 
@@ -16,12 +30,33 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Register all routers
+app.include_router(text_router)
+app.include_router(workbench_router)
+app.include_router(assets_router)
+app.include_router(tasks_router)
+app.include_router(insights_router)
+app.include_router(dashboard_router)
+app.include_router(settings_router)
+app.include_router(script_router)
+
 
 def service_payload() -> dict:
     return {
         "service": "scriptforge-backend",
         "status": "ok",
-        "endpoints": ["/health", "/api/health"],
+        "endpoints": [
+            "/health",
+            "/api/health",
+            "/api/text/*",
+            "/api/workbench/*",
+            "/api/assets/*",
+            "/api/tasks/*",
+            "/api/insights/*",
+            "/api/dashboard/*",
+            "/api/settings/*",
+            "/api/scripts/*",
+        ],
     }
 
 
@@ -35,5 +70,4 @@ def root():
 def health():
     return {
         **service_payload(),
-        "supabase": probe_supabase(),
     }
