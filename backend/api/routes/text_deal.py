@@ -21,13 +21,16 @@ async def upload_text(data: LongTextProcessing) -> Dict[str, Any]:
     """
     chunks = data.get_chunks()
     stats = data.get_statistics()
+    chapters = data.detect_chapters()
     
     return success_response(
         data={
             "text_id": data.text_id,
             "statistics": stats,
             "total_chunks": len(chunks),
-            "chunks": chunks
+            "chunks": chunks,
+            "chapters": chapters,
+            "total_chapters": len(chapters)
         }
     )
 
@@ -61,6 +64,7 @@ async def upload_file(
     
     chunks = text_processing.get_chunks()
     stats = text_processing.get_statistics()
+    chapters = text_processing.detect_chapters()
     
     return success_response(
         data={
@@ -73,7 +77,9 @@ async def upload_file(
             "content_hash": text_file.content_hash,
             "statistics": stats,
             "total_chunks": len(chunks),
-            "chunks": chunks
+            "chunks": chunks,
+            "chapters": chapters,
+            "total_chapters": len(chapters)
         }
     )
 
