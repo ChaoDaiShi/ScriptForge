@@ -28,21 +28,51 @@ interface ExportItem {
 }
 
 const exportFormats: ExportItem[] = [
-  { format: "yaml", label: "YAML 模型", desc: "结构化剧本数据，含完整 Schema 注释", icon: FileJson, color: "text-blue-500" },
-  { format: "pdf", label: "PDF 排版稿", desc: "剧本格式分页排版，含版权水印与页眉", icon: File, color: "text-red-500" },
-  { format: "json", label: "JSON 数据", desc: "标准化数据结构，可直接接入 API 下游", icon: FileDown, color: "text-emerald-500" },
-  { format: "share", label: "协作分享", desc: "生成分享链接，团队成员可在线查阅", icon: Share2, color: "text-purple-500" },
+  {
+    format: "yaml",
+    label: "YAML 模型",
+    desc: "结构化剧本数据，含完整 Schema 注释",
+    icon: FileJson,
+    color: "text-blue-500",
+  },
+  {
+    format: "pdf",
+    label: "PDF 排版稿",
+    desc: "剧本格式分页排版，含版权水印与页眉",
+    icon: File,
+    color: "text-red-500",
+  },
+  {
+    format: "json",
+    label: "JSON 数据",
+    desc: "标准化数据结构，可直接接入 API 下游",
+    icon: FileDown,
+    color: "text-emerald-500",
+  },
+  {
+    format: "share",
+    label: "协作分享",
+    desc: "生成分享链接，团队成员可在线查阅",
+    icon: Share2,
+    color: "text-purple-500",
+  },
 ];
 
 export default function AssetsPage() {
   const projects = useProjectStore((s) => s.projects);
   const addToast = useToastStore((s) => s.addToast);
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
-  const [exportingFormat, setExportingFormat] = useState<ExportFormat | null>(null);
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(
+    null,
+  );
+  const [exportingFormat, setExportingFormat] = useState<ExportFormat | null>(
+    null,
+  );
   const [exportStatus, setExportStatus] = useState<ExportStatus>("idle");
   const [exportProgress, setExportProgress] = useState(0);
-  const [recentExports, setRecentExports] = useState<{ format: ExportFormat; projectTitle: string; time: string }[]>([]);
+  const [recentExports, setRecentExports] = useState<
+    { format: ExportFormat; projectTitle: string; time: string }[]
+  >([]);
 
   const filteredProjects = projects.filter((p) =>
     p.title.toLowerCase().includes(searchQuery.toLowerCase()),
@@ -65,7 +95,11 @@ export default function AssetsPage() {
 
   const handleExport = (format: ExportFormat) => {
     if (!selectedProject) {
-      addToast({ type: "warning", title: "请先选择一个剧本项目", message: "从上方列表点击选择要导出的项目" });
+      addToast({
+        type: "warning",
+        title: "请先选择一个剧本项目",
+        message: "从上方列表点击选择要导出的项目",
+      });
       return;
     }
     if (exportStatus === "exporting") return;
@@ -74,7 +108,10 @@ export default function AssetsPage() {
     setExportStatus("preparing");
     setExportProgress(0);
 
-    addToast({ type: "info", title: `正在准备导出 ${exportFormats.find((f) => f.format === format)?.label}...` });
+    addToast({
+      type: "info",
+      title: `正在准备导出 ${exportFormats.find((f) => f.format === format)?.label}...`,
+    });
 
     // Simulate preparation
     setTimeout(() => {
@@ -89,9 +126,14 @@ export default function AssetsPage() {
             setExportStatus("done");
             setExportProgress(100);
 
-            const fmtLabel = exportFormats.find((f) => f.format === format)?.label ?? "";
+            const fmtLabel =
+              exportFormats.find((f) => f.format === format)?.label ?? "";
             setRecentExports((prev) => [
-              { format, projectTitle: selectedProject.title, time: new Date().toLocaleTimeString("zh-CN") },
+              {
+                format,
+                projectTitle: selectedProject.title,
+                time: new Date().toLocaleTimeString("zh-CN"),
+              },
               ...prev.slice(0, 4),
             ]);
 
@@ -167,25 +209,39 @@ export default function AssetsPage() {
                   }
                 }}
                 className={`card card-hover animate-fade-in-up cursor-pointer transition-all ${
-                  isSelected ? "ring-2 ring-(--accent-soft) bg-(--accent-light)" : ""
+                  isSelected
+                    ? "ring-2 ring-(--accent-soft) bg-(--accent-light)"
+                    : ""
                 } ${project.status !== "ready" ? "opacity-70" : ""}`}
                 style={{ animationDelay: `${i * 60}ms` }}
               >
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-3">
-                    <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${
-                      isSelected ? "bg-(--accent-soft) text-white" : "bg-(--accent-light) text-(--accent-soft)"
-                    }`}>
-                      {isSelected ? <Check className="h-5 w-5" /> : <FileText className="h-5 w-5" />}
+                    <div
+                      className={`flex h-10 w-10 items-center justify-center rounded-xl ${
+                        isSelected
+                          ? "bg-(--accent-soft) text-white"
+                          : "bg-(--accent-light) text-(--accent-soft)"
+                      }`}
+                    >
+                      {isSelected ? (
+                        <Check className="h-5 w-5" />
+                      ) : (
+                        <FileText className="h-5 w-5" />
+                      )}
                     </div>
                     <div>
-                      <p className="text-sm font-medium text-foreground">{project.title}</p>
+                      <p className="text-sm font-medium text-foreground">
+                        {project.title}
+                      </p>
                       {statusBadge(project.status)}
                     </div>
                   </div>
                   <button
                     type="button"
-                    onClick={(e) => { e.stopPropagation(); }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                    }}
                     className="rounded-md p-1 text-(--text-faint) hover:text-foreground hover:bg-(--muted) transition-colors"
                   >
                     <MoreHorizontal className="h-4 w-4" />
@@ -196,7 +252,9 @@ export default function AssetsPage() {
                 </p>
                 <div className="mt-4 flex items-center justify-between text-xs text-(--text-faint)">
                   <span>{project.chapterCount} 章节</span>
-                  <span>{new Date(project.createdAt).toLocaleDateString("zh-CN")}</span>
+                  <span>
+                    {new Date(project.createdAt).toLocaleDateString("zh-CN")}
+                  </span>
                 </div>
               </div>
             );
@@ -237,8 +295,11 @@ export default function AssetsPage() {
         <div className="grid gap-4 md:grid-cols-4 mb-5">
           {exportFormats.map((fmt) => {
             const Icon = fmt.icon;
-            const isExporting = exportingFormat === fmt.format && (exportStatus === "exporting" || exportStatus === "preparing");
-            const isDone = exportingFormat === fmt.format && exportStatus === "done";
+            const isExporting =
+              exportingFormat === fmt.format &&
+              (exportStatus === "exporting" || exportStatus === "preparing");
+            const isDone =
+              exportingFormat === fmt.format && exportStatus === "done";
 
             return (
               <button
@@ -261,11 +322,17 @@ export default function AssetsPage() {
                     <Check className="h-4 w-4 text-green-600" />
                   </div>
                 ) : (
-                  <Icon className={`h-7 w-7 ${fmt.color} group-hover:scale-110 transition-transform`} />
+                  <Icon
+                    className={`h-7 w-7 ${fmt.color} group-hover:scale-110 transition-transform`}
+                  />
                 )}
                 <div>
-                  <p className="text-sm font-medium text-foreground">{fmt.label}</p>
-                  <p className="mt-1 text-xs text-(--text-subtle) leading-4">{fmt.desc}</p>
+                  <p className="text-sm font-medium text-foreground">
+                    {fmt.label}
+                  </p>
+                  <p className="mt-1 text-xs text-(--text-subtle) leading-4">
+                    {fmt.desc}
+                  </p>
                 </div>
 
                 {isExporting && exportProgress > 0 && (
@@ -276,7 +343,9 @@ export default function AssetsPage() {
                         style={{ width: `${exportProgress}%` }}
                       />
                     </div>
-                    <p className="mt-0.5 text-xs text-(--text-subtle)">{Math.round(exportProgress)}%</p>
+                    <p className="mt-0.5 text-xs text-(--text-subtle)">
+                      {Math.round(exportProgress)}%
+                    </p>
                   </div>
                 )}
               </button>
@@ -298,8 +367,15 @@ export default function AssetsPage() {
                 <>
                   <Loader2 className="h-4 w-4 animate-spin text-(--accent-soft)" />
                   <p className="text-sm text-foreground">
-                    正在导出 {exportFormats.find((f) => f.format === exportingFormat)?.label}...
-                    <span className="text-(--text-subtle) ml-1">{Math.round(exportProgress)}%</span>
+                    正在导出{" "}
+                    {
+                      exportFormats.find((f) => f.format === exportingFormat)
+                        ?.label
+                    }
+                    ...
+                    <span className="text-(--text-subtle) ml-1">
+                      {Math.round(exportProgress)}%
+                    </span>
                   </p>
                 </>
               )}
@@ -308,7 +384,9 @@ export default function AssetsPage() {
                   <div className="flex h-5 w-5 items-center justify-center rounded-full bg-green-100">
                     <Check className="h-3 w-3 text-green-600" />
                   </div>
-                  <p className="text-sm text-green-600">导出完成！文件准备就绪</p>
+                  <p className="text-sm text-green-600">
+                    导出完成！文件准备就绪
+                  </p>
                 </>
               )}
             </div>
@@ -323,10 +401,17 @@ export default function AssetsPage() {
             </p>
             <div className="space-y-2">
               {recentExports.map((exp, i) => (
-                <div key={i} className="flex items-center gap-3 rounded-xl border border-(--line-soft) px-4 py-2.5 text-sm">
+                <div
+                  key={i}
+                  className="flex items-center gap-3 rounded-xl border border-(--line-soft) px-4 py-2.5 text-sm"
+                >
                   {formatIcon(exp.format)}
-                  <span className="flex-1 text-foreground">{exp.projectTitle}</span>
-                  <span className="text-xs text-(--text-faint)">{exp.time}</span>
+                  <span className="flex-1 text-foreground">
+                    {exp.projectTitle}
+                  </span>
+                  <span className="text-xs text-(--text-faint)">
+                    {exp.time}
+                  </span>
                   <button
                     type="button"
                     className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs text-(--accent-soft) hover:bg-(--accent-light) transition-colors"

@@ -1,12 +1,4 @@
-import {
-  Shield,
-  Users,
-  Receipt,
-  Key,
-  Bell,
-  Palette,
-  Globe,
-} from "lucide-react";
+import { Users, Receipt, Key, Bell, Palette, Globe } from "lucide-react";
 
 const plans = [
   {
