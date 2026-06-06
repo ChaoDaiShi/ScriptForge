@@ -9,10 +9,6 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
   const backendUrl =
     env.VITE_BACKEND_URL ?? env.BACKEND_URL ?? "http://127.0.0.1:8000";
-  const backendApiPrefix = (env.VITE_BACKEND_API_PREFIX ?? "/api").replace(
-    /\/+$/,
-    "",
-  );
 
   return {
     plugins: [
@@ -30,7 +26,6 @@ export default defineConfig(({ mode }) => {
         "/api": {
           target: backendUrl,
           changeOrigin: true,
-          rewrite: (path) => `${backendApiPrefix}${path}`,
         },
       },
     },
