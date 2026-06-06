@@ -9,6 +9,8 @@ import {
   AlertCircle,
   Loader2,
   BookOpen,
+  Film,
+  Clock,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import {
@@ -25,7 +27,7 @@ import { useToastStore } from "@/store/useToastStore";
 import { useNovelStore } from "@/store/useNovelStore";
 import mammoth from "mammoth";
 
-type ImportStep = "upload" | "preview" | "configure" | "converting";
+type ImportStep = "upload" | "preview" | "configure" | "confirm" | "converting";
 
 interface ChapterPreview {
   index: number;
@@ -46,6 +48,9 @@ export default function ImportPage() {
   const [adaptType, setAdaptType] = useState<"short" | "long" | null>(null);
   const [convertProgress, setConvertProgress] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [currentStep, setCurrentStep] = useState<string>("");
+  const [stepMessages, setStepMessages] = useState<string[]>([]);
+  const [lastProgressUpdate, setLastProgressUpdate] = useState<number>(0);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const addProject = useProjectStore((s) => s.addProject);
@@ -411,6 +416,9 @@ export default function ImportPage() {
     setCurrentNovel(novelId);
 
     try {
+      setStepMessages(["正在创建剧本..."]);
+      setCurrentStep("创建剧本");
+      
       console.log("Step 1: Creating script...");
       const script = await createScript({
         title: project.title,
@@ -418,14 +426,23 @@ export default function ImportPage() {
         text: selectedContent.trim(),
       });
       console.log("Script created:", script);
+      setStepMessages(prev => [...prev, "✅ 剧本创建完成"]);
 
+      setCurrentStep("启动处理任务");
+      setStepMessages(prev => [...prev, "正在启动处理任务..."]);
+      
       console.log("Step 2: Starting script processing...");
       const processingTask = await startScriptProcessing(script.id);
       console.log("Processing task:", processingTask);
+      setStepMessages(prev => [...prev, "✅ 处理任务启动成功"]);
 
+      setCurrentStep("获取任务状态");
+      setStepMessages(prev => [...prev, "正在获取任务状态..."]);
+      
       console.log("Step 3: Fetching live task...");
       const liveTask = await fetchTask(processingTask.id);
       console.log("Live task:", liveTask);
+      setStepMessages(prev => [...prev, "✅ 任务状态获取成功"]);
 
       updateProject(projectId, {
         scriptId: script.id,
@@ -437,6 +454,20 @@ export default function ImportPage() {
       setCurrentScript(script.id);
       setConvertProgress(Math.max(10, liveTask.progress));
 
+      const stepNames: Record<string, string> = {
+        dialogue_extraction: "步骤1: 提取对话",
+        character_extraction: "步骤2: 提取人物和描写",
+        main_plot_extraction: "步骤3: 提取主线",
+        dialogue_speaker_tagging: "步骤4: 标记对话主体",
+        scene_analysis: "步骤6: 分析场景头",
+        psychology_conversion: "步骤7: 转换心理描写",
+        scene_packaging: "步骤8: 打包场景",
+        useless_line_detection: "步骤9: 检测无用语句",
+        useless_line_removal: "步骤10: 移除无用语句",
+        polishing: "步骤11: 润色处理",
+        export: "步骤12: 导出剧本",
+      };
+
       const completionPoll = window.setInterval(async () => {
         try {
           console.log("Polling task:", liveTask.id);
@@ -444,27 +475,53 @@ export default function ImportPage() {
           console.log("Latest task:", latestTask);
           
           updateTask(latestTask.id, latestTask);
+          
+          // 检查进度是否有变化
+          const previousProgress = convertProgress;
           setConvertProgress(latestTask.progress);
+          
+          if (latestTask.progress > previousProgress) {
+            setLastProgressUpdate(Date.now());
+          }
+
+          // 更新当前步骤
+          if (latestTask.current_step && stepNames[latestTask.current_step]) {
+            const stepName = stepNames[latestTask.current_step];
+            if (currentStep !== stepName) {
+              setCurrentStep(stepName);
+              setStepMessages(prev => [...prev, `🔄 ${stepName}...`]);
+            }
+          }
 
           if (latestTask.status === "done") {
+            setCurrentStep("完成");
+            setStepMessages(prev => [...prev, "🎉 剧本转换完成！"]);
             const scriptDetail = await fetchScript(script.id);
             upsertScript(mapBackendScriptToWorkbench(scriptDetail, projectId));
             updateProject(projectId, { status: "ready" });
             setCurrentScript(script.id);
             window.clearInterval(completionPoll);
-            addToast({ type: "success", title: "剧本转换完成" });
-            navigate("/tasks");
+            setTimeout(() => {
+              addToast({ type: "success", title: "剧本转换完成" });
+              navigate("/tasks");
+            }, 1000);
           } else if (latestTask.status === "failed") {
+            setCurrentStep("失败");
+            setStepMessages(prev => [...prev, `❌ 转换失败: ${latestTask.error_message ?? "未知错误"}`]);
             updateProject(projectId, { status: "idle" });
             window.clearInterval(completionPoll);
-            addToast({
-              type: "error",
-              title: "转换失败",
-              message: latestTask.error_message ?? "后端处理失败",
-            });
+            setTimeout(() => {
+              addToast({
+                type: "error",
+                title: "转换失败",
+                message: latestTask.error_message ?? "后端处理失败",
+              });
+            }, 500);
           }
         } catch (error) {
           console.error("Polling error:", error);
+          setCurrentStep("轮询失败");
+          setStepMessages(prev => [...prev, `❌ 轮询失败: ${error instanceof Error ? error.message : "未知错误"}`]);
           window.clearInterval(completionPoll);
           addToast({
             type: "error",
@@ -473,6 +530,23 @@ export default function ImportPage() {
           });
         }
       }, 2500);
+
+      // 添加模拟进度更新机制，防止进度长时间不动
+      const heartbeatInterval = window.setInterval(() => {
+        const now = Date.now();
+        const timeSinceLastUpdate = now - lastProgressUpdate;
+        
+        // 如果超过5秒没有进度更新，添加心跳消息
+        if (timeSinceLastUpdate > 5000 && convertProgress < 100) {
+          setStepMessages(prev => {
+            const lastMsg = prev[prev.length - 1];
+            if (!lastMsg?.includes("处理中")) {
+              return [...prev, "⏳ AI正在处理中..."];
+            }
+            return prev;
+          });
+        }
+      }, 8000);
     } catch (error) {
       setStep("configure");
       addToast({
@@ -818,13 +892,13 @@ export default function ImportPage() {
                   {[
                     {
                       key: "short" as const,
-                      label: "竖屏短剧",
-                      desc: "快节奏、强冲突、每集 1-3 分钟",
+                      label: "影视作品剧本",
+                      desc: "适合影视制作，标准剧本格式",
                     },
                     {
                       key: "long" as const,
-                      label: "悬疑长剧",
-                      desc: "多线叙事、人物关系复杂、每集 10-15 分钟",
+                      label: "电影剧本",
+                      desc: "长篇电影剧本，完整故事架构",
                     },
                   ].map((type) => (
                     <button
@@ -881,12 +955,95 @@ export default function ImportPage() {
             </button>
             <button
               type="button"
-              onClick={handleStartConvert}
+              onClick={() => setStep("confirm")}
               disabled={!adaptType}
               className="inline-flex items-center gap-1.5 rounded-lg bg-(--accent-soft) px-5 py-2 text-sm font-medium text-white hover:bg-(--accent-soft)/90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
             >
               <Sparkles className="h-4 w-4" />
-              开始 AI 转换
+              预览转换效果
+            </button>
+          </div>
+        </div>
+      )}
+
+      {step === "confirm" && (
+        <div className="space-y-6 animate-fade-in-up">
+          <div className="card">
+            <p className="text-xs uppercase tracking-[0.22em] text-(--text-faint) mb-4">
+              确认转换配置
+            </p>
+            
+            <div className="space-y-4">
+              {/* 剧本类型 */}
+              <div className="flex items-center justify-between p-4 rounded-xl bg-(--accent-light)/30">
+                <div>
+                  <p className="text-sm text-(--text-subtle)">剧本类型</p>
+                  <p className="font-medium text-foreground">
+                    {adaptType === "short" ? "影视作品剧本" : "电影剧本"}
+                  </p>
+                </div>
+                <div className="w-10 h-10 rounded-full bg-(--accent-soft) flex items-center justify-center">
+                  <Film className="h-5 w-5 text-white" />
+                </div>
+              </div>
+
+              {/* 章节数量 */}
+              <div className="flex items-center justify-between p-4 rounded-xl bg-(--accent-light)/30">
+                <div>
+                  <p className="text-sm text-(--text-subtle)">待处理章节</p>
+                  <p className="font-medium text-foreground">
+                    {selectedChapters.size} 个章节
+                  </p>
+                </div>
+                <div className="w-10 h-10 rounded-full bg-green-500 flex items-center justify-center">
+                  <BookOpen className="h-5 w-5 text-white" />
+                </div>
+              </div>
+
+              {/* 预计时间 */}
+              <div className="flex items-center justify-between p-4 rounded-xl bg-(--accent-light)/30">
+                <div>
+                  <p className="text-sm text-(--text-subtle)">预计处理时间</p>
+                  <p className="font-medium text-foreground">
+                    {selectedChapters.size * 2 - 5} - {selectedChapters.size * 3} 秒
+                  </p>
+                </div>
+                <div className="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center">
+                  <Clock className="h-5 w-5 text-white" />
+                </div>
+              </div>
+
+              {/* 章节列表预览 */}
+              <div className="p-4 rounded-xl border border-(--line-soft)">
+                <p className="text-sm font-medium text-foreground mb-3">章节列表</p>
+                <div className="space-y-2 max-h-40 overflow-y-auto">
+                  {selectedChapterList.map((ch) => (
+                    <div key={ch.index} className="flex items-center justify-between text-sm">
+                      <span className="text-(--text-subtle)">第 {ch.index} 章</span>
+                      <span className="text-(--text-faint) truncate max-w-[200px]">{ch.title}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex justify-between">
+            <button
+              type="button"
+              onClick={() => setStep("configure")}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-(--line-medium) px-4 py-2 text-sm text-foreground hover:bg-(--muted) transition-colors"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              返回修改
+            </button>
+            <button
+              type="button"
+              onClick={handleStartConvert}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-(--accent-soft) px-5 py-2 text-sm font-medium text-white hover:bg-(--accent-soft)/90 transition-colors"
+            >
+              <Sparkles className="h-4 w-4" />
+              确认开始转换
             </button>
           </div>
         </div>
@@ -894,71 +1051,166 @@ export default function ImportPage() {
 
       {step === "converting" && (
         <div className="animate-fade-in-up">
-          <div className="card text-center py-12">
-            <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-full bg-(--accent-light)">
-              {convertProgress < 100 ? (
-                <Loader2 className="h-7 w-7 animate-spin text-(--accent-soft)" />
-              ) : (
-                <Check className="h-7 w-7 text-green-500" />
-              )}
+          <div className="card overflow-hidden">
+            {/* 头部动画区域 */}
+            <div className="bg-gradient-to-br from-(--accent-light) to-white py-8 px-6 text-center">
+              <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-white shadow-lg">
+                {convertProgress < 100 ? (
+                  <Loader2 className="h-7 w-7 animate-spin text-(--accent-soft)" />
+                ) : (
+                  <Check className="h-7 w-7 text-green-500" />
+                )}
+              </div>
+              <h2 className="font-serif text-xl text-foreground mb-2">
+                {convertProgress < 100 ? "AI 正在分析转换..." : "转换完成！"}
+              </h2>
+              <p className="text-sm text-(--text-subtle) max-w-md mx-auto">
+                {convertProgress < 100
+                  ? "正在逐章解析文本结构，提取人物与场景关系"
+                  : "小说文本已成功转换为结构化剧本"}
+              </p>
             </div>
 
-            <h2 className="font-serif text-xl text-foreground mb-2">
-              {convertProgress < 100 ? "AI 正在分析转换..." : "转换完成！"}
-            </h2>
-            <p className="text-sm text-(--text-subtle) mb-6 max-w-md mx-auto leading-6">
-              {convertProgress < 100
-                ? "正在逐章解析文本结构，提取人物与场景关系，按照剧本规范生成结构化数据。"
-                : "小说文本已成功转换为结构化剧本，可前往工作台查看和编辑。"}
-            </p>
-
-            <div className="mx-auto max-w-xs">
-              <div className="flex items-center justify-between text-xs text-(--text-subtle) mb-2">
-                <span>转换进度</span>
-                <span>{Math.round(convertProgress)}%</span>
+            {/* 进度条 */}
+            <div className="px-6 py-4 border-b border-(--line-soft)">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm font-medium text-foreground">转换进度</span>
+                <span className="text-sm font-bold text-(--accent-soft)">{Math.round(convertProgress)}%</span>
               </div>
-              <div className="h-2 overflow-hidden rounded-full bg-(--muted)">
+              <div className="relative h-3 overflow-hidden rounded-full bg-(--muted)">
                 <div
-                  className="h-full rounded-full bg-(--accent-soft) transition-all duration-500 ease-out"
+                  className="absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-(--accent-soft) to-(--accent-soft)/70 transition-all duration-500 ease-out"
+                  style={{ width: `${convertProgress}%` }}
+                />
+                <div
+                  className="absolute inset-y-0 left-0 w-1/3 rounded-full bg-white/30 animate-pulse"
                   style={{ width: `${convertProgress}%` }}
                 />
               </div>
             </div>
 
-            <div className="mt-8 space-y-2 max-w-sm mx-auto text-left">
-              {selectedChapterList.slice(0, 5).map((ch, idx) => {
-                const done = convertProgress > ((idx + 1) / selectedChapterList.length) * 100;
-                return (
-                  <div
-                    key={ch.index}
-                    className="flex items-center gap-3 text-sm"
-                  >
-                    <div
-                      className={`flex h-5 w-5 items-center justify-center rounded-full ${
-                        done
-                          ? "bg-green-100 text-green-600"
-                          : "bg-(--muted) text-(--text-faint)"
-                      }`}
-                    >
-                      {done ? (
-                        <Check className="h-3 w-3" />
-                      ) : (
-                        <span className="text-xs">{idx + 1}</span>
+            {/* 当前步骤 */}
+            <div className="px-6 py-4 bg-(--accent-light)/30">
+              <div className="flex items-center gap-3">
+                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-(--accent-soft) text-white">
+                  <Sparkles className="h-4 w-4" />
+                </div>
+                <div>
+                  <p className="text-xs text-(--text-faint)">当前步骤</p>
+                  <p className="text-sm font-medium text-foreground">
+                    {currentStep || "初始化中..."}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* 步骤日志 */}
+            <div className="px-6 py-4 max-h-[300px] overflow-y-auto">
+              <p className="text-xs uppercase tracking-[0.15em] text-(--text-faint) mb-3">处理日志</p>
+              <div className="space-y-2">
+                {stepMessages.length === 0 ? (
+                  <div className="flex items-center gap-2 text-sm text-(--text-subtle)">
+                    <div className="flex h-5 w-5 items-center justify-center rounded-full bg-(--muted)">
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                    </div>
+                    <span>等待任务开始...</span>
+                  </div>
+                ) : (
+                  stepMessages.map((msg, idx) => (
+                    <div key={idx} className="flex items-start gap-2 text-sm">
+                      <div className={`flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full ${
+                        msg.includes("完成") ? "bg-green-100 text-green-600" : 
+                        msg.includes("失败") ? "bg-red-100 text-red-600" : 
+                        "bg-(--accent-light) text-(--accent-soft)"
+                      }`}>
+                        {msg.includes("完成") ? <Check className="h-3 w-3" /> :
+                         msg.includes("失败") ? <AlertCircle className="h-3 w-3" /> :
+                         <span className="text-xs">{idx + 1}</span>}
+                      </div>
+                      <span className={msg.includes("失败") ? "text-red-500" : "text-foreground"}>
+                        {msg}
+                      </span>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
+            {/* 步骤详情 */}
+            <div className="px-6 py-4 border-t border-(--line-soft)">
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-xs uppercase tracking-[0.15em] text-(--text-faint)">步骤处理详情</p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    console.log("查看步骤详情");
+                  }}
+                  className="text-xs text-(--accent-soft) hover:underline"
+                >
+                  查看完整报告
+                </button>
+              </div>
+              <div className="space-y-2 text-xs max-h-[200px] overflow-y-auto">
+                {stepMessages.filter(msg => msg.includes("步骤") || msg.includes("提取") || msg.includes("移除") || msg.includes("转换") || msg.includes("标记")).map((msg, idx) => (
+                  <div key={idx} className="flex items-start gap-2 p-2 rounded-lg bg-(--muted)/50">
+                    <div className="flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-full bg-(--accent-light) text-(--accent-soft)">
+                      <Check className="h-2.5 w-2.5" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-foreground font-medium">{msg}</p>
+                      {msg.includes("提取对话") && (
+                        <p className="text-(--text-subtle) mt-1">✓ 已为对话添加唯一标识 |id|</p>
+                      )}
+                      {msg.includes("移除") && (
+                        <p className="text-(--text-subtle) mt-1">✓ 移除的语句已记录在详细报告中</p>
+                      )}
+                      {msg.includes("标记对话主体") && (
+                        <p className="text-(--text-subtle) mt-1">✓ 已使用 ***主体*** 标记说话人</p>
+                      )}
+                      {msg.includes("转换心理描写") && (
+                        <p className="text-(--text-subtle) mt-1">✓ 已转换为动作描写</p>
                       )}
                     </div>
-                    <span
-                      className={`truncate ${done ? "text-foreground" : "text-(--text-subtle)"}`}
-                    >
-                      {ch.title}
-                    </span>
                   </div>
-                );
-              })}
-              {selectedChapterList.length > 5 && (
-                <p className="text-xs text-(--text-faint) pl-8">
-                  还有 {selectedChapterList.length - 5} 个章节...
+                ))}
+              </div>
+            </div>
+
+            {/* 章节进度 */}
+            <div className="px-6 py-4 border-t border-(--line-soft) bg-(--muted)/50">
+              <p className="text-xs uppercase tracking-[0.15em] text-(--text-faint) mb-3">章节处理</p>
+              <div className="grid grid-cols-2 gap-2">
+                {selectedChapterList.slice(0, 6).map((ch, idx) => {
+                  const done = convertProgress > ((idx + 1) / selectedChapterList.length) * 100;
+                  return (
+                    <div
+                      key={ch.index}
+                      className={`flex items-center gap-2 rounded-lg px-3 py-2 text-xs ${
+                        done ? "bg-green-50 text-green-700" : "bg-white text-(--text-subtle)"
+                      }`}
+                    >
+                      <div className={`flex h-4 w-4 items-center justify-center rounded-full ${
+                        done ? "bg-green-500" : "bg-(--line-soft)"
+                      }`}>
+                        {done ? <Check className="h-2.5 w-2.5 text-white" /> : null}
+                      </div>
+                      <span className="truncate">{ch.title}</span>
+                    </div>
+                  );
+                })}
+              </div>
+              {selectedChapterList.length > 6 && (
+                <p className="mt-2 text-xs text-(--text-faint)">
+                  还有 {selectedChapterList.length - 6} 个章节待处理...
                 </p>
               )}
+            </div>
+
+            {/* 底部提示 */}
+            <div className="px-6 py-4 bg-(--accent-light)/20 text-center">
+              <p className="text-xs text-(--text-subtle)">
+                预计剩余时间：{Math.max(0, Math.round((100 - convertProgress) * 0.1))} 秒 (快速模式)
+              </p>
             </div>
           </div>
         </div>
