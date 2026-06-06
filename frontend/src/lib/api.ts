@@ -99,8 +99,11 @@ export async function apiJson<T>(
   path: string,
   init?: RequestInit,
 ): Promise<ApiEnvelope<T>> {
+  console.log(`Calling API: ${path}`, init);
   const response = await apiFetch(path, init);
-  return response.json() as Promise<ApiEnvelope<T>>;
+  const json = await response.json();
+  console.log(`API response for ${path}:`, json);
+  return json as ApiEnvelope<T>;
 }
 
 export async function createScript(payload: {
@@ -116,25 +119,20 @@ export async function createScript(payload: {
     body: JSON.stringify(payload),
   });
 
+  console.log("createScript response:", response);
+  console.log("createScript returning:", response.data);
   return response.data;
 }
 
 export async function startScriptProcessing(scriptId: string) {
-  const response = await apiJson<{
-    id: string;
-    script_id: string;
-    steps: string[];
-    current_step?: string | null;
-    status: string;
-    progress: number;
-    error_message?: string | null;
-    created_at: string;
-    updated_at: string;
-  }>(`scripts/${scriptId}/process`, {
-    method: "POST",
-  });
+  const response = await apiJson<{ task: BackendTask }>(
+    `scripts/${scriptId}/process`,
+    {
+      method: "POST",
+    },
+  );
 
-  return response.data;
+  return response.data.task;
 }
 
 export async function fetchScript(scriptId: string) {

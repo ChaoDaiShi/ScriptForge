@@ -41,6 +41,8 @@ export default function ImportPage() {
   const [dragOver, setDragOver] = useState(false);
   const [pasteContent, setPasteContent] = useState("");
   const [chapters, setChapters] = useState<ChapterPreview[]>([]);
+  const [selectedChapters, setSelectedChapters] = useState<Set<number>>(new Set());
+  const [selectedChapterList, setSelectedChapterList] = useState<ChapterPreview[]>([]);
   const [adaptType, setAdaptType] = useState<"short" | "long" | null>(null);
   const [convertProgress, setConvertProgress] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -62,37 +64,42 @@ export default function ImportPage() {
   const mapBackendScriptToWorkbench = (
     script: Awaited<ReturnType<typeof createScript>>,
     projectId: string,
-  ) => ({
-    id: script.id,
-    projectId,
-    title: script.title,
-    sourceText: script.original_text,
-    backend: script,
-    episodes: [
-      {
-        id: `${script.id}_episode_1`,
-        title: script.title,
-        coldOpen: script.main_plot ?? undefined,
-        scenes: script.scenes.map((scene) => ({
-          id: scene.id,
-          code: `SC-${scene.heading.scene_number}`,
-          title: `${scene.heading.location} · ${scene.heading.time_of_day}`,
-          location: scene.heading.location,
-          intent:
-            typeof scene.descriptions[0]?.content === "string"
-              ? String(scene.descriptions[0].content)
-              : (scene.dialogues[0]?.content ?? "待补充场景意图"),
-          beats: scene.dialogues.map((dialogue) => ({
-            id: dialogue.id,
-            description: dialogue.content,
-            dialogue: dialogue.content,
-            character: dialogue.speaker_name ?? undefined,
-          })),
-          status: "draft" as const,
-        })),
-      },
-    ],
-  });
+  ) => {
+    const scenes = script.scenes || [];
+    return {
+      id: script.id,
+      projectId,
+      title: script.title,
+      sourceText: script.original_text ?? "",
+      backend: script,
+      episodes: scenes.length > 0
+        ? [
+            {
+              id: `${script.id}_episode_1`,
+              title: script.title,
+              coldOpen: script.main_plot ?? undefined,
+              scenes: scenes.map((scene) => ({
+                id: scene.id,
+                code: `SC-${scene.heading?.scene_number || 1}`,
+                title: `${scene.heading?.location || "未知地点"} · ${scene.heading?.time_of_day || "未知时间"}`,
+                location: scene.heading?.location || "未知地点",
+                intent:
+                  typeof scene.descriptions?.[0]?.content === "string"
+                    ? String(scene.descriptions[0].content)
+                    : (scene.dialogues?.[0]?.content ?? "待补充场景意图"),
+                beats: (scene.dialogues || []).map((dialogue) => ({
+                  id: dialogue.id,
+                  description: dialogue.content,
+                  dialogue: dialogue.content,
+                  character: dialogue.speaker_name ?? undefined,
+                })),
+                status: "draft" as const,
+              })),
+            },
+          ]
+        : [],
+    };
+  };
 
   useEffect(() => {
     if (step !== "converting") {
@@ -344,11 +351,22 @@ export default function ImportPage() {
 
     setPasteContent(text); // 确保文本内容被保存
     setChapters(detected);
+    // 自动选中所有章节
+    setSelectedChapters(new Set(detected.map(ch => ch.index)));
+    setSelectedChapterList([]); // 清空之前的选中列表
     setStep("preview");
   };
 
   const handleStartConvert = async () => {
     if (!adaptType || !pasteContent.trim() || isSubmitting) return;
+    if (selectedChapters.size === 0) {
+      addToast({
+        type: "error",
+        title: "请选择章节",
+        message: "请至少选择一个章节进行AI分析",
+      });
+      return;
+    }
 
     setIsSubmitting(true);
     setStep("converting");
@@ -358,55 +376,56 @@ export default function ImportPage() {
     const novelId = `novel_${Date.now().toString(36)}`;
     const project = {
       id: projectId,
-      title: `新项目 (${chapters.length}章)`,
+      title: `新项目 (${selectedChapters.size}章)`,
       sourceNovel: "导入文本",
       sourceAuthor: "未知作者",
-      chapterCount: chapters.length,
+      chapterCount: selectedChapters.size,
       status: "converting" as const,
       createdAt: new Date().toISOString(),
     };
     addProject(project);
     setCurrentProject(projectId);
 
-    // 提取每章的内容并保存到NovelStore
-    const lines = pasteContent.split('\n');
-    const chaptersWithContent = chapters.map((ch) => {
-      let content = '';
-      if (ch.startPos !== undefined && ch.endPos !== undefined) {
-        content = lines.slice(ch.startPos, ch.endPos).join('\n');
-      }
-      return {
-        index: ch.index,
-        title: ch.title,
-        wordCount: ch.wordCount,
-        content,
-        startPos: ch.startPos,
-        endPos: ch.endPos,
-      };
-    });
+    // 提取选中的章节内容
+    const filteredSelectedChapterList = chapters.filter(ch => selectedChapters.has(ch.index));
+    setSelectedChapterList(filteredSelectedChapterList); // 保存到状态
+    const selectedContent = filteredSelectedChapterList.map(ch => ch.title + '\n' + pasteContent).join('\n\n');
 
     const novelData = {
       id: novelId,
       projectId,
       title: project.title,
       author: "未知作者",
-      totalChapters: chapters.length,
-      totalWordCount: pasteContent.length,
-      chapters: chaptersWithContent,
-      fullText: pasteContent,
+      totalChapters: selectedChapters.size,
+      totalWordCount: selectedContent.length,
+      chapters: filteredSelectedChapterList.map((ch, idx) => ({
+        index: idx + 1,
+        title: ch.title,
+        wordCount: ch.wordCount,
+        originalIndex: ch.index,
+      })),
+      fullText: selectedContent,
       createdAt: new Date().toISOString(),
     };
     addNovel(novelData);
     setCurrentNovel(novelId);
 
     try {
+      console.log("Step 1: Creating script...");
       const script = await createScript({
         title: project.title,
         type: adaptType === "short" ? "short_film" : "feature_film",
-        text: pasteContent.trim(),
+        text: selectedContent.trim(),
       });
+      console.log("Script created:", script);
+
+      console.log("Step 2: Starting script processing...");
       const processingTask = await startScriptProcessing(script.id);
+      console.log("Processing task:", processingTask);
+
+      console.log("Step 3: Fetching live task...");
       const liveTask = await fetchTask(processingTask.id);
+      console.log("Live task:", liveTask);
 
       updateProject(projectId, {
         scriptId: script.id,
@@ -420,7 +439,10 @@ export default function ImportPage() {
 
       const completionPoll = window.setInterval(async () => {
         try {
+          console.log("Polling task:", liveTask.id);
           const latestTask = await fetchTask(liveTask.id);
+          console.log("Latest task:", latestTask);
+          
           updateTask(latestTask.id, latestTask);
           setConvertProgress(latestTask.progress);
 
@@ -431,6 +453,7 @@ export default function ImportPage() {
             setCurrentScript(script.id);
             window.clearInterval(completionPoll);
             addToast({ type: "success", title: "剧本转换完成" });
+            navigate("/tasks");
           } else if (latestTask.status === "failed") {
             updateProject(projectId, { status: "idle" });
             window.clearInterval(completionPoll);
@@ -441,6 +464,7 @@ export default function ImportPage() {
             });
           }
         } catch (error) {
+          console.error("Polling error:", error);
           window.clearInterval(completionPoll);
           addToast({
             type: "error",
@@ -449,10 +473,6 @@ export default function ImportPage() {
           });
         }
       }, 2500);
-
-      setTimeout(() => {
-        navigate("/tasks");
-      }, 800);
     } catch (error) {
       setStep("configure");
       addToast({
@@ -656,13 +676,29 @@ export default function ImportPage() {
                 </p>
                 <p className="mt-1 text-sm text-foreground">
                   已识别 <strong>{chapters.length}</strong>{" "}
-                  个章节，请确认划分是否正确
+                  个章节，已选择 <strong>{selectedChapters.size}</strong>{" "}
+                  个章节进行AI分析
                 </p>
               </div>
-              <span className="badge badge-success">
-                <Check className="h-3 w-3" />
-                {chapters.length} 章节
-              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (selectedChapters.size === chapters.length) {
+                      setSelectedChapters(new Set());
+                    } else {
+                      setSelectedChapters(new Set(chapters.map(ch => ch.index)));
+                    }
+                  }}
+                  className="rounded-lg border border-(--line-soft) px-3 py-1.5 text-xs text-foreground hover:bg-(--muted) transition-colors"
+                >
+                  {selectedChapters.size === chapters.length ? "取消全选" : "全选"}
+                </button>
+                <span className="badge badge-success">
+                  <Check className="h-3 w-3" />
+                  {selectedChapters.size}/{chapters.length}
+                </span>
+              </div>
             </div>
 
             <div className="mb-4 rounded-lg border border-(--line-soft) bg-(--accent-light)/30 p-3">
@@ -675,16 +711,36 @@ export default function ImportPage() {
 
             <div className="space-y-2 max-h-[400px] overflow-y-auto pr-1">
               {chapters.map((ch, idx) => {
-                const percentage = chapters.length > 0 
-                  ? Math.round((ch.wordCount / pasteContent.length) * 100) 
+                const percentage = chapters.length > 0
+                  ? Math.round((ch.wordCount / pasteContent.length) * 100)
                   : 0;
-                
+                const isSelected = selectedChapters.has(ch.index);
+
                 return (
                   <div
                     key={ch.index}
-                    className="group rounded-xl border border-(--line-soft) bg-white px-4 py-3 hover:border-(--accent-soft)/50 hover:bg-(--accent-light)/30 transition-all"
+                    className={`group rounded-xl border cursor-pointer transition-all ${
+                      isSelected
+                        ? "border-(--accent-soft) bg-(--accent-light)/30"
+                        : "border-(--line-soft) bg-white hover:border-(--accent-soft)/50 hover:bg-(--accent-light)/30"
+                    }`}
+                    onClick={() => {
+                      const newSelected = new Set(selectedChapters);
+                      if (isSelected) {
+                        newSelected.delete(ch.index);
+                      } else {
+                        newSelected.add(ch.index);
+                      }
+                      setSelectedChapters(newSelected);
+                    }}
                   >
-                    <div className="flex items-center gap-3 mb-2">
+                    <div className="flex items-center gap-3 p-3">
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={() => {}}
+                        className="h-4 w-4 rounded border-(--line-medium) text-(--accent-soft) focus:ring-(--accent-soft)/30"
+                      />
                       <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-(--accent-light) text-sm font-medium text-(--accent-soft)">
                         {ch.index}
                       </span>
@@ -695,17 +751,25 @@ export default function ImportPage() {
                         {ch.wordCount.toLocaleString()} 字
                       </span>
                     </div>
-                    
+
                     {/* 字数进度条 */}
                     <div className="relative h-1.5 w-full overflow-hidden rounded-full bg-(--muted)">
-                      <div 
+                      <div
                         className="h-full rounded-full bg-gradient-to-r from-(--accent-soft) to-(--accent-soft)/70 transition-all duration-500"
                         style={{ width: `${percentage}%` }}
                       />
                     </div>
-                    <p className="mt-1.5 text-xs text-(--text-faint) text-right">
-                      占比 {percentage}%
-                    </p>
+                    <div className="flex items-center justify-between px-3 pb-2">
+                      <p className="text-xs text-(--text-faint)">
+                        占比 {percentage}%
+                      </p>
+                      {isSelected && (
+                        <span className="badge badge-success">
+                          <Check className="h-3 w-3" />
+                          已选择
+                        </span>
+                      )}
+                    </div>
                   </div>
                 );
               })}
@@ -723,10 +787,16 @@ export default function ImportPage() {
             </button>
             <button
               type="button"
-              onClick={() => setStep("configure")}
+              onClick={() => {
+                if (selectedChapters.size === 0) {
+                  alert("请至少选择一个章节进行AI分析");
+                  return;
+                }
+                setStep("configure");
+              }}
               className="inline-flex items-center gap-1.5 rounded-lg bg-(--accent-soft) px-5 py-2 text-sm font-medium text-white hover:bg-(--accent-soft)/90 transition-colors"
             >
-              继续配置
+              继续配置 ({selectedChapters.size} 个章节)
               <ArrowRight className="h-4 w-4" />
             </button>
           </div>
@@ -783,12 +853,17 @@ export default function ImportPage() {
                   <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-(--accent-soft)" />
                   <div>
                     <p className="text-sm font-medium text-foreground">
-                      AI 将分析 {chapters.length} 个章节
+                      AI 将分析已选择的 {selectedChapters.size} 个章节
                     </p>
                     <p className="mt-1 text-xs text-(--text-subtle) leading-5">
                       逐一解析章节内容，提取人物、场景和对白，按照剧本原子化规范生成结构化
-                      YAML 剧本。过程约需 1-3 分钟。
+                      YAML 剧本。过程约需 {selectedChapters.size * 0.5}-{selectedChapters.size * 1} 分钟。
                     </p>
+                    {selectedChapters.size < chapters.length && (
+                      <p className="mt-1 text-xs text-(--accent-soft)">
+                        提示：您选择了 {selectedChapters.size}/{chapters.length} 个章节进行测试，其他章节将在后续分析。
+                      </p>
+                    )}
                   </div>
                 </div>
               </div>
@@ -851,9 +926,8 @@ export default function ImportPage() {
             </div>
 
             <div className="mt-8 space-y-2 max-w-sm mx-auto text-left">
-              {chapters.slice(0, 5).map((ch) => {
-                const done =
-                  convertProgress > (ch.index / chapters.length) * 100;
+              {selectedChapterList.slice(0, 5).map((ch, idx) => {
+                const done = convertProgress > ((idx + 1) / selectedChapterList.length) * 100;
                 return (
                   <div
                     key={ch.index}
@@ -869,7 +943,7 @@ export default function ImportPage() {
                       {done ? (
                         <Check className="h-3 w-3" />
                       ) : (
-                        <span className="text-xs">{ch.index}</span>
+                        <span className="text-xs">{idx + 1}</span>
                       )}
                     </div>
                     <span
@@ -880,9 +954,9 @@ export default function ImportPage() {
                   </div>
                 );
               })}
-              {chapters.length > 5 && (
+              {selectedChapterList.length > 5 && (
                 <p className="text-xs text-(--text-faint) pl-8">
-                  还有 {chapters.length - 5} 个章节...
+                  还有 {selectedChapterList.length - 5} 个章节...
                 </p>
               )}
             </div>
