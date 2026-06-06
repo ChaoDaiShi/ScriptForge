@@ -83,7 +83,7 @@ export default async function handler(
       body:
         request.method && ["GET", "HEAD"].includes(request.method)
           ? undefined
-          : (request as unknown as BodyInit),
+          : (request as unknown as RequestInit["body"]),
       duplex: "half",
     });
 
