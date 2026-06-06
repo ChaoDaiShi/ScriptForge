@@ -107,8 +107,9 @@ export default function ImportPage() {
 
   const detectChapters = (text: string): ChapterPreview[] => {
     const lines = text.split("\n");
+    // 更全面的章节检测正则表达式，支持更多格式
     const chapterRegex =
-      /^(第[一二三四五六七八九十百千零\d]+[章节部回]|Chapter\s+\d+)/i;
+      /^(第[一二三四五六七八九十百千零\d]+[章节部回卷]|Chapter\s+\d+|VOLUME\s*\d+|卷[一二三四五六七八九十百千零\d]+|第\s*[一二三四五六七八九十百千零\d]+\s*[章节部回卷]|Ep\.\s*\d+|Episode\s+\d+)/i;
     const detected: ChapterPreview[] = [];
     let currentChapter = 0;
 
@@ -126,6 +127,25 @@ export default function ImportPage() {
       }
     });
 
+    // 如果没有检测到足够章节，尝试基于段落或其他方式创建虚拟章节
+    if (detected.length < 3 && text.trim().length > 0) {
+      const paragraphs = text.split(/\n\s*\n/).filter(p => p.trim().length > 0);
+      if (paragraphs.length > 0) {
+        // 将文本平均分成 3 个虚拟章节
+        const chunkSize = Math.ceil(paragraphs.length / 3);
+        for (let i = 0; i < 3; i++) {
+          const start = i * chunkSize;
+          const end = Math.min(start + chunkSize, paragraphs.length);
+          const chapterText = paragraphs.slice(start, end).join('\n\n');
+          detected.push({
+            index: i + 1,
+            title: `第 ${i + 1} 部分`,
+            wordCount: chapterText.length,
+          });
+        }
+      }
+    }
+
     return detected;
   };
 
@@ -142,10 +162,15 @@ export default function ImportPage() {
 
   const handleTextContent = (text: string) => {
     const detected = detectChapters(text);
-    if (detected.length < 3) {
-      alert("至少需要 3 个章节才能进行转换，请补充更多内容。");
+    const textLength = text.trim().length;
+    
+    // 如果没有检测到 3 个章节，但文本足够长（超过 1000 字），也允许通过
+    if (detected.length < 3 && textLength < 1000) {
+      alert("至少需要 3 个章节或文本超过 1000 字才能进行转换，请补充更多内容。");
       return;
     }
+    
+    setPasteContent(text); // 确保文本内容被保存
     setChapters(detected);
     setStep("preview");
   };
@@ -248,7 +273,7 @@ export default function ImportPage() {
         <h1 className="page-header-title">导入小说源文本</h1>
         <p className="page-header-description">
           支持 TXT 文件上传或直接粘贴小说内容。系统将自动识别章节结构，最少需要
-          3 个章节才能进行转换。
+          3 个章节或文本超过 1000 字才能进行转换。
         </p>
       </header>
 
@@ -317,7 +342,7 @@ export default function ImportPage() {
               value={pasteContent}
               onChange={(e) => setPasteContent(e.target.value)}
               className="w-full min-h-[220px] rounded-xl border border-(--line-medium) bg-white p-4 text-sm text-foreground placeholder:text-(--text-subtle) focus:outline-none focus:ring-2 focus:ring-(--accent-soft)/30 focus:border-(--accent-soft) resize-y transition-shadow"
-              placeholder="将你的小说段落粘贴在此处，至少包含 3 个章节..."
+              placeholder="将你的小说段落粘贴在此处，至少包含 3 个章节或文本超过 1000 字..."
             />
             <div className="mt-3 flex items-center justify-between">
               <span className="flex items-center gap-1.5 text-xs text-(--text-subtle)">

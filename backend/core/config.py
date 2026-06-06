@@ -31,22 +31,15 @@ class Settings(BaseSettings):
     ai_api_key: Optional[str] = None
     ai_api_base: Optional[str] = None
 
-    @field_validator("debug", mode="before")
-    @classmethod
-    def normalize_debug(cls, value: object) -> bool:
-        if isinstance(value, bool):
-            return value
-        if isinstance(value, str):
-            normalized = value.strip().lower()
-            if normalized in {"1", "true", "yes", "on", "debug", "dev"}:
-                return True
-            if normalized in {"0", "false", "no", "off", "release", "prod", "production"}:
-                return False
-        return bool(value)
+    # Supabase settings (for backward compatibility)
+    supabase_url: Optional[str] = None
+    supabase_key: Optional[str] = None
 
-    class Config:
-        env_file = ".env"
-        case_sensitive = False
+    model_config = {
+        "env_file": ".env",
+        "case_sensitive": False,
+        "extra": "ignore",  # Allow extra fields from .env
+    }
 
 
 # Create settings instance
