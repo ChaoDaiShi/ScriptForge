@@ -2,8 +2,10 @@
 Configuration settings.
 Loads environment variables and provides application settings.
 """
-from pydantic_settings import BaseSettings
 from typing import Optional
+
+from pydantic import field_validator
+from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
@@ -28,6 +30,19 @@ class Settings(BaseSettings):
     # AI API settings
     ai_api_key: Optional[str] = None
     ai_api_base: Optional[str] = None
+
+    @field_validator("debug", mode="before")
+    @classmethod
+    def normalize_debug(cls, value: object) -> bool:
+        if isinstance(value, bool):
+            return value
+        if isinstance(value, str):
+            normalized = value.strip().lower()
+            if normalized in {"1", "true", "yes", "on", "debug", "dev"}:
+                return True
+            if normalized in {"0", "false", "no", "off", "release", "prod", "production"}:
+                return False
+        return bool(value)
 
     class Config:
         env_file = ".env"
