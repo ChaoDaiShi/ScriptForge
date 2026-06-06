@@ -1,12 +1,15 @@
 from functools import lru_cache
 import os
+from pathlib import Path
 from typing import Any
 
 from dotenv import load_dotenv
 from supabase import Client, create_client
 
 
-load_dotenv()
+# Load .env from the backend directory (parent of core/)
+env_path = Path(__file__).resolve().parent.parent / ".env"
+load_dotenv(dotenv_path=env_path)
 
 
 class SupabaseConfigError(RuntimeError):

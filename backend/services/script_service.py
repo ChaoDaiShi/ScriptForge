@@ -29,7 +29,13 @@ from services.ai_service import AIService
 class ScriptService:
     """剧本处理服务"""
 
-    _repository = SupabaseScriptRepository()
+    _repository: Optional[SupabaseScriptRepository] = None
+
+    @classmethod
+    def _get_repository(cls) -> SupabaseScriptRepository:
+        if cls._repository is None:
+            cls._repository = SupabaseScriptRepository()
+        return cls._repository
 
     @staticmethod
     def _task_status_for_frontend(status: ProcessingStatus) -> str:
@@ -53,23 +59,23 @@ class ScriptService:
             type=request.type,
             original_text=request.text,
         )
-        return ScriptService._repository.create_script(script)
+        return ScriptService._get_repository().create_script(script)
 
     @staticmethod
     async def get_script(script_id: str) -> Optional[Script]:
-        return ScriptService._repository.get_script(script_id)
+        return ScriptService._get_repository().get_script(script_id)
 
     @staticmethod
     async def list_scripts(script_type: Optional[ScriptType] = None) -> List[Script]:
-        return ScriptService._repository.list_scripts(script_type)
+        return ScriptService._get_repository().list_scripts(script_type)
 
     @staticmethod
     async def delete_script(script_id: str) -> bool:
-        return ScriptService._repository.delete_script(script_id)
+        return ScriptService._get_repository().delete_script(script_id)
 
     @staticmethod
     async def create_processing_task(script_id: str) -> ProcessingTask:
-        script = ScriptService._repository.get_script(script_id)
+        script = ScriptService._get_repository().get_script(script_id)
         if not script:
             raise ValueError(f"剧本不存在: {script_id}")
 
@@ -93,7 +99,7 @@ class ScriptService:
             steps=steps,
             status=ProcessingStatus.PENDING,
         )
-        return ScriptService._repository.create_task(task)
+        return ScriptService._get_repository().create_task(task)
 
     @staticmethod
     async def process_script(script_id: str, task_id: str):
@@ -184,7 +190,7 @@ class ScriptService:
             await ScriptService._polish_script(script)
 
             script.updated_at = datetime.now()
-            ScriptService._repository.update_script(script)
+            ScriptService._get_repository().update_script(script)
 
             await ScriptService._update_task(
                 task_id,
@@ -293,20 +299,20 @@ class ScriptService:
 
     @staticmethod
     async def _update_task(task_id: str, **kwargs) -> Optional[ProcessingTask]:
-        return ScriptService._repository.update_task(task_id, kwargs)
+        return ScriptService._get_repository().update_task(task_id, kwargs)
 
     @staticmethod
     async def get_tasks(script_id: str) -> List[ProcessingTask]:
-        return ScriptService._repository.get_tasks(script_id)
+        return ScriptService._get_repository().get_tasks(script_id)
 
     @staticmethod
     async def get_task(task_id: str) -> Optional[ProcessingTask]:
-        return ScriptService._repository.get_task(task_id)
+        return ScriptService._get_repository().get_task(task_id)
 
     @staticmethod
     async def list_all_tasks(status: Optional[str] = None) -> List[TaskListItem]:
         items: List[TaskListItem] = []
-        for task in ScriptService._repository.list_tasks():
+        for task in ScriptService._get_repository().list_tasks():
             item = await ScriptService.serialize_task(task)
             if not item:
                 continue

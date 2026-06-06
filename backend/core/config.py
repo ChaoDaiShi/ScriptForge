@@ -2,8 +2,10 @@
 Configuration settings.
 Loads environment variables and provides application settings.
 """
-from pydantic_settings import BaseSettings
 from typing import Optional
+
+from pydantic import field_validator
+from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
