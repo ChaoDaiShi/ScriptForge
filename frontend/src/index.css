@@ -71,7 +71,7 @@
     --line-soft: rgba(94, 72, 58, 0.09);
     --line-medium: rgba(94, 72, 58, 0.12);
     --shadow-card: 0 12px 40px rgba(94, 72, 58, 0.08);
-    --shadow-surface: 0 20px 56px rgba(94, 72, 58, 0.10);
+    --shadow-surface: 0 20px 56px rgba(94, 72, 58, 0.1);
   }
 }
 
@@ -117,7 +117,11 @@
   .app-shell {
     position: relative;
     background:
-      linear-gradient(180deg, rgba(255, 253, 250, 0.95) 0%, rgba(244, 237, 230, 0.85) 100%),
+      linear-gradient(
+        180deg,
+        rgba(255, 253, 250, 0.95) 0%,
+        rgba(244, 237, 230, 0.85) 100%
+      ),
       hsl(var(--background));
   }
 
@@ -136,7 +140,11 @@
     height: 100%;
     padding: 1.25rem;
     overflow: auto;
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.50), rgba(255, 255, 255, 0.28));
+    background: linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.5),
+      rgba(255, 255, 255, 0.28)
+    );
   }
 
   .pane-card {
@@ -145,7 +153,9 @@
     border-radius: 1.25rem;
     padding: 1rem;
     box-shadow: 0 4px 16px rgba(94, 72, 58, 0.04);
-    transition: box-shadow 200ms ease, border-color 200ms ease;
+    transition:
+      box-shadow 200ms ease,
+      border-color 200ms ease;
   }
 
   .pane-card:hover {
@@ -155,7 +165,11 @@
 
   .scene-card {
     border: 1px solid var(--line-soft);
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.64), rgba(255, 255, 255, 0.44));
+    background: linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.64),
+      rgba(255, 255, 255, 0.44)
+    );
     border-radius: 1.5rem;
     padding: 1.25rem;
     transition:
@@ -170,9 +184,9 @@
   }
 
   .scene-card-active {
-    border-color: rgba(185, 125, 92, 0.30);
+    border-color: rgba(185, 125, 92, 0.3);
     box-shadow:
-      0 0 0 1px rgba(185, 125, 92, 0.10),
+      0 0 0 1px rgba(185, 125, 92, 0.1),
       0 8px 32px rgba(94, 72, 58, 0.07);
   }
 
@@ -192,23 +206,42 @@
     position: absolute;
     inset: 0 3px;
     border-radius: 999px;
-    background: linear-gradient(180deg, transparent, rgba(94, 72, 58, 0.08), transparent);
+    background: linear-gradient(
+      180deg,
+      transparent,
+      rgba(94, 72, 58, 0.08),
+      transparent
+    );
     transition: background 200ms ease;
   }
 
   .resize-handle:hover::after,
   .resize-handle[data-resize-handle-active]::after {
-    background: linear-gradient(180deg, transparent, rgba(185, 125, 92, 0.30), transparent);
+    background: linear-gradient(
+      180deg,
+      transparent,
+      rgba(185, 125, 92, 0.3),
+      transparent
+    );
   }
 
   .resize-handle[data-resize-handle-active]::after {
-    background: linear-gradient(180deg, transparent, rgba(185, 125, 92, 0.45), transparent);
+    background: linear-gradient(
+      180deg,
+      transparent,
+      rgba(185, 125, 92, 0.45),
+      transparent
+    );
   }
 
   .surface-card {
     border: 1px solid var(--line-soft);
     border-radius: 1.5rem;
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.70), rgba(255, 255, 255, 0.46));
+    background: linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.7),
+      rgba(255, 255, 255, 0.46)
+    );
     padding: 1.25rem;
     box-shadow: var(--shadow-surface);
   }

@@ -65,7 +65,11 @@ const yamlSnippet = `episode:
       reveal: 名单被人为擦除`;
 
 const revisions = [
-  { time: "2 分钟前", title: "接受 AI 对 Scene 01 的情绪增强", status: "saved" },
+  {
+    time: "2 分钟前",
+    title: "接受 AI 对 Scene 01 的情绪增强",
+    status: "saved",
+  },
   { time: "11 分钟前", title: "手动调整 Cold Open 节奏", status: "saved" },
   { time: "24 分钟前", title: "YAML 自动修复缩进错误", status: "warning" },
 ];
@@ -76,14 +80,12 @@ export default function Workbench() {
   const [activePrompt, setActivePrompt] = useState(assistantSuggestions[0]);
 
   const { isGenerating, setGenerating } = useAIStore();
-  const {
-    setLeftPaneWidth,
-    setCenterPaneWidth,
-    setRightPaneWidth,
-  } = useLayoutStore();
+  const { setLeftPaneWidth, setCenterPaneWidth, setRightPaneWidth } =
+    useLayoutStore();
   const { selectedSceneId, setSelectedSceneId } = useScriptStore();
 
-  const currentScene = scenes.find((scene) => scene.id === selectedSceneId) ?? scenes[0];
+  const currentScene =
+    scenes.find((scene) => scene.id === selectedSceneId) ?? scenes[0];
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-background text-foreground">
@@ -99,14 +101,24 @@ export default function Workbench() {
                 Episode 01 · 潮汐以下
               </h1>
               <p className="mt-1.5 max-w-3xl text-sm leading-relaxed text-[--text-subtle]">
-                三栏联动编辑当前冷开场与前两场戏，左侧参考原著上下文，中间打磨节拍，右侧接管 AI 协作、YAML 结构与版本回溯。
+                三栏联动编辑当前冷开场与前两场戏，左侧参考原著上下文，中间打磨节拍，右侧接管
+                AI 协作、YAML 结构与版本回溯。
               </p>
             </div>
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
-            <WorkbenchMetric label="解析进度" value="68%" hint="9 / 13 场已结构化" accent />
-            <WorkbenchMetric label="版本快照" value="10" hint="自动保留最近编辑记录" />
+            <WorkbenchMetric
+              label="解析进度"
+              value="68%"
+              hint="9 / 13 场已结构化"
+              accent
+            />
+            <WorkbenchMetric
+              label="版本快照"
+              value="10"
+              hint="自动保留最近编辑记录"
+            />
             <Button
               className="h-10 rounded-full bg-[--accent-soft] px-5 text-white shadow-[0_8px_20px_rgba(185,125,92,0.30)] hover:bg-[--accent-soft]/90 hover:shadow-[0_12px_28px_rgba(185,125,92,0.35)] transition-all duration-200"
               onClick={() => setGenerating(!isGenerating)}
@@ -269,7 +281,10 @@ export default function Workbench() {
                     return (
                       <article
                         key={scene.id}
-                        className={cn("scene-card", isSelected && "scene-card-active")}
+                        className={cn(
+                          "scene-card",
+                          isSelected && "scene-card-active",
+                        )}
                         onClick={() => setSelectedSceneId(scene.id)}
                         onMouseEnter={() => setHoveredSceneId(scene.id)}
                         onMouseLeave={() => setHoveredSceneId(null)}
@@ -330,7 +345,9 @@ export default function Workbench() {
                               <p
                                 className={cn(
                                   "mt-3 text-sm leading-7",
-                                  index === 1 ? "text-foreground" : "text-[--text-subtle]",
+                                  index === 1
+                                    ? "text-foreground"
+                                    : "text-[--text-subtle]",
                                 )}
                               >
                                 {beat}
@@ -385,13 +402,20 @@ export default function Workbench() {
                 {inspectorTab === "assistant" ? (
                   <div className="space-y-4">
                     <section className="pane-card">
-                      <SectionLabel label="协同副驾" action={isGenerating ? "流式生成中" : "已待命"} />
+                      <SectionLabel
+                        label="协同副驾"
+                        action={isGenerating ? "流式生成中" : "已待命"}
+                      />
                       <div className="rounded-2xl border border-[--accent-soft]/20 bg-[linear-gradient(180deg,rgba(255,255,255,0.78),rgba(240,223,211,0.44))] p-4">
                         <p className="text-sm leading-7 text-foreground">
-                          我建议先强化 Scene 01 中“脚步声靠近”的听觉焦虑，再把裴竞的登场压到最后一拍，这样悬念扣子会更利落。
+                          我建议先强化 Scene 01
+                          中“脚步声靠近”的听觉焦虑，再把裴竞的登场压到最后一拍，这样悬念扣子会更利落。
                         </p>
                         <div className="mt-4 flex flex-wrap gap-2">
-                          <Button size="sm" className="rounded-full bg-[--accent-soft] text-[#091018] hover:bg-[--accent-strong]">
+                          <Button
+                            size="sm"
+                            className="rounded-full bg-[--accent-soft] text-[#091018] hover:bg-[--accent-strong]"
+                          >
                             接受改写
                           </Button>
                           <Button
@@ -430,12 +454,16 @@ export default function Workbench() {
                       <SectionLabel label="Schema 校验" action="自动修复开启" />
                       <div className="space-y-3 text-sm">
                         <StatusRow
-                          icon={<CheckCircle2 className="h-4 w-4 text-emerald-300" />}
+                          icon={
+                            <CheckCircle2 className="h-4 w-4 text-emerald-300" />
+                          }
                           title="当前片段结构有效"
                           detail="Scene 01 和 Scene 02 均通过节拍字段校验。"
                         />
                         <StatusRow
-                          icon={<AlertCircle className="h-4 w-4 text-amber-300" />}
+                          icon={
+                            <AlertCircle className="h-4 w-4 text-amber-300" />
+                          }
                           title="发现 1 处命名可优化"
                           detail="建议把 cold_open.objective 压缩为更可执行的拍摄目标。"
                         />
@@ -456,7 +484,8 @@ export default function Workbench() {
                     <section className="pane-card">
                       <SectionLabel label="编译提示" action="JSON Schema" />
                       <div className="rounded-2xl border border-amber-500/24 bg-amber-100/70 p-4 text-sm text-amber-900">
-                        若手动编辑 YAML 出现缩进或字段缺失，右侧将即时标记并尝试自动修正，再同步回可视化卡片。
+                        若手动编辑 YAML
+                        出现缩进或字段缺失，右侧将即时标记并尝试自动修正，再同步回可视化卡片。
                       </div>
                     </section>
                   </div>
@@ -556,8 +585,12 @@ function WorkbenchMetric({
     <div
       className={cn(
         "rounded-2xl border px-4 py-3",
-        accent ? "border-[--accent-soft]/25 bg-[--accent-soft]/10" : "border-white/10 bg-white/[0.03]",
-        accent ? "border-[--accent-soft]/25 bg-[rgba(185,125,92,0.08)]" : "border-[rgba(94,72,58,0.08)] bg-white/42",
+        accent
+          ? "border-[--accent-soft]/25 bg-[--accent-soft]/10"
+          : "border-white/10 bg-white/[0.03]",
+        accent
+          ? "border-[--accent-soft]/25 bg-[rgba(185,125,92,0.08)]"
+          : "border-[rgba(94,72,58,0.08)] bg-white/42",
       )}
     >
       <p className="text-xs uppercase tracking-[0.22em] text-[--text-faint]">
@@ -601,7 +634,9 @@ function InspectorTabButton({
       onClick={onClick}
       className={cn(
         "inline-flex items-center justify-center gap-2 rounded-xl px-3 py-2 text-sm font-medium transition",
-        active ? "bg-[rgba(185,125,92,0.12)] text-foreground" : "text-[--text-subtle] hover:bg-white/60 hover:text-foreground",
+        active
+          ? "bg-[rgba(185,125,92,0.12)] text-foreground"
+          : "text-[--text-subtle] hover:bg-white/60 hover:text-foreground",
       )}
     >
       {icon}
@@ -642,7 +677,8 @@ export function WorkbenchOverviewCard() {
             继续推进当前工作台
           </h3>
           <p className="mt-2 max-w-xl text-sm text-[--text-subtle]">
-            当前集已完成 68% 结构化。继续进入三栏沉浸式工作台，处理 AI 回写、YAML 校验与节拍润色。
+            当前集已完成 68% 结构化。继续进入三栏沉浸式工作台，处理 AI
+            回写、YAML 校验与节拍润色。
           </p>
         </div>
         <ArrowRight className="hidden h-10 w-10 text-[--accent-soft] md:block" />

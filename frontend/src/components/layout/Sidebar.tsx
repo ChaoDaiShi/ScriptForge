@@ -57,7 +57,9 @@ export default function Sidebar() {
           </div>
           {sidebarOpen ? (
             <div className="mt-3">
-              <div className="font-medium text-foreground">Episode 01 polish</div>
+              <div className="font-medium text-foreground">
+                Episode 01 polish
+              </div>
               <div className="mt-1 text-xs leading-5 text-[--text-subtle]">
                 4 场景待复审，2 个素材包待同步。
               </div>
