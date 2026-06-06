@@ -11,7 +11,8 @@ import re
 from schemas.script_schema import (
     Script, ScriptType, Character, CharacterRole,
     Dialogue, Scene, SceneHeading, DescriptionType,
-    ProcessingTask, ProcessingStep, ProcessingStatus, ScriptCreateRequest
+    ProcessingTask, ProcessingStep, ProcessingStatus, ScriptCreateRequest,
+    TaskListItem
 )
 from services.ai_service import AIService
 from core.utils import success_response, text_deal
@@ -23,6 +24,43 @@ class ScriptService:
     # 内存存储（临时，后续替换为数据库）
     _scripts: Dict[str, Script] = {}
     _tasks: Dict[str, ProcessingTask] = {}
+
+    @staticmethod
+    def _task_status_for_frontend(status: ProcessingStatus) -> str:
+        """将后端处理状态映射到前端展示状态"""
+        mapping = {
+            ProcessingStatus.PENDING: "queued",
+            ProcessingStatus.PROCESSING: "running",
+            ProcessingStatus.COMPLETED: "done",
+            ProcessingStatus.FAILED: "failed",
+        }
+        return mapping.get(status, "queued")
+
+    @staticmethod
+    def _task_title(script: Script) -> str:
+        """生成任务标题"""
+        return f"{script.title} · AI 转换"
+
+    @staticmethod
+    def serialize_task(task: ProcessingTask) -> Optional[TaskListItem]:
+        """将处理任务序列化为前端消费结构"""
+        script = ScriptService._scripts.get(task.script_id)
+        if not script:
+            return None
+
+        return TaskListItem(
+            id=task.id,
+            script_id=task.script_id,
+            script_title=script.title,
+            title=ScriptService._task_title(script),
+            type="convert",
+            status=ScriptService._task_status_for_frontend(task.status),
+            progress=int(task.progress),
+            current_step=task.current_step.value if task.current_step else None,
+            error_message=task.error_message,
+            created_at=task.created_at,
+            updated_at=task.updated_at,
+        )
 
     @staticmethod
     async def create_script(request: ScriptCreateRequest) -> Script:
@@ -277,6 +315,21 @@ class ScriptService:
     async def get_task(task_id: str) -> Optional[ProcessingTask]:
         """获取单个处理任务"""
         return ScriptService._tasks.get(task_id)
+
+    @staticmethod
+    async def list_all_tasks(status: Optional[str] = None) -> List[TaskListItem]:
+        """获取所有任务，供任务中心使用"""
+        items: List[TaskListItem] = []
+        for task in ScriptService._tasks.values():
+            item = ScriptService.serialize_task(task)
+            if not item:
+                continue
+            if status and item.status != status:
+                continue
+            items.append(item)
+
+        items.sort(key=lambda item: item.updated_at, reverse=True)
+        return items
 
     @staticmethod
     async def export_json(script_id: str) -> Dict[str, Any]:

@@ -7,7 +7,10 @@ import {
   Trash2,
   RefreshCw,
 } from "lucide-react";
+import { useEffect, useState } from "react";
+import { deleteTask, fetchTasks, retryTask } from "@/lib/api";
 import { useTaskStore, type TaskItem } from "@/store/useTaskStore";
+import { useToastStore } from "@/store/useToastStore";
 
 const statusConfig = {
   queued: { icon: Clock, label: "排队中", color: "text-(--text-faint)" },
@@ -26,9 +29,38 @@ const columns: { key: TaskItem["status"]; label: string; count: number }[] = [
 
 function TaskCard({ task }: { task: TaskItem }) {
   const removeTask = useTaskStore((s) => s.removeTask);
-  const updateTask = useTaskStore((s) => s.updateTask);
+  const addTask = useTaskStore((s) => s.addTask);
+  const addToast = useToastStore((s) => s.addToast);
   const status = statusConfig[task.status];
   const StatusIcon = status.icon;
+
+  const handleRetry = async () => {
+    try {
+      const nextTask = await retryTask(task.id);
+      addTask(nextTask);
+      addToast({ type: "success", title: "已重新创建任务" });
+    } catch (error) {
+      addToast({
+        type: "error",
+        title: "重试失败",
+        message: error instanceof Error ? error.message : "未知错误",
+      });
+    }
+  };
+
+  const handleDelete = async () => {
+    try {
+      await deleteTask(task.id);
+      removeTask(task.id);
+      addToast({ type: "success", title: "任务已删除" });
+    } catch (error) {
+      addToast({
+        type: "error",
+        title: "删除失败",
+        message: error instanceof Error ? error.message : "未知错误",
+      });
+    }
+  };
 
   return (
     <div className="rounded-xl border border-(--line-soft) bg-white px-4 py-3 text-sm shadow-sm transition-all hover:shadow-md hover:border-(--line-medium) animate-scale-in">
@@ -47,7 +79,7 @@ function TaskCard({ task }: { task: TaskItem }) {
           {(task.status === "review" || task.status === "failed") && (
             <button
               type="button"
-              onClick={() => updateTask(task.id, { status: "queued" })}
+              onClick={handleRetry}
               className="rounded-md p-1 text-(--text-faint) hover:text-(--accent-soft) hover:bg-(--accent-light) transition-colors"
               title="重新排队"
             >
@@ -56,7 +88,7 @@ function TaskCard({ task }: { task: TaskItem }) {
           )}
           <button
             type="button"
-            onClick={() => removeTask(task.id)}
+            onClick={handleDelete}
             className="rounded-md p-1 text-(--text-faint) hover:text-red-400 hover:bg-red-50 transition-colors"
             title="删除任务"
           >
@@ -95,7 +127,43 @@ function TaskCard({ task }: { task: TaskItem }) {
 }
 
 export default function TasksPage() {
+  const [isLoading, setIsLoading] = useState(true);
   const tasks = useTaskStore((s) => s.tasks);
+  const setTasks = useTaskStore((s) => s.setTasks);
+  const addToast = useToastStore((s) => s.addToast);
+
+  useEffect(() => {
+    let active = true;
+
+    const loadTasks = async () => {
+      try {
+        const payload = await fetchTasks();
+        if (active) {
+          setTasks(payload.tasks);
+        }
+      } catch (error) {
+        if (active) {
+          addToast({
+            type: "error",
+            title: "加载任务失败",
+            message: error instanceof Error ? error.message : "未知错误",
+          });
+        }
+      } finally {
+        if (active) {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    void loadTasks();
+    const interval = window.setInterval(loadTasks, 3000);
+
+    return () => {
+      active = false;
+      window.clearInterval(interval);
+    };
+  }, [addToast, setTasks]);
 
   const statCards = [
     {
@@ -127,7 +195,7 @@ export default function TasksPage() {
         <h1 className="page-header-title">任务调度中心</h1>
         <p className="page-header-description">
           追踪排队、推理、校验与人工接力状态。
-          {tasks.length > 0 && `当前共 ${tasks.length} 个任务`}
+          {isLoading ? "正在同步后端任务..." : tasks.length > 0 && `当前共 ${tasks.length} 个任务`}
         </p>
       </header>
 

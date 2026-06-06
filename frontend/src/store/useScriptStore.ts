@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import type { BackendScript } from "@/lib/api";
 
 export interface Beat {
   id: string;
@@ -29,6 +30,8 @@ export interface ScriptData {
   projectId: string;
   title: string;
   episodes: Episode[];
+  sourceText?: string;
+  backend?: BackendScript;
 }
 
 interface ScriptState {
@@ -38,6 +41,7 @@ interface ScriptState {
   setCurrentScript: (id: string) => void;
   setSelectedSceneId: (id: string | null) => void;
   addScript: (script: ScriptData) => void;
+  upsertScript: (script: ScriptData) => void;
 }
 
 export const useScriptStore = create<ScriptState>((set) => ({
@@ -48,4 +52,17 @@ export const useScriptStore = create<ScriptState>((set) => ({
   setSelectedSceneId: (id) => set({ selectedSceneId: id }),
   addScript: (script) =>
     set((state) => ({ scripts: [...state.scripts, script] })),
+  upsertScript: (script) =>
+    set((state) => {
+      const exists = state.scripts.some((item) => item.id === script.id);
+      if (!exists) {
+        return { scripts: [...state.scripts, script] };
+      }
+
+      return {
+        scripts: state.scripts.map((item) =>
+          item.id === script.id ? { ...item, ...script } : item,
+        ),
+      };
+    }),
 }));

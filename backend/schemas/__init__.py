@@ -16,6 +16,12 @@ from .script_schema import (
     ProcessingStatus,
     ProcessingTask,
     ScriptCreateRequest,
+    TaskListItem,
+    TaskPagination,
+    TaskListResponse,
+    TaskDetailResponse,
+    TaskCreateRequest,
+    TaskUpdateRequest,
 )
 
 __all__ = [
@@ -34,4 +40,10 @@ __all__ = [
     "ProcessingStatus",
     "ProcessingTask",
     "ScriptCreateRequest",
+    "TaskListItem",
+    "TaskPagination",
+    "TaskListResponse",
+    "TaskDetailResponse",
+    "TaskCreateRequest",
+    "TaskUpdateRequest",
 ]

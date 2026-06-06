@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Sparkles,
   Upload,
@@ -10,7 +10,18 @@ import {
   Loader2,
   BookOpen,
 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import {
+  createScript,
+  fetchScript,
+  fetchTask,
+  fetchTasks,
+  startScriptProcessing,
+} from "@/lib/api";
 import { useProjectStore } from "@/store/useProjectStore";
+import { useScriptStore } from "@/store/useScriptStore";
+import { useTaskStore } from "@/store/useTaskStore";
+import { useToastStore } from "@/store/useToastStore";
 
 type ImportStep = "upload" | "preview" | "configure" | "converting";
 
@@ -21,16 +32,78 @@ interface ChapterPreview {
 }
 
 export default function ImportPage() {
+  const navigate = useNavigate();
   const [step, setStep] = useState<ImportStep>("upload");
   const [dragOver, setDragOver] = useState(false);
   const [pasteContent, setPasteContent] = useState("");
   const [chapters, setChapters] = useState<ChapterPreview[]>([]);
   const [adaptType, setAdaptType] = useState<"short" | "long" | null>(null);
   const [convertProgress, setConvertProgress] = useState(0);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const addProject = useProjectStore((s) => s.addProject);
+  const updateProject = useProjectStore((s) => s.updateProject);
+  const setCurrentProject = useProjectStore((s) => s.setCurrentProject);
   const projects = useProjectStore((s) => s.projects);
+  const upsertScript = useScriptStore((s) => s.upsertScript);
+  const setCurrentScript = useScriptStore((s) => s.setCurrentScript);
+  const setTasks = useTaskStore((s) => s.setTasks);
+  const addTask = useTaskStore((s) => s.addTask);
+  const updateTask = useTaskStore((s) => s.updateTask);
+  const addToast = useToastStore((s) => s.addToast);
+
+  const mapBackendScriptToWorkbench = (
+    script: Awaited<ReturnType<typeof createScript>>,
+    projectId: string,
+  ) => ({
+    id: script.id,
+    projectId,
+    title: script.title,
+    sourceText: script.original_text,
+    backend: script,
+    episodes: [
+      {
+        id: `${script.id}_episode_1`,
+        title: script.title,
+        coldOpen: script.main_plot ?? undefined,
+        scenes: script.scenes.map((scene) => ({
+          id: scene.id,
+          code: `SC-${scene.heading.scene_number}`,
+          title: `${scene.heading.location} · ${scene.heading.time_of_day}`,
+          location: scene.heading.location,
+          intent:
+            typeof scene.descriptions[0]?.content === "string"
+              ? String(scene.descriptions[0].content)
+              : scene.dialogues[0]?.content ?? "待补充场景意图",
+          beats: scene.dialogues.map((dialogue) => ({
+            id: dialogue.id,
+            description: dialogue.content,
+            dialogue: dialogue.content,
+            character: dialogue.speaker_name ?? undefined,
+          })),
+          status: "draft" as const,
+        })),
+      },
+    ],
+  });
+
+  useEffect(() => {
+    if (step !== "converting") {
+      return;
+    }
+
+    const interval = window.setInterval(async () => {
+      try {
+        const taskPayload = await fetchTasks();
+        setTasks(taskPayload.tasks);
+      } catch {
+        // Ignore polling errors here and surface them only on submit path.
+      }
+    }, 3000);
+
+    return () => window.clearInterval(interval);
+  }, [setTasks, step]);
 
   const detectChapters = (text: string): ChapterPreview[] => {
     const lines = text.split("\n");
@@ -77,13 +150,16 @@ export default function ImportPage() {
     setStep("preview");
   };
 
-  const handleStartConvert = () => {
-    if (!adaptType) return;
+  const handleStartConvert = async () => {
+    if (!adaptType || !pasteContent.trim() || isSubmitting) return;
+
+    setIsSubmitting(true);
     setStep("converting");
     setConvertProgress(0);
 
+    const projectId = `proj_${Date.now().toString(36)}`;
     const project = {
-      id: `proj_${Date.now().toString(36)}`,
+      id: projectId,
       title: `新项目 (${chapters.length}章)`,
       sourceNovel: "导入文本",
       sourceAuthor: "未知作者",
@@ -92,17 +168,72 @@ export default function ImportPage() {
       createdAt: new Date().toISOString(),
     };
     addProject(project);
+    setCurrentProject(projectId);
 
-    const interval = setInterval(() => {
-      setConvertProgress((prev) => {
-        const next = prev + Math.random() * 8 + 2;
-        if (next >= 100) {
-          clearInterval(interval);
-          return 100;
-        }
-        return Math.min(next, 100);
+    try {
+      const script = await createScript({
+        title: project.title,
+        type: adaptType === "short" ? "short_film" : "feature_film",
+        text: pasteContent.trim(),
       });
-    }, 300);
+      const processingTask = await startScriptProcessing(script.id);
+      const liveTask = await fetchTask(processingTask.id);
+
+      updateProject(projectId, {
+        scriptId: script.id,
+        taskId: liveTask.id,
+      });
+
+      addTask(liveTask);
+      upsertScript(mapBackendScriptToWorkbench(script, projectId));
+      setCurrentScript(script.id);
+      setConvertProgress(Math.max(10, liveTask.progress));
+
+      const completionPoll = window.setInterval(async () => {
+        try {
+          const latestTask = await fetchTask(liveTask.id);
+          updateTask(latestTask.id, latestTask);
+          setConvertProgress(latestTask.progress);
+
+          if (latestTask.status === "done") {
+            const scriptDetail = await fetchScript(script.id);
+            upsertScript(mapBackendScriptToWorkbench(scriptDetail, projectId));
+            updateProject(projectId, { status: "ready" });
+            setCurrentScript(script.id);
+            window.clearInterval(completionPoll);
+            addToast({ type: "success", title: "剧本转换完成" });
+          } else if (latestTask.status === "failed") {
+            updateProject(projectId, { status: "idle" });
+            window.clearInterval(completionPoll);
+            addToast({
+              type: "error",
+              title: "转换失败",
+              message: latestTask.error_message ?? "后端处理失败",
+            });
+          }
+        } catch (error) {
+          window.clearInterval(completionPoll);
+          addToast({
+            type: "error",
+            title: "轮询任务失败",
+            message: error instanceof Error ? error.message : "未知错误",
+          });
+        }
+      }, 2500);
+
+      setTimeout(() => {
+        navigate("/tasks");
+      }, 800);
+    } catch (error) {
+      setStep("configure");
+      addToast({
+        type: "error",
+        title: "提交失败",
+        message: error instanceof Error ? error.message : "无法连接后端服务",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (

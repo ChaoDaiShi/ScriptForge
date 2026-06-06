@@ -1,18 +1,11 @@
 import { create } from "zustand";
+import type { BackendTask } from "@/lib/api";
 
-export interface TaskItem {
-  id: string;
-  projectId: string;
-  title: string;
-  type: "convert" | "export" | "polish";
-  status: "queued" | "running" | "review" | "done" | "failed";
-  progress: number;
-  createdAt: string;
-  updatedAt: string;
-}
+export type TaskItem = BackendTask;
 
 interface TaskState {
   tasks: TaskItem[];
+  setTasks: (tasks: TaskItem[]) => void;
   addTask: (task: TaskItem) => void;
   updateTask: (id: string, updates: Partial<TaskItem>) => void;
   removeTask: (id: string) => void;
@@ -20,6 +13,7 @@ interface TaskState {
 
 export const useTaskStore = create<TaskState>((set) => ({
   tasks: [],
+  setTasks: (tasks) => set({ tasks }),
   addTask: (task) => set((state) => ({ tasks: [...state.tasks, task] })),
   updateTask: (id, updates) =>
     set((state) => ({
