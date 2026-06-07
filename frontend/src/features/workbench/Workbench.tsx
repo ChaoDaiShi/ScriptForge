@@ -1239,9 +1239,16 @@ function AIConvertPanel({ processedText, setProcessedText, setYamlOutput }: AICo
       console.log("Process all response:", data);
 
       if (data.status === "success" && data.data) {
+        // 剧本正文
         setProcessedText(data.data.text);
         if (data.data.yaml) {
           setYamlOutput(data.data.yaml);
+        }
+        // AI 分析结果（人物分析 + 场景拆分）
+        if (data.data.analysis) {
+          // 在剧本正文前附加 AI 分析（可折叠查看）
+          const fullOutput = data.data.analysis + "\n\n---\n\n" + data.data.text;
+          setProcessedText(fullOutput);
         }
         // 标记所有步骤为完成
         const allDone = new Set(AI_STEPS.filter(s => s.id !== "structure").map(s => s.id));
@@ -1249,7 +1256,7 @@ function AIConvertPanel({ processedText, setProcessedText, setYamlOutput }: AICo
         setCurrentStep(AI_STEPS.length);
         setIsComplete(true);
         saveScript(data.data.text);
-        addToast({ type: "success", title: "AI 转换完成，已生成结构化剧本" });
+        addToast({ type: "success", title: "AI 5步转换完成，已生成结构化剧本" });
       } else {
         addToast({ type: "error", title: "转换失败", message: data.message || "后端返回异常" });
       }

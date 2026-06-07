@@ -13,7 +13,7 @@ from openai import AsyncOpenAI
 load_dotenv()
 
 class AIService:
-    """AI服务封装 - 使用DeepSeek API"""
+    """AI服务封装 - 使用DeepSeek API，5步小说转剧本流程"""
     
     def __init__(self):
         self.client = AsyncOpenAI(
@@ -21,6 +21,172 @@ class AIService:
             base_url=os.getenv("DEEPSEEK_API_BASE_URL", "https://api.deepseek.com/v1")
         )
         self.model = os.getenv("DEEPSEEK_V4_FLASH_MODEL", "deepseek-v4-flash")
+
+    # ================================================================
+    # 小说转剧本 5 步流程
+    # ================================================================
+
+    async def analyze_novel(self, text: str, title: str = "未命名剧本") -> str:
+        """
+        第1步：拆解原文 —— 提取人物、核心剧情、冲突，洗稿删水
+        合并用户 Step 1 + Step 2（分析 + 场景拆分)
+        """
+        if not os.getenv("DEEPSEEK_API_KEY"):
+            return self._analyze_local(text)
+
+        prompt = f"""你是资深影视编剧，擅长小说改短剧剧本。请帮我把下面的小说片段改编为剧本前置拆解：
+
+【第1步：拆解分析】
+1. 提炼核心人物：人设、性格、当下情绪、人物关系
+2. 提炼本段核心剧情、冲突点、反转点、看点
+3. 删除所有无效心理描写、注水铺垫、无关环境描写
+4. 梳理剧情逻辑，保证节奏紧凑，适合短剧/影视剧呈现
+
+【第2步：场景拆分】
+5. 按照「不同地点 + 不同时间」独立拆分单场镜头
+6. 每一场标注：场次、时间（日/夜）、地点、出场人物
+7. 每场只保留核心剧情，不拖沓、不冗余
+
+输出格式：
+---
+## 人物分析
+- 角色名：人设、性格、情绪
+...
+
+## 剧情大纲
+核心冲突 + 关键转折
+
+## 场景拆分
+### 场景1：INT./EXT. 地点 - 时间
+出场人物：...
+剧情概要：...
+---
+
+以下是原文：
+{text[:8000]}
+"""
+        return await self._call_ai(prompt)
+
+    async def convert_to_script(self, text: str, script_type: str = "long") -> str:
+        """
+        第3-5步：台词转化 + 镜头适配 + 剧本规范化
+        使用用户提供的万能提示词，一步完成从小说到成片剧本的转换
+        """
+        if not os.getenv("DEEPSEEK_API_KEY"):
+            return self._convert_local(text)
+
+        # 根据类型选择不同风格的提示词
+        if script_type == "short":
+            style_extra = """
+【短剧专属要求】
+- 每15-25秒一个小冲突，全程无废话
+- 开头3秒抓眼球，结尾留钩子、悬念、反转
+- 台词简短、犀利、有张力
+- 动作细节更夸张，情绪更饱满，适合竖屏拍摄
+- 精简人物，精简场景，降低拍摄难度"""
+        else:
+            style_extra = ""
+
+        prompt = f"""你是资深影视编剧，擅长小说改短剧剧本。请将以下小说片段，完整改编为专业影视短剧剧本。
+
+严格遵守以下规则：
+
+1. 剧本格式（严格遵守，不得使用 markdown 格式）：
+   每一场开头必须用下面这行格式：
+   【场次】INT./EXT. 地点 - 时间（日/夜）｜出场：角色1、角色2
+   
+   紧接着是该场的动作描写和台词。示例：
+   【场景1】INT. 咖啡厅 - 日｜出场：张三、李四
+   ...
+   
+   对话格式（必须严格使用）：
+   ***角色名***
+       台词内容
+
+2. 把小说的心理活动、叙述文字，全部转化为：
+   - 人物表情（微笑、皱眉、眼神变化）
+   - 微动作（握拳、后退、转头）
+   - 语气标记（低沉地、冷冷地、颤抖地）
+   - 行为细节（推门、坐下、起身）
+
+3. 核心禁忌（必须遵守）：
+   - 不要大段保留小说旁白，能演就不说
+   - 不要保留大量心理描写，全部转动作、眼神、语气
+   - 不要书面化台词，全部改成日常口语对话
+   - 不要平铺直叙，每场必须有情绪推进/冲突/变化
+   - 禁止大段旁白，能用动作和台词表达的，绝不旁白
+   - 禁止使用 markdown 格式（* 加粗 / - 列表 等）
+   - 角色名只能用原文出现的名字，不要编造
+
+4. 环境描写精简，只写拍摄需要的画面
+5. 节奏紧凑，适合实拍，镜头感强
+6. 保留全部核心爽点、虐点、反转、情绪冲突
+{style_extra}
+
+以下是原文：
+{text[:8000]}
+"""
+        return await self._call_ai(prompt)
+
+    def _analyze_local(self, text: str) -> str:
+        """本地分析回退"""
+        lines = text.strip().split("\n")
+        meaningful = [l for l in lines if len(l.strip()) > 10]
+        result = ["## 人物分析", "待AI分析", "", "## 剧情大纲", "待AI分析", "", "## 场景拆分", "待AI分析", ""]
+        if meaningful:
+            result.append(f"原文共{len(lines)}行，{len(meaningful)}行有效内容。")
+        return "\n".join(result)
+
+    def _convert_local(self, text: str) -> str:
+        """本地剧本转换回退"""
+        lines = [l.strip() for l in text.split("\n") if l.strip()]
+        out = ["EXT. 未知地点 - 白天", ""]
+        for line in lines[:30]:
+            # 检测对话标记
+            if line.startswith("——") or line.startswith("……"):
+                out.append("    ***角色***")
+                out.append(f"        {line}")
+            elif line.startswith("(") and line.endswith(")"):
+                out.append(f"    [{line[1:-1]}]")
+            else:
+                out.append(f"    {line}")
+        return "\n".join(out)
+
+    async def generate_yaml_ai(self, script_text: str, title: str = "未命名剧本") -> str:
+        """用 AI 生成 YAML 结构化剧本"""
+        if not os.getenv("DEEPSEEK_API_KEY"):
+            return f"script:\n  title: \"{title}\"\n  episodes: []"
+
+        prompt = f"""将以下剧本内容转换为 YAML 格式的结构化剧本：
+
+{script_text[:6000]}
+
+输出格式要求（严格 YAML，不要 markdown 代码块）：
+script:
+  title: "{title}"
+  episodes:
+    - id: ep_01
+      title: "第一集"
+      scenes:
+        - id: sc_001
+          type: "INT.|EXT."
+          location: "地点"
+          time: "白天|夜晚"
+          characters: ["角色1", "角色2"]
+          summary: "场景概要"
+          dialogue_count: 3
+"""
+        response = await self._call_ai(prompt)
+        if response:
+            result = response.strip()
+            for marker in ["```yaml", "```"]:
+                result = result.replace(marker, "")
+            return result.strip()
+        return f"script:\n  title: \"{title}\"\n  episodes: []"
+
+    # ================================================================
+    # 旧方法（保留兼容）
+    # ================================================================
     
     async def extract_dialogues(self, text: str) -> List[Dict[str, Any]]:
         """提取对话（步骤1）"""
@@ -505,7 +671,7 @@ script:
         
         return prompt
 
-    async def _call_ai(self, prompt: str) -> str:
+    async def _call_ai(self, prompt: str, max_tokens: int = 4000) -> str:
         """调用DeepSeek API"""
         try:
             max_prompt_length = 15000
@@ -515,11 +681,11 @@ script:
             completion = await self.client.chat.completions.create(
                 model=self.model,
                 messages=[
-                    {"role": "system", "content": "你是一个专业的剧本创作助手，擅长处理小说文本的分析和转换。"},
+                    {"role": "system", "content": "你是一个专业的剧本创作助手，擅长处理小说文本的分析和转换。你输出的剧本格式专业、对话生动、镜头感强。"},
                     {"role": "user", "content": prompt}
                 ],
                 temperature=0.7,
-                max_tokens=2000
+                max_tokens=max_tokens
             )
             return completion.choices[0].message.content or ""
         except Exception as e:
