@@ -647,8 +647,8 @@ episode:
               {/* 上传区域 */}
               <div
                 className={`flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed p-6 transition-all ${dragOver
-                    ? "border-(--accent-soft) bg-(--accent-light)"
-                    : "border-(--line-medium) hover:border-(--accent-soft)/50 hover:bg-(--accent-light)"
+                  ? "border-(--accent-soft) bg-(--accent-light)"
+                  : "border-(--line-medium) hover:border-(--accent-soft)/50 hover:bg-(--accent-light)"
                   }`}
                 onDragOver={(e) => {
                   e.preventDefault();
