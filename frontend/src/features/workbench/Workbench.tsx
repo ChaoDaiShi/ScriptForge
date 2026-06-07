@@ -1075,6 +1075,52 @@ export function WorkbenchOverviewCard() {
   );
 }
 
+interface CollapsibleTextContainerProps {
+  title: string;
+  text: string;
+  charCount: number;
+}
+
+function CollapsibleTextContainer({ title, text, charCount }: CollapsibleTextContainerProps) {
+  const [isExpanded, setIsExpanded] = useState(true);
+
+  return (
+    <div className="mb-4">
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-sm text-(--text-subtle)">{title}</span>
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-(--text-faint)">{charCount} 字符</span>
+          <button
+            type="button"
+            onClick={() => setIsExpanded(!isExpanded)}
+            className="flex items-center gap-1 px-2 py-1 rounded text-xs text-(--text-subtle) hover:text-foreground hover:bg-(--muted) transition-colors"
+          >
+            {isExpanded ? (
+              <>
+                <ChevronDown className="h-3 w-3" />
+                收起文本
+              </>
+            ) : (
+              <>
+                <ChevronRight className="h-3 w-3" />
+                展开文本
+              </>
+            )}
+          </button>
+        </div>
+      </div>
+      <div
+        className={`overflow-hidden transition-all duration-300 rounded-xl ${isExpanded ? "max-h-[400px]" : "max-h-0"
+          }`}
+      >
+        <div className="bg-(--muted) rounded-xl p-4 max-h-[400px] font-mono text-sm text-foreground whitespace-pre-wrap overflow-auto">
+          {text || "等待导入文本..."}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 const AI_STEPS = [
   { id: "dialog", label: "对话标记", desc: "识别对话语句并添加唯一标识" },
   { id: "character", label: "人物提取", desc: "提取主要人物和次要人物" },
@@ -1103,7 +1149,6 @@ function AIConvertPanel({ processedText, setProcessedText, setYamlOutput, setAna
   const [adaptType, setAdaptType] = useState<"short" | "long">("long");
   const [completedSteps, setCompletedSteps] = useState<Set<string>>(new Set());
   const [isComplete, setIsComplete] = useState(false);
-  const [showTextPanel, setShowTextPanel] = useState(true);
   const novels = useNovelStore((s) => s.novels);
   const currentNovelId = useNovelStore((s) => s.currentNovelId);
   const currentNovel = novels.find(n => n.id === currentNovelId);
@@ -1522,7 +1567,7 @@ function AIConvertPanel({ processedText, setProcessedText, setYamlOutput, setAna
   };
 
   return (
-    <div className="flex-1 flex flex-col p-4">
+    <div className="flex flex-col p-4">
       <div className="mb-4">
         <div className="flex items-center justify-between">
           <div>
@@ -1568,49 +1613,11 @@ function AIConvertPanel({ processedText, setProcessedText, setYamlOutput, setAna
         </div>
       </div>
 
-      <div className="flex-1 overflow-auto mb-4">
-        <div className="flex items-center justify-between mb-2">
-          <span className="text-sm text-(--text-subtle)">
-            {isProcessing && processingStep ? (
-              <span className="flex items-center gap-2">
-                <span className="w-3 h-3 border-2 border-(--accent-soft) border-t-transparent rounded-full animate-spin" />
-                正在处理: {processingStep.label}
-              </span>
-            ) : processedText ? (
-              "已处理文本"
-            ) : (
-              "原始文本"
-            )}
-          </span>
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-(--text-faint)">
-              {displayText.length} 字符
-            </span>
-            <button
-              type="button"
-              onClick={() => setShowTextPanel(!showTextPanel)}
-              className="flex items-center gap-1 px-2 py-1 rounded text-xs text-(--text-subtle) hover:text-foreground hover:bg-(--muted) transition-colors"
-            >
-              {showTextPanel ? (
-                <>
-                  <ChevronDown className="h-3 w-3" />
-                  收起文本
-                </>
-              ) : (
-                <>
-                  <ChevronRight className="h-3 w-3" />
-                  展开文本
-                </>
-              )}
-            </button>
-          </div>
-        </div>
-        {showTextPanel && (
-          <div className="bg-(--muted) rounded-xl p-4 min-h-[400px] font-mono text-sm text-foreground whitespace-pre-wrap overflow-auto">
-            {displayText || "等待导入文本..."}
-          </div>
-        )}
-      </div>
+      <CollapsibleTextContainer
+        title={isProcessing && processingStep ? `正在处理: ${processingStep.label}` : processedText ? "已处理文本" : "原始文本"}
+        text={displayText}
+        charCount={displayText.length}
+      />
 
       <div className="border-t border-(--line-soft) pt-4">
         <div className="flex items-center justify-between mb-3">
