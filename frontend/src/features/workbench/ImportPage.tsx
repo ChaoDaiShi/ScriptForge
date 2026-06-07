@@ -528,7 +528,7 @@ export default function ImportPage() {
             }
           }
 
-          if (latestTask.status === "done") {
+          if (latestTask.status === "completed" || latestTask.status === "done") {
             setCurrentStep("完成");
             setStepMessages(prev => [...prev, "🎉 剧本转换完成！"]);
             const scriptDetail = await fetchScript(script.id);
@@ -584,7 +584,9 @@ export default function ImportPage() {
         }
       }, 8000);
     } catch (error) {
-      setStep("configure");
+      // 只有在创建脚本或启动任务阶段失败才跳转回配置页
+      // 轮询过程中的错误由轮询内部处理
+      console.error("Initial setup error:", error);
       addToast({
         type: "error",
         title: "提交失败",

@@ -5,7 +5,7 @@ Handles script creation, processing, and export.
 from fastapi import APIRouter, BackgroundTasks, HTTPException, Query
 from typing import Optional, Dict, Any
 from schemas.script_schema import (
-    Script, ScriptType, ProcessingTask, ProcessingStatus, ScriptCreateRequest
+    Script, ScriptType, ProcessingTask, ProcessingStatus, ScriptCreateRequest, TaskDetailResponse
 )
 from core.utils import success_response, error_response
 from services.script_service import ScriptService
@@ -23,8 +23,12 @@ async def create_script(request: ScriptCreateRequest):
     """
     try:
         script = await ScriptService.create_script(request)
-        return success_response(data=script.model_dump(mode="json"), message="剧本创建成功")
+        response_data = script.model_dump(mode="json")
+        print("Creating script with data:", request)
+        print("Created script:", response_data)
+        return success_response(data=response_data, message="剧本创建成功")
     except Exception as e:
+        print("Error creating script:", str(e))
         return error_response(message=str(e), code=500)
 
 
@@ -74,12 +78,15 @@ async def start_processing(script_id: str, background_tasks: BackgroundTasks):
             return error_response(message="剧本不存在", code=404)
         
         task = await ScriptService.create_processing_task(script_id)
+        item = await ScriptService.serialize_task(task)
+        if not item:
+            return error_response(message="任务创建成功但序列化失败", code=500)
         
         # 后台任务处理
         background_tasks.add_task(ScriptService.process_script, script_id, task.id)
         
         return success_response(
-            data=task.model_dump(mode="json"),
+            data=TaskDetailResponse(task=item).model_dump(mode="json"),
             message="处理任务已启动"
         )
     except Exception as e:

@@ -1,7 +1,8 @@
 from functools import lru_cache
 import os
+import time
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable, TypeVar
 
 from dotenv import load_dotenv
 from supabase import Client, create_client
@@ -25,6 +26,26 @@ def get_supabase_client() -> Client:
         raise SupabaseConfigError("SUPABASE_URL and SUPABASE_KEY are required")
 
     return create_client(url, key)
+
+
+T = TypeVar('T')
+
+def with_retry(max_retries: int = 3, delay: float = 1.0) -> Callable[[Callable[..., T]], Callable[..., T]]:
+    """Decorator to add retry logic to database operations"""
+    def decorator(func: Callable[..., T]) -> Callable[..., T]:
+        def wrapper(*args, **kwargs) -> T:
+            last_exception = None
+            for attempt in range(max_retries):
+                try:
+                    return func(*args, **kwargs)
+                except Exception as e:
+                    last_exception = e
+                    print(f"Database operation failed (attempt {attempt + 1}/{max_retries}): {e}")
+                    if attempt < max_retries - 1:
+                        time.sleep(delay * (2 ** attempt))  # Exponential backoff
+            raise last_exception
+        return wrapper
+    return decorator
 
 
 def probe_supabase() -> dict[str, Any]:

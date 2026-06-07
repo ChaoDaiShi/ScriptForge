@@ -376,6 +376,10 @@ class AIService:
     async def _call_ai(self, prompt: str) -> str:
         """调用DeepSeek API"""
         try:
+            max_prompt_length = 15000
+            if len(prompt) > max_prompt_length:
+                prompt = prompt[:max_prompt_length] + "\n\n（文本过长，已截断）"
+            
             completion = await self.client.chat.completions.create(
                 model=self.model,
                 messages=[
@@ -388,6 +392,8 @@ class AIService:
             return completion.choices[0].message.content or ""
         except Exception as e:
             print(f"AI调用失败: {str(e)}")
+            if "maximum context length" in str(e) or "context_length" in str(e).lower():
+                print("文本过长，将使用本地规则处理")
             return ""
     
     def _parse_json_response(self, response: str) -> Any:

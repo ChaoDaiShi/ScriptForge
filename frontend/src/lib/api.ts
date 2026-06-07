@@ -8,21 +8,21 @@ export function apiUrl(path: string) {
 }
 
 export async function apiFetch(path: string, init?: RequestInit) {
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 30000); // 30秒超时
-  
-  const response = await fetch(apiUrl(path), {
-    ...init,
-    signal: controller.signal,
-  });
-  
-  clearTimeout(timeoutId);
+  // 临时禁用超时机制进行测试
+  try {
+    const response = await fetch(apiUrl(path), init);
 
-  if (!response.ok) {
-    throw new Error(`API request failed: ${response.status}`);
+    if (!response.ok) {
+      throw new Error(`API request failed: ${response.status}`);
+    }
+
+    return response;
+  } catch (error) {
+    if (error instanceof Error && error.name === "AbortError") {
+      throw new Error("请求超时，请检查网络连接或稍后重试");
+    }
+    throw error;
   }
-
-  return response;
 }
 
 export interface ApiEnvelope<T> {
