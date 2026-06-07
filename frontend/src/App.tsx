@@ -1,4 +1,5 @@
-import { Navigate, Route, Routes } from "react-router-dom";
+import { Navigate, Route, Routes, useNavigate } from "react-router-dom";
+import { useEffect } from "react";
 import Layout from "@/components/layout/Layout";
 import AssetsPage from "@/features/workbench/AssetsPage";
 import TasksPage from "@/features/workbench/TasksPage";
@@ -7,13 +8,36 @@ import ImportPage from "@/features/workbench/ImportPage";
 import InsightsPage from "@/features/workbench/InsightsPage";
 import DashboardPage from "@/features/workbench/DashboardPage";
 import SettingsPage from "@/features/workbench/SettingsPage";
+import LoginPage from "@/features/auth/LoginPage";
 import ToastContainer from "@/components/ui/ToastContainer";
+import { useAuthStore } from "@/store/useAuthStore";
+
+function AuthGate({ children }: { children: React.ReactNode }) {
+  const navigate = useNavigate();
+  const { isLoggedIn, hasSkipped } = useAuthStore();
+
+  useEffect(() => {
+    if (!isLoggedIn && !hasSkipped) {
+      navigate("/login", { replace: true });
+    }
+  }, [isLoggedIn, hasSkipped, navigate]);
+
+  return <>{children}</>;
+}
 
 function App() {
   return (
     <>
       <Routes>
-        <Route path="/" element={<Layout />}>
+        <Route path="/login" element={<LoginPage />} />
+        <Route
+          path="/"
+          element={
+            <AuthGate>
+              <Layout />
+            </AuthGate>
+          }
+        >
           <Route index element={<Navigate to="/workbench" replace />} />
           <Route path="workbench" element={<Workbench />} />
           <Route path="import" element={<ImportPage />} />
