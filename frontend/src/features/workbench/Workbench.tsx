@@ -18,10 +18,17 @@ import {
   Copy,
   Check,
   Plus,
+  Upload,
+  AlertCircle,
+  ArrowRight,
+  X,
 } from "lucide-react";
 import { useScriptStore } from "@/store/useScriptStore";
 import { useProjectStore } from "@/store/useProjectStore";
 import { useNovelStore } from "@/store/useNovelStore";
+import mammoth from "mammoth";
+import { useNavigate } from "react-router-dom";
+import { useToastStore } from "@/store/useToastStore";
 
 type AssistantTab = "chat" | "yaml" | "history";
 
@@ -67,27 +74,205 @@ interface ChatMessage {
 }
 
 export default function Workbench() {
+  const navigate = useNavigate();
   const [assistantTab, setAssistantTab] = useState<AssistantTab>("chat");
   const [chatInput, setChatInput] = useState("");
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [isAiTyping, setIsAiTyping] = useState(false);
   const [copiedYaml, setCopiedYaml] = useState(false);
   const [selectedChapterIndex, setSelectedChapterIndex] = useState<number | null>(null);
+  const [showImportPanel, setShowImportPanel] = useState(false);
+  const [importText, setImportText] = useState("");
+  const [dragOver, setDragOver] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const currentScript = useScriptStore((s) =>
     s.scripts.find((scr) => scr.id === s.currentScriptId),
   );
   const projects = useProjectStore((s) => s.projects);
   const activeProject = projects.find((p) => p.id === currentScript?.projectId);
-  
+
+  const addProject = useProjectStore((s) => s.addProject);
+  const setCurrentProject = useProjectStore((s) => s.setCurrentProject);
+  const upsertScript = useScriptStore((s) => s.upsertScript);
+  const setCurrentScript = useScriptStore((s) => s.setCurrentScript);
+  const addNovel = useNovelStore((s) => s.addNovel);
+  const setCurrentNovel = useNovelStore((s) => s.setCurrentNovel);
+  const addToast = useToastStore((s) => s.addToast);
+
   // 获取当前小说数据
-  const currentNovel = useNovelStore((s) => 
+  const currentNovel = useNovelStore((s) =>
     s.novels.find((n) => n.projectId === activeProject?.id)
   );
   const setSelectedChapter = useNovelStore((s) => s.setSelectedChapter);
 
-  const hasData = !!currentScript && currentScript.episodes.length > 0;
+  const hasData = !!currentScript && currentScript.episodes.length > 0 && currentScript.sourceText;
   const hasNovelData = !!currentNovel && currentNovel.chapters.length > 0;
+
+  const ALLOWED_EXTENSIONS = [".txt", ".md", ".doc", ".docx"];
+
+  const isValidFileType = (filename: string): boolean => {
+    const ext = filename.toLowerCase().split(".").pop();
+    return ext ? ALLOWED_EXTENSIONS.includes(`.${ext}`) : false;
+  };
+
+  const readFileContent = async (file: File): Promise<string> => {
+    const ext = file.name.toLowerCase().split(".").pop();
+
+    if (ext === "docx") {
+      const arrayBuffer = await file.arrayBuffer();
+      const result = await mammoth.extractRawText({ arrayBuffer });
+      return result.value;
+    }
+
+    const arrayBuffer = await file.arrayBuffer();
+    const encodings = ["UTF-8", "GBK", "GB2312", "GB18030", "Big5"];
+
+    for (const encoding of encodings) {
+      try {
+        const textDecoder = new TextDecoder(encoding, { fatal: true });
+        const text = textDecoder.decode(arrayBuffer);
+        const replacementCharCount = (text.match(/\uFFFD/g) || []).length;
+        if (replacementCharCount < text.length * 0.1) {
+          return text;
+        }
+      } catch {
+        continue;
+      }
+    }
+
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (evt) => resolve(evt.target?.result as string);
+      reader.onerror = () => reject(new Error("文件读取失败"));
+      reader.readAsText(file);
+    });
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!isValidFileType(file.name)) {
+      addToast({
+        type: "error",
+        title: "文件格式非法",
+        message: `仅支持 ${ALLOWED_EXTENSIONS.join(", ")} 格式的文件`,
+      });
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      return;
+    }
+
+    try {
+      const text = await readFileContent(file);
+      setImportText(text);
+    } catch {
+      addToast({
+        type: "error",
+        title: "文件读取失败",
+        message: "无法读取文件内容，请确认文件未损坏",
+      });
+    }
+  };
+
+  const handleDrop = async (e: React.DragEvent) => {
+    e.preventDefault();
+    setDragOver(false);
+    const file = e.dataTransfer.files[0];
+    if (file) {
+      if (!isValidFileType(file.name)) {
+        addToast({
+          type: "error",
+          title: "文件格式非法",
+          message: `仅支持 ${ALLOWED_EXTENSIONS.join(", ")} 格式的文件`,
+        });
+        return;
+      }
+      try {
+        const text = await readFileContent(file);
+        setImportText(text);
+      } catch {
+        addToast({
+          type: "error",
+          title: "文件读取失败",
+          message: "无法读取文件内容，请确认文件未损坏",
+        });
+      }
+    }
+  };
+
+  const handleCreateFromImport = () => {
+    const text = importText.trim();
+    if (!text) {
+      addToast({ type: "error", title: "请输入文本", message: "请先输入或上传小说文本" });
+      return;
+    }
+
+    const projectId = `proj_${Date.now().toString(36)}`;
+    const project = {
+      id: projectId,
+      title: "新项目",
+      sourceNovel: "导入文本",
+      sourceAuthor: "未知作者",
+      chapterCount: 1,
+      status: "idle" as const,
+      createdAt: new Date().toISOString(),
+    };
+    addProject(project);
+    setCurrentProject(projectId);
+
+    const novelId = `novel_${Date.now().toString(36)}`;
+    const novelData = {
+      id: novelId,
+      projectId,
+      title: project.title,
+      author: "未知作者",
+      totalChapters: 1,
+      totalWordCount: text.length,
+      chapters: [{
+        index: 1,
+        title: "全文",
+        wordCount: text.length,
+        content: text,
+      }],
+      fullText: text,
+      createdAt: new Date().toISOString(),
+    };
+    addNovel(novelData);
+    setCurrentNovel(novelId);
+
+    const scriptId = `script_${Date.now().toString(36)}`;
+    const initialScriptData = {
+      id: scriptId,
+      projectId,
+      title: project.title,
+      sourceText: text,
+      episodes: [
+        {
+          id: `${scriptId}_episode_1`,
+          title: project.title,
+          coldOpen: "等待 AI 分析",
+          scenes: [
+            {
+              id: `${scriptId}_scene_1`,
+              code: "SC-001",
+              title: "等待处理",
+              location: "等待分析",
+              intent: "导入的原始文本尚未处理，请启动 AI 转换",
+              beats: [],
+              status: "draft" as const,
+            },
+          ],
+        },
+      ],
+    };
+    upsertScript(initialScriptData);
+    setCurrentScript(scriptId);
+
+    setShowImportPanel(false);
+    setImportText("");
+    addToast({ type: "success", title: "文本导入成功" });
+  };
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -206,9 +391,9 @@ episode:
                     共 {currentNovel.totalChapters} 章 · {currentNovel.totalWordCount.toLocaleString()} 字
                   </p>
                 </div>
-                
+
                 {/* 章节列表 */}
-                <div className="space-y-1.5 max-h-[300px] overflow-y-auto">
+                <div className="space-y-1.5 max-h-[200px] overflow-y-auto">
                   {currentNovel.chapters.map((chapter) => (
                     <button
                       key={chapter.index}
@@ -217,11 +402,10 @@ episode:
                         setSelectedChapterIndex(chapter.index);
                         setSelectedChapter(chapter.index);
                       }}
-                      className={`w-full flex items-center gap-2 rounded-lg border px-3 py-2 text-sm transition-colors ${
-                        selectedChapterIndex === chapter.index
-                          ? "border-(--accent-soft) bg-(--accent-light) text-foreground"
-                          : "border-(--line-soft) hover:bg-(--muted) text-(--text-subtle)"
-                      }`}
+                      className={`w-full flex items-center gap-2 rounded-lg border px-3 py-2 text-sm transition-colors ${selectedChapterIndex === chapter.index
+                        ? "border-(--accent-soft) bg-(--accent-light) text-foreground"
+                        : "border-(--line-soft) hover:bg-(--muted) text-(--text-subtle)"
+                        }`}
                     >
                       <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded bg-(--accent-light) text-xs text-(--accent-soft)">
                         {chapter.index}
@@ -235,19 +419,6 @@ episode:
                     </button>
                   ))}
                 </div>
-                
-                {/* 当前章节内容预览 */}
-                {selectedChapterIndex !== null && (
-                  <div className="mt-3 rounded-lg border border-(--line-soft) p-3">
-                    <p className="text-xs font-medium text-foreground mb-2">
-                      {currentNovel.chapters.find(c => c.index === selectedChapterIndex)?.title}
-                    </p>
-                    <p className="text-xs text-(--text-subtle) leading-5 max-h-[150px] overflow-y-auto">
-                      {currentNovel.chapters.find(c => c.index === selectedChapterIndex)?.content?.slice(0, 500) || "暂无内容"}
-                      {currentNovel.chapters.find(c => c.index === selectedChapterIndex)?.content?.length > 500 && "..."}
-                    </p>
-                  </div>
-                )}
               </div>
             ) : hasData ? (
               <div className="text-sm leading-6 text-(--text-subtle)">
@@ -259,6 +430,45 @@ episode:
             ) : (
               <p className="text-sm leading-6 text-(--text-subtle)">
                 导入小说源文本后，此处将显示原始章节内容。
+              </p>
+            )}
+          </CollapsibleSection>
+
+          <CollapsibleSection
+            title="原始文本"
+            icon={<FileText className="h-3 w-3" />}
+          >
+            {currentScript?.sourceText ? (
+              <div className="space-y-2">
+                {selectedChapterIndex !== null && hasNovelData ? (
+                  /* 显示选中章节的内容 */
+                  <div>
+                    <p className="text-xs font-medium text-foreground mb-2">
+                      {currentNovel.chapters.find(c => c.index === selectedChapterIndex)?.title}
+                    </p>
+                    <div className="rounded-lg border border-(--line-soft) p-3 bg-white">
+                      <pre className="text-xs text-(--text-subtle) leading-6 whitespace-pre-wrap max-h-[300px] overflow-y-auto">
+                        {currentNovel.chapters.find(c => c.index === selectedChapterIndex)?.content || "暂无内容"}
+                      </pre>
+                    </div>
+                  </div>
+                ) : (
+                  /* 显示全部原始文本 */
+                  <div>
+                    <p className="text-xs font-medium text-foreground mb-2">
+                      全部原始文本
+                    </p>
+                    <div className="rounded-lg border border-(--line-soft) p-3 bg-white">
+                      <pre className="text-xs text-(--text-subtle) leading-6 whitespace-pre-wrap max-h-[350px] overflow-y-auto">
+                        {currentScript.sourceText}
+                      </pre>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <p className="text-sm leading-6 text-(--text-subtle)">
+                暂无原始文本，请先导入文本。
               </p>
             )}
           </CollapsibleSection>
@@ -301,11 +511,10 @@ episode:
                 <div key={step} className="flex gap-3">
                   <div className="flex flex-col items-center">
                     <span
-                      className={`mt-1 h-2.5 w-2.5 rounded-full ${
-                        i === 0 && hasData
-                          ? "bg-(--accent-soft)"
-                          : "bg-(--line-medium)"
-                      }`}
+                      className={`mt-1 h-2.5 w-2.5 rounded-full ${i === 0 && hasData
+                        ? "bg-(--accent-soft)"
+                        : "bg-(--line-medium)"
+                        }`}
                     />
                     {i < 3 && (
                       <span className="mt-1.5 h-8 w-px bg-(--line-soft)" />
@@ -419,16 +628,137 @@ episode:
                 </div>
               </div>
             </div>
+          ) : showImportPanel ? (
+            <div className="flex flex-1 flex-col overflow-hidden rounded-xl border-2 border-(--accent-soft)/50 bg-white p-4 animate-scale-in">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="font-serif text-lg text-foreground">导入小说文本</h3>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowImportPanel(false);
+                    setImportText("");
+                  }}
+                  className="rounded-md p-1 text-(--text-faint) hover:text-foreground hover:bg-(--muted) transition-colors"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+
+              {/* 上传区域 */}
+              <div
+                className={`flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed p-6 transition-all ${dragOver
+                    ? "border-(--accent-soft) bg-(--accent-light)"
+                    : "border-(--line-medium) hover:border-(--accent-soft)/50 hover:bg-(--accent-light)"
+                  }`}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  setDragOver(true);
+                }}
+                onDragLeave={() => setDragOver(false)}
+                onDrop={handleDrop}
+                onClick={() => fileInputRef.current?.click()}
+              >
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".txt,.md,.doc,.docx"
+                  className="hidden"
+                  onChange={handleFileUpload}
+                />
+                <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-(--accent-light) text-(--accent-soft)">
+                  <Upload className="h-5 w-5" />
+                </div>
+                <p className="text-sm text-foreground">点击上传或拖拽文件</p>
+                <p className="mt-1 text-xs text-(--text-subtle)">支持 TXT、MD、DOC、DOCX 格式</p>
+              </div>
+
+              <div className="relative my-4">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t border-(--line-soft)" />
+                </div>
+                <div className="relative flex justify-center">
+                  <span className="bg-white px-3 text-xs text-(--text-subtle)">或者</span>
+                </div>
+              </div>
+
+              {/* 文本输入区域 */}
+              <div className="flex-1 flex flex-col min-h-0">
+                <textarea
+                  value={importText}
+                  onChange={(e) => setImportText(e.target.value)}
+                  className="flex-1 resize-none rounded-xl border border-(--line-medium) bg-white p-4 text-sm text-foreground placeholder:text-(--text-subtle) focus:outline-none focus:ring-2 focus:ring-(--accent-soft)/30 focus:border-(--accent-soft)"
+                  placeholder="将你的小说文本粘贴到这里..."
+                />
+                <div className="mt-3 flex items-center justify-between">
+                  <span className="flex items-center gap-1.5 text-xs text-(--text-subtle)">
+                    <FileText className="h-3.5 w-3.5" />
+                    共 {importText.length} 字
+                  </span>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowImportPanel(false);
+                        setImportText("");
+                      }}
+                      className="rounded-lg border border-(--line-medium) px-4 py-2 text-sm text-foreground hover:bg-(--muted) transition-colors"
+                    >
+                      取消
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleCreateFromImport}
+                      disabled={!importText.trim()}
+                      className="inline-flex items-center gap-1.5 rounded-lg bg-(--accent-soft) px-4 py-2 text-sm font-medium text-white hover:bg-(--accent-soft)/90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      开始创作
+                      <ArrowRight className="h-4 w-4" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
           ) : (
             <div className="flex flex-1 items-center justify-center rounded-xl border-2 border-dashed border-(--line-soft) p-8">
-              <div className="text-center">
-                <WandSparkles className="mx-auto h-8 w-8 text-(--text-faint)" />
-                <p className="mt-3 text-sm text-(--text-subtle)">
-                  暂无场景数据
+              <div className="text-center max-w-md">
+                <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-(--accent-light)">
+                  <FileText className="h-8 w-8 text-(--accent-soft)" />
+                </div>
+                <h3 className="font-serif text-xl text-foreground mb-2">
+                  导入小说源文本
+                </h3>
+                <p className="text-sm text-(--text-subtle) mb-6">
+                  上传小说文件或直接粘贴文本内容，开始你的剧本创作之旅
                 </p>
-                <p className="mt-1 text-xs text-(--text-faint)">
-                  通过"导入文本"开始新项目，或从已有项目继续编辑
-                </p>
+                <div className="flex gap-3 justify-center">
+                  <button
+                    type="button"
+                    onClick={() => navigate("/import")}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-(--line-medium) px-4 py-2 text-sm text-foreground hover:bg-(--muted) transition-colors"
+                  >
+                    <Upload className="h-4 w-4" />
+                    高级导入
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowImportPanel(true)}
+                    className="inline-flex items-center gap-1.5 rounded-lg bg-(--accent-soft) px-4 py-2 text-sm font-medium text-white hover:bg-(--accent-soft)/90 transition-colors"
+                  >
+                    <FileText className="h-4 w-4" />
+                    快速输入
+                  </button>
+                </div>
+                <div className="mt-6 rounded-xl border border-(--line-soft) bg-(--muted) p-4">
+                  <div className="flex items-start gap-3">
+                    <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-(--accent-soft)" />
+                    <div className="text-left">
+                      <p className="text-xs font-medium text-foreground">格式要求</p>
+                      <p className="mt-1 text-xs text-(--text-subtle) leading-5">
+                        支持 TXT、MD、DOC、DOCX 文件格式，或直接粘贴文本内容。系统将自动识别章节结构。
+                      </p>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           )}
@@ -459,11 +789,10 @@ episode:
                 key={tab.key}
                 type="button"
                 onClick={() => setAssistantTab(tab.key)}
-                className={`flex flex-1 items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
-                  assistantTab === tab.key
-                    ? "bg-white text-foreground shadow-sm"
-                    : "text-(--text-subtle) hover:text-foreground"
-                }`}
+                className={`flex flex-1 items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${assistantTab === tab.key
+                  ? "bg-white text-foreground shadow-sm"
+                  : "text-(--text-subtle) hover:text-foreground"
+                  }`}
               >
                 {tab.icon}
                 {tab.label}
@@ -526,11 +855,10 @@ episode:
                       className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"} animate-fade-in`}
                     >
                       <div
-                        className={`max-w-[85%] rounded-xl px-3 py-2 text-xs leading-5 ${
-                          msg.role === "user"
-                            ? "bg-(--accent-soft) text-white"
-                            : "bg-(--muted) text-foreground"
-                        }`}
+                        className={`max-w-[85%] rounded-xl px-3 py-2 text-xs leading-5 ${msg.role === "user"
+                          ? "bg-(--accent-soft) text-white"
+                          : "bg-(--muted) text-foreground"
+                          }`}
                       >
                         {msg.content}
                       </div>

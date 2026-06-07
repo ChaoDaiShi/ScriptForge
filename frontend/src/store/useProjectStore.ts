@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { persist } from "zustand/middleware";
 
 export interface Project {
   id: string;
@@ -20,16 +21,23 @@ interface ProjectState {
   updateProject: (id: string, updates: Partial<Project>) => void;
 }
 
-export const useProjectStore = create<ProjectState>((set) => ({
-  projects: [],
-  currentProjectId: null,
-  setCurrentProject: (id) => set({ currentProjectId: id }),
-  addProject: (project) =>
-    set((state) => ({ projects: [...state.projects, project] })),
-  updateProject: (id, updates) =>
-    set((state) => ({
-      projects: state.projects.map((project) =>
-        project.id === id ? { ...project, ...updates } : project,
-      ),
-    })),
-}));
+export const useProjectStore = create<ProjectState>()(
+  persist(
+    (set) => ({
+      projects: [],
+      currentProjectId: null,
+      setCurrentProject: (id) => set({ currentProjectId: id }),
+      addProject: (project) =>
+        set((state) => ({ projects: [...state.projects, project] })),
+      updateProject: (id, updates) =>
+        set((state) => ({
+          projects: state.projects.map((project) =>
+            project.id === id ? { ...project, ...updates } : project,
+          ),
+        })),
+    }),
+    {
+      name: "project-storage",
+    }
+  )
+);

@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { persist } from "zustand/middleware";
 
 export interface NovelChapter {
   index: number;
@@ -32,24 +33,31 @@ interface NovelState {
   getChapterContent: (novelId: string, chapterIndex: number) => string | null;
 }
 
-export const useNovelStore = create<NovelState>((set, get) => ({
-  novels: [],
-  currentNovelId: null,
-  selectedChapterIndex: null,
-  setCurrentNovel: (id) => set({ currentNovelId: id }),
-  setSelectedChapter: (index) => set({ selectedChapterIndex: index }),
-  addNovel: (novel) =>
-    set((state) => ({ novels: [...state.novels, novel] })),
-  updateNovel: (id, updates) =>
-    set((state) => ({
-      novels: state.novels.map((novel) =>
-        novel.id === id ? { ...novel, ...updates } : novel,
-      ),
-    })),
-  getChapterContent: (novelId, chapterIndex) => {
-    const novel = get().novels.find((n) => n.id === novelId);
-    if (!novel) return null;
-    const chapter = novel.chapters.find((c) => c.index === chapterIndex);
-    return chapter?.content || null;
-  },
-}));
+export const useNovelStore = create<NovelState>()(
+  persist(
+    (set, get) => ({
+      novels: [],
+      currentNovelId: null,
+      selectedChapterIndex: null,
+      setCurrentNovel: (id) => set({ currentNovelId: id }),
+      setSelectedChapter: (index) => set({ selectedChapterIndex: index }),
+      addNovel: (novel) =>
+        set((state) => ({ novels: [...state.novels, novel] })),
+      updateNovel: (id, updates) =>
+        set((state) => ({
+          novels: state.novels.map((novel) =>
+            novel.id === id ? { ...novel, ...updates } : novel,
+          ),
+        })),
+      getChapterContent: (novelId, chapterIndex) => {
+        const novel = get().novels.find((n) => n.id === novelId);
+        if (!novel) return null;
+        const chapter = novel.chapters.find((c) => c.index === chapterIndex);
+        return chapter?.content || null;
+      },
+    }),
+    {
+      name: "novel-storage",
+    }
+  )
+);

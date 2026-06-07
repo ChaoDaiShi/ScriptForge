@@ -71,38 +71,64 @@ export default function ImportPage() {
     projectId: string,
   ) => {
     const scenes = script.scenes || [];
+    const hasProcessedScenes = scenes.length > 0;
+
     return {
       id: script.id,
       projectId,
       title: script.title,
       sourceText: script.original_text ?? "",
       backend: script,
-      episodes: scenes.length > 0
-        ? [
-            {
-              id: `${script.id}_episode_1`,
-              title: script.title,
-              coldOpen: script.main_plot ?? undefined,
-              scenes: scenes.map((scene) => ({
-                id: scene.id,
-                code: `SC-${scene.heading?.scene_number || 1}`,
-                title: `${scene.heading?.location || "未知地点"} · ${scene.heading?.time_of_day || "未知时间"}`,
-                location: scene.heading?.location || "未知地点",
-                intent:
-                  typeof scene.descriptions?.[0]?.content === "string"
-                    ? String(scene.descriptions[0].content)
-                    : (scene.dialogues?.[0]?.content ?? "待补充场景意图"),
-                beats: (scene.dialogues || []).map((dialogue) => ({
-                  id: dialogue.id,
-                  description: dialogue.content,
-                  dialogue: dialogue.content,
-                  character: dialogue.speaker_name ?? undefined,
-                })),
-                status: "draft" as const,
+      episodes: [
+        {
+          id: `${script.id}_episode_1`,
+          title: script.title,
+          coldOpen: script.main_plot ?? (hasProcessedScenes ? undefined : "正在处理中..."),
+          scenes: hasProcessedScenes
+            ? scenes.map((scene) => ({
+              id: scene.id,
+              code: `SC-${scene.heading?.scene_number || 1}`,
+              title: `${scene.heading?.location || "未知地点"} · ${scene.heading?.time_of_day || "未知时间"}`,
+              location: scene.heading?.location || "未知地点",
+              intent:
+                typeof scene.descriptions?.[0]?.content === "string"
+                  ? String(scene.descriptions[0].content)
+                  : (scene.dialogues?.[0]?.content ?? "待补充场景意图"),
+              beats: (scene.dialogues || []).map((dialogue) => ({
+                id: dialogue.id,
+                description: dialogue.content,
+                dialogue: dialogue.content,
+                character: dialogue.speaker_name ?? undefined,
               })),
-            },
-          ]
-        : [],
+              status: "draft" as const,
+            }))
+            : [
+              // 创建一个临时场景，让工作台有内容显示
+              {
+                id: `${script.id}_temp_scene_1`,
+                code: "SC-001",
+                title: "场景处理中...",
+                location: "等待AI分析",
+                intent: "AI正在分析文本结构，请稍候...",
+                beats: [
+                  {
+                    id: `${script.id}_temp_beat_1`,
+                    description: "正在提取人物角色...",
+                    dialogue: undefined,
+                    character: undefined,
+                  },
+                  {
+                    id: `${script.id}_temp_beat_2`,
+                    description: "正在分析场景结构...",
+                    dialogue: undefined,
+                    character: undefined,
+                  },
+                ],
+                status: "draft" as const,
+              },
+            ],
+        },
+      ],
     };
   };
 
@@ -125,7 +151,7 @@ export default function ImportPage() {
 
   const detectChapters = (text: string): ChapterPreview[] => {
     const lines = text.split("\n");
-    
+
     // 更全面的章节检测正则表达式，支持多种语言和格式
     const chapterPatterns = [
       // 中文格式 - 支持更多变体
@@ -157,7 +183,7 @@ export default function ImportPage() {
       /^\d+\s*[章节部回卷集]/,
       /^\d+[\.\-\s][章节部回卷集]?/,
     ];
-    
+
     // 需要过滤的关键词
     const filterKeywords = [
       '插图', '插图页', 'color', 'COLOR', 'illustration', 'Illustration',
@@ -165,21 +191,21 @@ export default function ImportPage() {
       '目录', 'contents', 'Contents', 'CONTENTS',
       '作者简介', '作者紹介', 'about the author'
     ];
-    
+
     const detected: ChapterPreview[] = [];
     let currentChapter: ChapterPreview | null = null;
     let currentCharPos = 0; // 记录当前字符位置
 
-    lines.forEach((line, lineIndex) => {
+    lines.forEach((line) => {
       const trimmed = line.trim();
       const lineStartPos = currentCharPos;
       const lineEndPos = lineStartPos + line.length + 1; // +1 是换行符
-      
+
       // 检查是否匹配任何章节模式
       const matchesPattern = chapterPatterns.some((pattern) => pattern.test(trimmed));
-      
+
       // 额外的验证规则
-      const isValidChapter = matchesPattern && 
+      const isValidChapter = matchesPattern &&
         // 检查是否包含过滤关键词
         !filterKeywords.some(keyword => trimmed.includes(keyword)) &&
         // 检查是否包含特殊引号（如 『第一章』这种情况）
@@ -194,13 +220,13 @@ export default function ImportPage() {
           /Chapter\s+\d+/i.test(trimmed) ||
           /Volume\s+\d+/i.test(trimmed)
         );
-      
+
       if (isValidChapter) {
         // 保存前一个章节的结束位置
         if (currentChapter) {
           currentChapter.endPos = lineStartPos;
         }
-        
+
         // 开始新章节
         currentChapter = {
           index: detected.length + 1,
@@ -213,13 +239,13 @@ export default function ImportPage() {
         // 累加当前章节的字数
         currentChapter.wordCount += trimmed.length;
       }
-      
+
       currentCharPos = lineEndPos;
     });
-    
+
     // 设置最后一个章节的结束位置
     if (currentChapter) {
-      currentChapter.endPos = text.length;
+      (currentChapter as ChapterPreview).endPos = text.length;
     }
 
     // 如果检测到的章节不足3个且文本较长，尝试其他方式
@@ -228,24 +254,24 @@ export default function ImportPage() {
       const paragraphs = text
         .split(/\n\n+/)
         .filter((p) => p.trim().length > 100); // 只保留超过100字的段落
-      
+
       if (paragraphs.length >= 3) {
         // 将长段落分成3个虚拟章节
         const chapterSize = Math.ceil(paragraphs.length / 3);
         const newChapters: ChapterPreview[] = [];
         let currentPos = 0;
-        
+
         for (let i = 0; i < 3; i++) {
           const start = i * chapterSize;
           const end = Math.min(start + chapterSize, paragraphs.length);
           const chapterParagraphs = paragraphs.slice(start, end);
-          
+
           if (chapterParagraphs.length > 0) {
             const chapterText = chapterParagraphs.join("\n\n");
             const chapterStartPos = text.indexOf(chapterText, currentPos);
             const chapterEndPos = chapterStartPos + chapterText.length;
             currentPos = chapterEndPos;
-            
+
             newChapters.push({
               index: i + 1,
               title: `第 ${i + 1} 部分（约 ${chapterParagraphs.length} 段）`,
@@ -255,7 +281,7 @@ export default function ImportPage() {
             });
           }
         }
-        
+
         // 如果成功创建了章节，替换检测到的章节
         if (newChapters.length >= 3) {
           return newChapters;
@@ -270,7 +296,7 @@ export default function ImportPage() {
   const analyzeChapterPatterns = (text: string): string[] => {
     const lines = text.split("\n");
     const potentialChapters: string[] = [];
-    
+
     lines.forEach((line, idx) => {
       const trimmed = line.trim();
       // 查找包含数字开头的行
@@ -278,7 +304,7 @@ export default function ImportPage() {
         potentialChapters.push(`行 ${idx + 1}: ${trimmed}`);
       }
     });
-    
+
     return potentialChapters.slice(0, 20); // 只返回前20个
   };
 
@@ -301,7 +327,7 @@ export default function ImportPage() {
     // txt, md, doc 等纯文本格式 - 尝试多种编码
     const arrayBuffer = await file.arrayBuffer();
     const encodings = ["UTF-8", "GBK", "GB2312", "GB18030", "Big5"];
-    
+
     for (const encoding of encodings) {
       try {
         const textDecoder = new TextDecoder(encoding, { fatal: true });
@@ -380,6 +406,105 @@ export default function ImportPage() {
     setStep("preview");
   };
 
+  const handleGoToWorkbench = async () => {
+    if (!adaptType) {
+      addToast({ type: "error", title: "请选择改编形式", message: "请先选择影视作品剧本或电影剧本" });
+      return;
+    }
+    if (!pasteContent.trim()) {
+      addToast({ type: "error", title: "请导入文本", message: "请先上传或粘贴小说文本内容" });
+      return;
+    }
+
+    // 提取选中的章节内容
+    const filteredSelectedChapterList = chapters.filter(ch => selectedChapters.has(ch.index));
+
+    // 为每个章节提取内容
+    const chaptersWithContent = filteredSelectedChapterList.map((ch, idx) => {
+      let content = '';
+      if (ch.startPos !== undefined && ch.endPos !== undefined) {
+        content = pasteContent.slice(ch.startPos, ch.endPos);
+      } else {
+        // 如果没有位置信息，尝试从文本中提取
+        const lines = pasteContent.split('\n');
+        content = lines.slice((ch.index - 1) * 100, ch.index * 100).join('\n') || ch.title;
+      }
+
+      return {
+        index: idx + 1,
+        title: ch.title,
+        wordCount: ch.wordCount,
+        originalIndex: ch.index,
+        content: content,
+      };
+    });
+
+    const selectedContent = chaptersWithContent.map(ch => ch.content).join('\n\n');
+
+    // 创建项目
+    const projectId = `proj_${Date.now().toString(36)}`;
+    const project = {
+      id: projectId,
+      title: `新项目 (${selectedChapters.size}章)`,
+      sourceNovel: "导入文本",
+      sourceAuthor: "未知作者",
+      chapterCount: selectedChapters.size,
+      status: "idle" as const,
+      createdAt: new Date().toISOString(),
+    };
+    addProject(project);
+    setCurrentProject(projectId);
+
+    // 创建小说数据
+    const novelId = `novel_${Date.now().toString(36)}`;
+    const novelData = {
+      id: novelId,
+      projectId,
+      title: project.title,
+      author: "未知作者",
+      totalChapters: selectedChapters.size,
+      totalWordCount: selectedContent.length,
+      chapters: chaptersWithContent,
+      fullText: selectedContent,
+      createdAt: new Date().toISOString(),
+    };
+    addNovel(novelData);
+    setCurrentNovel(novelId);
+
+    // 创建基础剧本数据（不需要AI处理）
+    const scriptId = `script_${Date.now().toString(36)}`;
+    const initialScriptData = {
+      id: scriptId,
+      projectId,
+      title: project.title,
+      sourceText: selectedContent,
+      episodes: [
+        {
+          id: `${scriptId}_episode_1`,
+          title: project.title,
+          coldOpen: "等待 AI 分析",
+          scenes: [
+            {
+              id: `${scriptId}_scene_1`,
+              code: "SC-001",
+              title: "等待处理",
+              location: "等待分析",
+              intent: "导入的原始文本尚未处理，请启动 AI 转换",
+              beats: [],
+              status: "draft" as const,
+            },
+          ],
+        },
+      ],
+    };
+    upsertScript(initialScriptData);
+    setCurrentScript(scriptId);
+
+    // 跳转到工作台
+    navigate("/workbench");
+    addToast({ type: "success", title: "已进入工作台" });
+  };
+
   const handleStartConvert = async () => {
     if (!adaptType || !pasteContent.trim() || isSubmitting) return;
     if (selectedChapters.size === 0) {
@@ -444,7 +569,7 @@ export default function ImportPage() {
     try {
       setStepMessages(["正在创建剧本..."]);
       setCurrentStep("创建剧本");
-      
+
       console.log("Step 1: Creating script...");
       const script = await createScript({
         title: project.title,
@@ -454,9 +579,14 @@ export default function ImportPage() {
       console.log("Script created:", script);
       setStepMessages(prev => [...prev, "✅ 剧本创建完成"]);
 
+      // 立即保存基础剧本数据到 store，即使任务还在处理中
+      const initialScriptData = mapBackendScriptToWorkbench(script, projectId);
+      upsertScript(initialScriptData);
+      setCurrentScript(script.id);
+
       setCurrentStep("启动处理任务");
       setStepMessages(prev => [...prev, "正在启动处理任务..."]);
-      
+
       console.log("Step 2: Starting script processing...");
       const processingTask = await startScriptProcessing(script.id);
       console.log("Processing task:", processingTask);
@@ -464,7 +594,7 @@ export default function ImportPage() {
 
       setCurrentStep("获取任务状态");
       setStepMessages(prev => [...prev, "正在获取任务状态..."]);
-      
+
       console.log("Step 3: Fetching live task...");
       const liveTask = await fetchTask(processingTask.id);
       console.log("Live task:", liveTask);
@@ -499,17 +629,17 @@ export default function ImportPage() {
           console.log("Polling task:", liveTask.id);
           const latestTask = await fetchTask(liveTask.id);
           console.log("Latest task:", latestTask);
-          
+
           updateTask(latestTask.id, latestTask);
-          
+
           // 检查进度是否有变化
           const previousProgress = convertProgress;
           setConvertProgress(latestTask.progress);
-          
+
           if (latestTask.progress > previousProgress) {
             setLastProgressUpdate(Date.now());
           }
-          
+
           // 检查是否长时间无响应（超过2分钟）
           const now = Date.now();
           if (now - lastProgressUpdate > 120000) {
@@ -528,7 +658,8 @@ export default function ImportPage() {
             }
           }
 
-          if (latestTask.status === "completed" || latestTask.status === "done") {
+          if (latestTask.status === "done") {
+            window.clearInterval(heartbeatInterval);
             setCurrentStep("完成");
             setStepMessages(prev => [...prev, "🎉 剧本转换完成！"]);
             const scriptDetail = await fetchScript(script.id);
@@ -538,9 +669,10 @@ export default function ImportPage() {
             window.clearInterval(completionPoll);
             setTimeout(() => {
               addToast({ type: "success", title: "剧本转换完成" });
-              navigate("/tasks");
+              navigate("/workbench");
             }, 1000);
           } else if (latestTask.status === "failed") {
+            window.clearInterval(heartbeatInterval);
             setCurrentStep("失败");
             setStepMessages(prev => [...prev, `❌ 转换失败: ${latestTask.error_message ?? "未知错误"}`]);
             updateProject(projectId, { status: "idle" });
@@ -571,7 +703,7 @@ export default function ImportPage() {
       const heartbeatInterval = window.setInterval(() => {
         const now = Date.now();
         const timeSinceLastUpdate = now - lastProgressUpdate;
-        
+
         // 如果超过5秒没有进度更新，添加心跳消息
         if (timeSinceLastUpdate > 5000 && convertProgress < 100) {
           setStepMessages(prev => {
@@ -583,6 +715,7 @@ export default function ImportPage() {
           });
         }
       }, 8000);
+
     } catch (error) {
       // 只有在创建脚本或启动任务阶段失败才跳转回配置页
       // 轮询过程中的错误由轮询内部处理
@@ -617,11 +750,10 @@ export default function ImportPage() {
       {step === "upload" && (
         <div className="space-y-6 animate-fade-in-up">
           <div
-            className={`flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed p-12 transition-all duration-200 ${
-              dragOver
-                ? "border-(--accent-soft) bg-(--accent-light) scale-[1.01]"
-                : "border-(--line-medium) hover:border-(--accent-soft)/50 hover:bg-(--accent-light) hover:scale-[1.005]"
-            }`}
+            className={`flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed p-12 transition-all duration-200 ${dragOver
+              ? "border-(--accent-soft) bg-(--accent-light) scale-[1.01]"
+              : "border-(--line-medium) hover:border-(--accent-soft)/50 hover:bg-(--accent-light) hover:scale-[1.005]"
+              }`}
             onDragOver={(e) => {
               e.preventDefault();
               setDragOver(true);
@@ -822,7 +954,7 @@ export default function ImportPage() {
             </div>
 
             <div className="space-y-2 max-h-[400px] overflow-y-auto pr-1">
-              {chapters.map((ch, idx) => {
+              {chapters.map((ch) => {
                 const percentage = chapters.length > 0
                   ? Math.round((ch.wordCount / pasteContent.length) * 100)
                   : 0;
@@ -831,11 +963,10 @@ export default function ImportPage() {
                 return (
                   <div
                     key={ch.index}
-                    className={`group rounded-xl border cursor-pointer transition-all ${
-                      isSelected
-                        ? "border-(--accent-soft) bg-(--accent-light)/30"
-                        : "border-(--line-soft) bg-white hover:border-(--accent-soft)/50 hover:bg-(--accent-light)/30"
-                    }`}
+                    className={`group rounded-xl border cursor-pointer transition-all ${isSelected
+                      ? "border-(--accent-soft) bg-(--accent-light)/30"
+                      : "border-(--line-soft) bg-white hover:border-(--accent-soft)/50 hover:bg-(--accent-light)/30"
+                      }`}
                     onClick={() => {
                       const newSelected = new Set(selectedChapters);
                       if (isSelected) {
@@ -850,7 +981,7 @@ export default function ImportPage() {
                       <input
                         type="checkbox"
                         checked={isSelected}
-                        onChange={() => {}}
+                        onChange={() => { }}
                         className="h-4 w-4 rounded border-(--line-medium) text-(--accent-soft) focus:ring-(--accent-soft)/30"
                       />
                       <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-(--accent-light) text-sm font-medium text-(--accent-soft)">
@@ -943,11 +1074,10 @@ export default function ImportPage() {
                       key={type.key}
                       type="button"
                       onClick={() => setAdaptType(type.key)}
-                      className={`rounded-xl border-2 px-4 py-4 text-left transition-all ${
-                        adaptType === type.key
-                          ? "border-(--accent-soft) bg-(--accent-light)"
-                          : "border-(--line-soft) hover:border-(--accent-soft)/50 hover:bg-(--accent-light)/50"
-                      }`}
+                      className={`rounded-xl border-2 px-4 py-4 text-left transition-all ${adaptType === type.key
+                        ? "border-(--accent-soft) bg-(--accent-light)"
+                        : "border-(--line-soft) hover:border-(--accent-soft)/50 hover:bg-(--accent-light)/50"
+                        }`}
                     >
                       <p className="font-medium text-foreground">
                         {type.label}
@@ -993,12 +1123,12 @@ export default function ImportPage() {
             </button>
             <button
               type="button"
-              onClick={() => setStep("confirm")}
+              onClick={handleGoToWorkbench}
               disabled={!adaptType}
               className="inline-flex items-center gap-1.5 rounded-lg bg-(--accent-soft) px-5 py-2 text-sm font-medium text-white hover:bg-(--accent-soft)/90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
             >
-              <Sparkles className="h-4 w-4" />
-              预览转换效果
+              <FileText className="h-4 w-4" />
+              进入工作台
             </button>
           </div>
         </div>
@@ -1010,7 +1140,7 @@ export default function ImportPage() {
             <p className="text-xs uppercase tracking-[0.22em] text-(--text-faint) mb-4">
               确认转换配置
             </p>
-            
+
             <div className="space-y-4">
               {/* 剧本类型 */}
               <div className="flex items-center justify-between p-4 rounded-xl bg-(--accent-light)/30">
@@ -1075,14 +1205,24 @@ export default function ImportPage() {
               <ArrowLeft className="h-4 w-4" />
               返回修改
             </button>
-            <button
-              type="button"
-              onClick={handleStartConvert}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-(--accent-soft) px-5 py-2 text-sm font-medium text-white hover:bg-(--accent-soft)/90 transition-colors"
-            >
-              <Sparkles className="h-4 w-4" />
-              确认开始转换
-            </button>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={handleGoToWorkbench}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-(--accent-soft) px-4 py-2 text-sm font-medium text-(--accent-soft) hover:bg-(--accent-light) transition-colors"
+              >
+                <FileText className="h-4 w-4" />
+                直接进入工作台
+              </button>
+              <button
+                type="button"
+                onClick={handleStartConvert}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-(--accent-soft) px-5 py-2 text-sm font-medium text-white hover:bg-(--accent-soft)/90 transition-colors"
+              >
+                <Sparkles className="h-4 w-4" />
+                开始 AI 转换
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -1156,14 +1296,13 @@ export default function ImportPage() {
                 ) : (
                   stepMessages.map((msg, idx) => (
                     <div key={idx} className="flex items-start gap-2 text-sm">
-                      <div className={`flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full ${
-                        msg.includes("完成") ? "bg-green-100 text-green-600" : 
-                        msg.includes("失败") ? "bg-red-100 text-red-600" : 
-                        "bg-(--accent-light) text-(--accent-soft)"
-                      }`}>
+                      <div className={`flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full ${msg.includes("完成") ? "bg-green-100 text-green-600" :
+                        msg.includes("失败") ? "bg-red-100 text-red-600" :
+                          "bg-(--accent-light) text-(--accent-soft)"
+                        }`}>
                         {msg.includes("完成") ? <Check className="h-3 w-3" /> :
-                         msg.includes("失败") ? <AlertCircle className="h-3 w-3" /> :
-                         <span className="text-xs">{idx + 1}</span>}
+                          msg.includes("失败") ? <AlertCircle className="h-3 w-3" /> :
+                            <span className="text-xs">{idx + 1}</span>}
                       </div>
                       <span className={msg.includes("失败") ? "text-red-500" : "text-foreground"}>
                         {msg}
@@ -1223,13 +1362,11 @@ export default function ImportPage() {
                   return (
                     <div
                       key={ch.index}
-                      className={`flex items-center gap-2 rounded-lg px-3 py-2 text-xs ${
-                        done ? "bg-green-50 text-green-700" : "bg-white text-(--text-subtle)"
-                      }`}
+                      className={`flex items-center gap-2 rounded-lg px-3 py-2 text-xs ${done ? "bg-green-50 text-green-700" : "bg-white text-(--text-subtle)"
+                        }`}
                     >
-                      <div className={`flex h-4 w-4 items-center justify-center rounded-full ${
-                        done ? "bg-green-500" : "bg-(--line-soft)"
-                      }`}>
+                      <div className={`flex h-4 w-4 items-center justify-center rounded-full ${done ? "bg-green-500" : "bg-(--line-soft)"
+                        }`}>
                         {done ? <Check className="h-2.5 w-2.5 text-white" /> : null}
                       </div>
                       <span className="truncate">{ch.title}</span>

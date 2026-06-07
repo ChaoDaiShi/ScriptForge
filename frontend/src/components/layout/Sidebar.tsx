@@ -7,7 +7,6 @@ import {
   Settings,
   LineChart,
   Cable,
-  Upload,
 } from "lucide-react";
 import { useLayoutStore } from "@/store/useLayoutStore";
 
@@ -47,12 +46,6 @@ export default function Sidebar() {
       </div>
 
       <nav className="mt-4 flex flex-1 flex-col gap-0.5 px-3">
-        <SidebarItem
-          to="/import"
-          icon={<Upload size={20} />}
-          label="导入文本"
-          expanded={sidebarOpen}
-        />
         <SidebarItem
           to="/workbench"
           icon={<LayoutDashboard size={20} />}
