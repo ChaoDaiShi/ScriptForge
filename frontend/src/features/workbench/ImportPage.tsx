@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import {
+  createProject,
   createScript,
   fetchScript,
   fetchTask,
@@ -438,15 +439,23 @@ export default function ImportPage() {
     const selectedContent = chaptersWithContent.map(ch => ch.content).join('\n\n');
 
     // 创建项目
-    const projectId = `proj_${Date.now().toString(36)}`;
-    const project = {
-      id: projectId,
+    const backendProject = await createProject({
       title: `新项目 (${selectedChapters.size}章)`,
-      sourceNovel: "导入文本",
-      sourceAuthor: "未知作者",
-      chapterCount: selectedChapters.size,
-      status: "idle" as const,
-      createdAt: new Date().toISOString(),
+      source_novel: "导入文本",
+      source_author: "未知作者",
+      chapter_count: selectedChapters.size,
+    });
+    const projectId = backendProject.id;
+    const project = {
+      id: backendProject.id,
+      title: backendProject.title,
+      sourceNovel: backendProject.source_novel,
+      sourceAuthor: backendProject.source_author,
+      chapterCount: backendProject.chapter_count,
+      status: backendProject.status === "failed" || backendProject.status === "distributing"
+        ? "idle"
+        : backendProject.status,
+      createdAt: backendProject.created_at,
     };
     addProject(project);
     setCurrentProject(projectId);
@@ -516,16 +525,22 @@ export default function ImportPage() {
     setStep("converting");
     setConvertProgress(0);
 
-    const projectId = `proj_${Date.now().toString(36)}`;
+    const backendProject = await createProject({
+      title: `新项目 (${selectedChapters.size}章)`,
+      source_novel: "导入文本",
+      source_author: "未知作者",
+      chapter_count: selectedChapters.size,
+    });
+    const projectId = backendProject.id;
     const novelId = `novel_${Date.now().toString(36)}`;
     const project = {
-      id: projectId,
-      title: `新项目 (${selectedChapters.size}章)`,
-      sourceNovel: "导入文本",
-      sourceAuthor: "未知作者",
-      chapterCount: selectedChapters.size,
+      id: backendProject.id,
+      title: backendProject.title,
+      sourceNovel: backendProject.source_novel,
+      sourceAuthor: backendProject.source_author,
+      chapterCount: backendProject.chapter_count,
       status: "converting" as const,
-      createdAt: new Date().toISOString(),
+      createdAt: backendProject.created_at,
     };
     addProject(project);
     setCurrentProject(projectId);
@@ -571,6 +586,7 @@ export default function ImportPage() {
         title: project.title,
         type: adaptType === "short" ? "short_film" : "feature_film",
         text: selectedContent.trim(),
+        project_id: projectId,
       });
       console.log("Script created:", script);
       setStepMessages(prev => [...prev, "✅ 剧本创建完成"]);
@@ -584,7 +600,7 @@ export default function ImportPage() {
       setStepMessages(prev => [...prev, "正在启动处理任务..."]);
 
       console.log("Step 2: Starting script processing...");
-      const processingTask = await startScriptProcessing(script.id);
+      const processingTask = await startScriptProcessing(script.id, projectId);
       console.log("Processing task:", processingTask);
       setStepMessages(prev => [...prev, "✅ 处理任务启动成功"]);
 

@@ -17,6 +17,8 @@ import {
   Clock,
 } from "lucide-react";
 import { useScriptStore } from "@/store/useScriptStore";
+import { createDistributionJob, dispatchDistributionJob } from "@/lib/api";
+import { useToastStore } from "@/store/useToastStore";
 
 type DistributeStep = "select" | "generate" | "distribute" | "complete";
 
@@ -54,12 +56,18 @@ export default function WorkbenchDistributeSection() {
     douyin: "idle",
   });
   const [showConfig, setShowConfig] = useState(false);
+  const addToast = useToastStore((s) => s.addToast);
+  const [distributionJobId, setDistributionJobId] = useState<string | null>(null);
 
   const scripts = useScriptStore((s) => s.scripts);
   const currentScriptId = useScriptStore((s) => s.currentScriptId);
   const currentScript = scripts.find((s) => s.id === currentScriptId);
 
   const handleGenerateVideo = async () => {
+    if (!currentScript?.projectId) {
+      addToast({ type: "warning", title: "当前剧本未绑定项目" });
+      return;
+    }
     setGenerating(true);
     setStep("generate");
     setGenerateProgress(0);
@@ -76,26 +84,51 @@ export default function WorkbenchDistributeSection() {
     }, 2000);
 
     // Simulate API call completion after ~15 seconds
-    setTimeout(() => {
+    setTimeout(async () => {
       clearInterval(interval);
       setGenerateProgress(100);
       setGenerating(false);
-      setVideoUrl("https://example.com/generated-drama-video.mp4");
+      try {
+        const job = await createDistributionJob({
+          project_id: currentScript.projectId,
+          script_id: currentScript.id,
+          title: config.title || currentScript.title,
+          description: config.description,
+          resolution: config.resolution,
+          ratio: config.ratio,
+          duration: config.duration,
+          watermark: config.watermark,
+          generate_audio: config.generateAudio,
+          platforms: ["wechat", "douyin"],
+        });
+        setDistributionJobId(job.id);
+        setVideoUrl(job.video_url ?? "https://example.com/generated-drama-video.mp4");
+      } catch (error) {
+        addToast({
+          type: "error",
+          title: "创建分发任务失败",
+          message: error instanceof Error ? error.message : "未知错误",
+        });
+      }
       setStep("distribute");
     }, 15000);
   };
 
   const handleDistributeToWechat = async () => {
     setPlatformStatus((prev) => ({ ...prev, wechat: "uploading" }));
-    // Simulate WeChat distribution
-    await new Promise((r) => setTimeout(r, 3000));
+    if (currentScript?.projectId && distributionJobId) {
+      await dispatchDistributionJob(currentScript.projectId, distributionJobId, ["wechat"]);
+    }
+    await new Promise((r) => setTimeout(r, 1000));
     setPlatformStatus((prev) => ({ ...prev, wechat: "success" }));
   };
 
   const handleDistributeToDouyin = async () => {
     setPlatformStatus((prev) => ({ ...prev, douyin: "uploading" }));
-    // Simulate Douyin distribution
-    await new Promise((r) => setTimeout(r, 3000));
+    if (currentScript?.projectId && distributionJobId) {
+      await dispatchDistributionJob(currentScript.projectId, distributionJobId, ["douyin"]);
+    }
+    await new Promise((r) => setTimeout(r, 1000));
     setPlatformStatus((prev) => ({ ...prev, douyin: "success" }));
   };
 

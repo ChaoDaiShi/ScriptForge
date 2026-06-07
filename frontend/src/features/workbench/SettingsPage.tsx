@@ -1,4 +1,7 @@
+import { useMemo, useState } from "react";
 import { Users, Receipt, Key, Bell, Palette, Globe } from "lucide-react";
+import { fetchMe, loginWithEmail, registerWithEmail, type AuthPayload } from "@/lib/api";
+import { useToastStore } from "@/store/useToastStore";
 
 const plans = [
   {
@@ -37,6 +40,64 @@ const settingSections = [
 ];
 
 export default function SettingsPage() {
+  const addToast = useToastStore((s) => s.addToast);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [isRegisterMode, setIsRegisterMode] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [authPayload, setAuthPayload] = useState<AuthPayload | null>(() => {
+    if (typeof window === "undefined") return null;
+    const stored = window.localStorage.getItem("scriptforge-auth");
+    if (!stored) return null;
+    try {
+      return JSON.parse(stored) as AuthPayload;
+    } catch {
+      return null;
+    }
+  });
+
+  const accountDescription = useMemo(() => {
+    if (!authPayload) {
+      return "登录后可查看和编辑账户详情";
+    }
+    return `当前登录：${authPayload.user.email}`;
+  }, [authPayload]);
+
+  const persistAuth = (payload: AuthPayload) => {
+    setAuthPayload(payload);
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem("scriptforge-auth", JSON.stringify(payload));
+    }
+  };
+
+  const handleSubmit = async () => {
+    if (!email.trim() || !password.trim()) {
+      addToast({ type: "warning", title: "请输入邮箱和密码" });
+      return;
+    }
+    setIsSubmitting(true);
+    try {
+      const payload = isRegisterMode
+        ? await registerWithEmail({ email, password })
+        : await loginWithEmail({ email, password });
+      persistAuth(payload);
+      await fetchMe();
+      addToast({
+        type: "success",
+        title: isRegisterMode ? "注册成功" : "登录成功",
+        message: payload.user.email,
+      });
+    } catch (error) {
+      addToast({
+        type: "error",
+        title: isRegisterMode ? "注册失败" : "登录失败",
+        message: error instanceof Error ? error.message : "未知错误",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   return (
     <div className="page-container max-w-4xl animate-fade-in">
       <header className="page-header">
@@ -57,16 +118,41 @@ export default function SettingsPage() {
             <div className="flex-1">
               <p className="text-sm font-medium text-foreground">账户信息</p>
               <p className="text-xs text-(--text-subtle) mt-0.5">
-                登录后可查看和编辑账户详情
+                {accountDescription}
               </p>
             </div>
+          </div>
+          <div className="mt-4 grid gap-3 md:grid-cols-[1fr_1fr_auto]">
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="邮箱"
+              className="rounded-lg border border-(--line-medium) bg-white px-4 py-2 text-sm text-foreground"
+            />
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="密码"
+              className="rounded-lg border border-(--line-medium) bg-white px-4 py-2 text-sm text-foreground"
+            />
             <button
               type="button"
-              className="rounded-lg border border-(--line-medium) px-4 py-2 text-sm text-foreground hover:bg-(--muted) transition-colors"
+              onClick={handleSubmit}
+              disabled={isSubmitting}
+              className="rounded-lg bg-(--accent-soft) px-4 py-2 text-sm text-white disabled:opacity-50"
             >
-              登录
+              {isSubmitting ? "提交中..." : isRegisterMode ? "注册" : "登录"}
             </button>
           </div>
+          <button
+            type="button"
+            onClick={() => setIsRegisterMode((prev) => !prev)}
+            className="mt-3 text-xs text-(--accent-soft)"
+          >
+            {isRegisterMode ? "已有账号，切换到登录" : "没有账号，切换到注册"}
+          </button>
         </div>
 
         {/* Settings Sections */}

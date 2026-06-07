@@ -4,7 +4,17 @@ from datetime import datetime, timezone
 from typing import Any, Optional
 
 from core.database import get_supabase_client
-from schemas.script_schema import ProcessingTask, Script, ScriptType
+from schemas.script_schema import (
+    DistributionJob,
+    DistributionPlatform,
+    ExportFormat,
+    ProcessingTask,
+    Project,
+    ProjectExport,
+    Script,
+    ScriptType,
+    User,
+)
 
 
 def _iso_now() -> str:
@@ -12,57 +22,94 @@ def _iso_now() -> str:
 
 
 class SupabaseScriptRepository:
-    """基于 Supabase 的剧本与任务仓储。"""
+    """基于 Supabase 的用户、项目、剧本、任务与分发仓储。"""
 
     def __init__(self) -> None:
         self.client = get_supabase_client()
 
+    def create_user(self, user: User) -> User:
+        payload = user.model_dump(mode="json")
+        self.client.table("users").insert(payload).execute()
+        return user
+
+    def get_user_by_email(self, email: str) -> Optional[User]:
+        response = self.client.table("users").select("*").eq("email", email).limit(1).execute()
+        rows = response.data or []
+        return User.model_validate(rows[0]) if rows else None
+
+    def get_user(self, user_id: str) -> Optional[User]:
+        response = self.client.table("users").select("*").eq("id", user_id).limit(1).execute()
+        rows = response.data or []
+        return User.model_validate(rows[0]) if rows else None
+
+    def create_project(self, project: Project) -> Project:
+        self.client.table("projects").insert(project.model_dump(mode="json")).execute()
+        return project
+
+    def list_projects(self, user_id: Optional[str] = None) -> list[Project]:
+        query = self.client.table("projects").select("*").order("updated_at", desc=True)
+        if user_id:
+            query = query.eq("user_id", user_id)
+        response = query.execute()
+        return [Project.model_validate(row) for row in (response.data or [])]
+
+    def get_project(self, project_id: str) -> Optional[Project]:
+        response = self.client.table("projects").select("*").eq("id", project_id).limit(1).execute()
+        rows = response.data or []
+        return Project.model_validate(rows[0]) if rows else None
+
+    def update_project(self, project_id: str, updates: dict[str, Any]) -> Optional[Project]:
+        payload = {k: v.value if hasattr(v, "value") else v for k, v in updates.items() if v is not None}
+        payload["updated_at"] = _iso_now()
+        self.client.table("projects").update(payload).eq("id", project_id).execute()
+        return self.get_project(project_id)
+
+    def delete_project(self, project_id: str) -> bool:
+        project = self.get_project(project_id)
+        if not project:
+            return False
+        self.client.table("distribution_jobs").delete().eq("project_id", project_id).execute()
+        self.client.table("project_exports").delete().eq("project_id", project_id).execute()
+        self.client.table("tasks").delete().eq("project_id", project_id).execute()
+        self.client.table("scripts").delete().eq("project_id", project_id).execute()
+        self.client.table("projects").delete().eq("id", project_id).execute()
+        return True
+
     def create_script(self, script: Script) -> Script:
         payload = {
-          "id": script.id,
-          "title": script.title,
-          "type": script.type.value,
-          "original_text": script.original_text,
-          "processed_text": script.processed_text,
-          "main_plot": script.main_plot,
-          "characters": [character.model_dump(mode="json") for character in script.characters],
-          "scenes": [scene.model_dump(mode="json") for scene in script.scenes],
-          "created_at": script.created_at.isoformat(),
-          "updated_at": script.updated_at.isoformat(),
+            **script.model_dump(mode="json"),
+            "type": script.type.value,
+            "characters": [character.model_dump(mode="json") for character in script.characters],
+            "scenes": [scene.model_dump(mode="json") for scene in script.scenes],
         }
         self.client.table("scripts").insert(payload).execute()
         return script
 
     def get_script(self, script_id: str) -> Optional[Script]:
-        response = (
-          self.client.table("scripts")
-          .select("*")
-          .eq("id", script_id)
-          .limit(1)
-          .execute()
-        )
+        response = self.client.table("scripts").select("*").eq("id", script_id).limit(1).execute()
         rows = response.data or []
-        if not rows:
-            return None
-        return self._row_to_script(rows[0])
+        return self._row_to_script(rows[0]) if rows else None
 
-    def list_scripts(self, script_type: Optional[ScriptType] = None) -> list[Script]:
+    def list_scripts(self, script_type: Optional[ScriptType] = None, project_id: Optional[str] = None) -> list[Script]:
         query = self.client.table("scripts").select("*").order("created_at", desc=True)
         if script_type:
             query = query.eq("type", script_type.value)
+        if project_id:
+            query = query.eq("project_id", project_id)
         response = query.execute()
         return [self._row_to_script(row) for row in (response.data or [])]
 
     def update_script(self, script: Script) -> Script:
         payload = {
-          "title": script.title,
-          "type": script.type.value,
-          "original_text": script.original_text,
-          "processed_text": script.processed_text,
-          "main_plot": script.main_plot,
-          "characters": [character.model_dump(mode="json") for character in script.characters],
-          "scenes": [scene.model_dump(mode="json") for scene in script.scenes],
-          "updated_at": _iso_now(),
+            "title": script.title,
+            "type": script.type.value,
+            "original_text": script.original_text,
+            "processed_text": script.processed_text,
+            "main_plot": script.main_plot,
+            "project_id": script.project_id,
+            "characters": [character.model_dump(mode="json") for character in script.characters],
+            "scenes": [scene.model_dump(mode="json") for scene in script.scenes],
+            "updated_at": _iso_now(),
         }
         self.client.table("scripts").update(payload).eq("id", script.id).execute()
         refreshed = self.get_script(script.id)
@@ -73,60 +120,97 @@ class SupabaseScriptRepository:
         if not existing:
             return False
         self.client.table("tasks").delete().eq("script_id", script_id).execute()
+        self.client.table("project_exports").delete().eq("script_id", script_id).execute()
+        self.client.table("distribution_jobs").delete().eq("script_id", script_id).execute()
         self.client.table("scripts").delete().eq("id", script_id).execute()
         return True
 
     def create_task(self, task: ProcessingTask) -> ProcessingTask:
         payload = {
-          "id": task.id,
-          "script_id": task.script_id,
-          "steps": [step.value for step in task.steps],
-          "current_step": task.current_step.value if task.current_step else None,
-          "status": task.status.value,
-          "progress": task.progress,
-          "error_message": task.error_message,
-          "created_at": task.created_at.isoformat(),
-          "updated_at": task.updated_at.isoformat(),
+            **task.model_dump(mode="json"),
+            "steps": [step.value for step in task.steps],
+            "current_step": task.current_step.value if task.current_step else None,
+            "status": task.status.value,
         }
         self.client.table("tasks").insert(payload).execute()
         return task
 
     def update_task(self, task_id: str, updates: dict[str, Any]) -> Optional[ProcessingTask]:
-        payload = dict(updates)
-        if "status" in payload and payload["status"] is not None:
-            payload["status"] = payload["status"].value
-        if "current_step" in payload and payload["current_step"] is not None:
-            payload["current_step"] = payload["current_step"].value
+        payload: dict[str, Any] = {}
+        for key, value in updates.items():
+            if value is None:
+                continue
+            payload[key] = value.value if hasattr(value, "value") else value
         payload["updated_at"] = _iso_now()
         self.client.table("tasks").update(payload).eq("id", task_id).execute()
         return self.get_task(task_id)
 
     def get_task(self, task_id: str) -> Optional[ProcessingTask]:
-        response = (
-          self.client.table("tasks")
-          .select("*")
-          .eq("id", task_id)
-          .limit(1)
-          .execute()
-        )
+        response = self.client.table("tasks").select("*").eq("id", task_id).limit(1).execute()
         rows = response.data or []
-        if not rows:
-            return None
-        return self._row_to_task(rows[0])
+        return self._row_to_task(rows[0]) if rows else None
 
     def get_tasks(self, script_id: str) -> list[ProcessingTask]:
-        response = (
-          self.client.table("tasks")
-          .select("*")
-          .eq("script_id", script_id)
-          .order("created_at", desc=True)
-          .execute()
-        )
+        response = self.client.table("tasks").select("*").eq("script_id", script_id).order("created_at", desc=True).execute()
         return [self._row_to_task(row) for row in (response.data or [])]
 
-    def list_tasks(self) -> list[ProcessingTask]:
-        response = self.client.table("tasks").select("*").order("updated_at", desc=True).execute()
+    def list_tasks(self, status: Optional[str] = None, project_id: Optional[str] = None) -> list[ProcessingTask]:
+        query = self.client.table("tasks").select("*").order("updated_at", desc=True)
+        if status:
+            query = query.eq("status", status)
+        if project_id:
+            query = query.eq("project_id", project_id)
+        response = query.execute()
         return [self._row_to_task(row) for row in (response.data or [])]
+
+    def create_export(self, export_item: ProjectExport) -> ProjectExport:
+        payload = {
+            **export_item.model_dump(mode="json"),
+            "format": export_item.format.value,
+        }
+        self.client.table("project_exports").insert(payload).execute()
+        return export_item
+
+    def list_exports(self, project_id: Optional[str] = None) -> list[ProjectExport]:
+        query = self.client.table("project_exports").select("*").order("created_at", desc=True)
+        if project_id:
+            query = query.eq("project_id", project_id)
+        response = query.execute()
+        return [self._row_to_export(row) for row in (response.data or [])]
+
+    def create_distribution_job(self, job: DistributionJob) -> DistributionJob:
+        payload = {
+            **job.model_dump(mode="json"),
+            "platforms": [platform.value for platform in job.platforms],
+            "status": job.status.value,
+        }
+        self.client.table("distribution_jobs").insert(payload).execute()
+        return job
+
+    def update_distribution_job(self, job_id: str, updates: dict[str, Any]) -> Optional[DistributionJob]:
+        payload: dict[str, Any] = {}
+        for key, value in updates.items():
+            if value is None:
+                continue
+            if key == "platforms":
+                payload[key] = [platform.value if isinstance(platform, DistributionPlatform) else platform for platform in value]
+            else:
+                payload[key] = value.value if hasattr(value, "value") else value
+        payload["updated_at"] = _iso_now()
+        self.client.table("distribution_jobs").update(payload).eq("id", job_id).execute()
+        return self.get_distribution_job(job_id)
+
+    def get_distribution_job(self, job_id: str) -> Optional[DistributionJob]:
+        response = self.client.table("distribution_jobs").select("*").eq("id", job_id).limit(1).execute()
+        rows = response.data or []
+        return self._row_to_distribution(rows[0]) if rows else None
+
+    def list_distribution_jobs(self, project_id: Optional[str] = None) -> list[DistributionJob]:
+        query = self.client.table("distribution_jobs").select("*").order("updated_at", desc=True)
+        if project_id:
+            query = query.eq("project_id", project_id)
+        response = query.execute()
+        return [self._row_to_distribution(row) for row in (response.data or [])]
 
     @staticmethod
     def _row_to_script(row: dict[str, Any]) -> Script:
@@ -137,3 +221,13 @@ class SupabaseScriptRepository:
     @staticmethod
     def _row_to_task(row: dict[str, Any]) -> ProcessingTask:
         return ProcessingTask.model_validate(row)
+
+    @staticmethod
+    def _row_to_export(row: dict[str, Any]) -> ProjectExport:
+        payload = dict(row)
+        payload["format"] = ExportFormat(payload["format"])
+        return ProjectExport.model_validate(payload)
+
+    @staticmethod
+    def _row_to_distribution(row: dict[str, Any]) -> DistributionJob:
+        return DistributionJob.model_validate(row)

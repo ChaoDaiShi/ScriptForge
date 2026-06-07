@@ -15,6 +15,7 @@ import {
 import { useProjectStore } from "@/store/useProjectStore";
 import { useToastStore } from "@/store/useToastStore";
 import { useState } from "react";
+import { createProjectExport, fetchProjectExports } from "@/lib/api";
 
 type ExportFormat = "yaml" | "pdf" | "json" | "share";
 type ExportStatus = "idle" | "preparing" | "exporting" | "done" | "error";
@@ -93,7 +94,7 @@ export default function AssetsPage() {
     }
   };
 
-  const handleExport = (format: ExportFormat) => {
+  const handleExport = async (format: ExportFormat) => {
     if (!selectedProject) {
       addToast({
         type: "warning",
@@ -113,16 +114,17 @@ export default function AssetsPage() {
       title: `正在准备导出 ${exportFormats.find((f) => f.format === format)?.label}...`,
     });
 
-    // Simulate preparation
-    setTimeout(() => {
+    setTimeout(async () => {
       setExportStatus("exporting");
       setExportProgress(10);
 
       const interval = setInterval(() => {
+        let shouldPersist = false;
         setExportProgress((prev) => {
           const next = prev + Math.random() * 15 + 5;
           if (next >= 100) {
             clearInterval(interval);
+            shouldPersist = true;
             setExportStatus("done");
             setExportProgress(100);
 
@@ -153,6 +155,24 @@ export default function AssetsPage() {
           }
           return Math.min(next, 100);
         });
+        if (shouldPersist) {
+          void (async () => {
+            try {
+              await createProjectExport(
+                selectedProject.id,
+                format,
+                selectedProject.scriptId,
+              );
+              await fetchProjectExports(selectedProject.id);
+            } catch (error) {
+              addToast({
+                type: "error",
+                title: "导出记录保存失败",
+                message: error instanceof Error ? error.message : "未知错误",
+              });
+            }
+          })();
+        }
       }, 200);
     }, 800);
   };

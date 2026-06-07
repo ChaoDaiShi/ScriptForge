@@ -1,99 +1,171 @@
-from pydantic import BaseModel, Field
-from typing import List, Optional, Dict, Any
-from enum import Enum
+from __future__ import annotations
+
 from datetime import datetime
+from enum import Enum
+from typing import Any, Dict, List, Optional
+
+from pydantic import BaseModel, EmailStr, Field
 
 
 class ScriptType(str, Enum):
-    """剧本类型"""
     FEATURE_FILM = "feature_film"
     SHORT_FILM = "short_film"
 
 
 class CharacterRole(str, Enum):
-    """人物角色类型"""
     MAIN = "main"
     SUPPORTING = "supporting"
     BACKGROUND = "background"
 
 
 class Character(BaseModel):
-    """人物模型"""
-    id: str = Field(..., description="人物唯一标识")
-    name: str = Field(..., description="人物名称")
-    role: CharacterRole = Field(default=CharacterRole.SUPPORTING, description="角色类型")
-    description: Optional[str] = Field(None, description="人物描述")
-    traits: List[str] = Field(default=[], description="人物特征")
-
-
-class DescriptionType(str, Enum):
-    """描写类型"""
-    SCENERY = "scenery"
-    PSYCHOLOGY = "psychology"
-    PORTRAIT = "portrait"
-    ACTION = "action"
-    EXPRESSION = "expression"
+    id: str
+    name: str
+    role: CharacterRole = CharacterRole.SUPPORTING
+    description: Optional[str] = None
+    traits: List[str] = Field(default_factory=list)
 
 
 class Dialogue(BaseModel):
-    """对话模型"""
-    id: str = Field(..., description="对话唯一标识")
-    speaker_id: Optional[str] = Field(None, description="说话者ID")
-    speaker_name: Optional[str] = Field(None, description="说话者名称")
-    content: str = Field(..., description="对话内容")
-    emotion: Optional[str] = Field(None, description="情绪标记")
+    id: str
+    speaker_id: Optional[str] = None
+    speaker_name: Optional[str] = None
+    content: str
+    emotion: Optional[str] = None
 
 
 class SceneHeading(BaseModel):
-    """场景头模型"""
-    scene_number: int = Field(..., description="场号")
-    is_interior: bool = Field(..., description="内景/外景")
-    location: str = Field(..., description="地点")
-    time_of_day: str = Field(..., description="昼夜")
+    scene_number: int
+    is_interior: bool
+    location: str
+    time_of_day: str
 
 
 class Scene(BaseModel):
-    """场景模型"""
-    id: str = Field(..., description="场景唯一标识")
-    heading: SceneHeading = Field(..., description="场景头")
-    content: Optional[str] = Field(None, description="场景内容")
-    dialogues: List[Dialogue] = Field(default=[], description="对话列表")
-    descriptions: List[Dict[str, Any]] = Field(default=[], description="描写列表")
-    characters: List[Character] = Field(default=[], description="出场人物列表")
+    id: str
+    heading: SceneHeading
+    content: Optional[str] = None
+    dialogues: List[Dialogue] = Field(default_factory=list)
+    descriptions: List[Dict[str, Any]] = Field(default_factory=list)
+    characters: List[Character] = Field(default_factory=list)
+
+
+class ProjectStatus(str, Enum):
+    IDLE = "idle"
+    IMPORTING = "importing"
+    CONVERTING = "converting"
+    READY = "ready"
+    DISTRIBUTING = "distributing"
+    FAILED = "failed"
+
+
+class ExportFormat(str, Enum):
+    YAML = "yaml"
+    PDF = "pdf"
+    JSON = "json"
+    SHARE = "share"
+
+
+class DistributionPlatform(str, Enum):
+    DOUYIN = "douyin"
+    WECHAT = "wechat"
+
+
+class DistributionStatus(str, Enum):
+    PENDING = "pending"
+    GENERATED = "generated"
+    DISTRIBUTING = "distributing"
+    COMPLETED = "completed"
+    FAILED = "failed"
+
+
+class User(BaseModel):
+    id: str
+    email: EmailStr
+    password_hash: str
+    password_salt: str
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class UserPublic(BaseModel):
+    id: str
+    email: EmailStr
+    created_at: datetime
 
 
 class Script(BaseModel):
-    """剧本模型"""
-    id: str = Field(..., description="剧本唯一标识")
-    title: str = Field(..., description="剧本标题")
-    type: ScriptType = Field(..., description="剧本类型")
-    original_text: str = Field(..., description="原始文本")
-    processed_text: Optional[str] = Field(None, description="处理后的文本")
-    characters: List[Character] = Field(default=[], description="人物列表")
-    scenes: List[Scene] = Field(default=[], description="场景列表")
-    main_plot: Optional[str] = Field(None, description="主线摘要")
-    created_at: datetime = Field(default_factory=datetime.now, description="创建时间")
-    updated_at: datetime = Field(default_factory=datetime.now, description="更新时间")
+    id: str
+    title: str
+    type: ScriptType
+    original_text: str
+    processed_text: Optional[str] = None
+    characters: List[Character] = Field(default_factory=list)
+    scenes: List[Scene] = Field(default_factory=list)
+    main_plot: Optional[str] = None
+    project_id: Optional[str] = None
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class Project(BaseModel):
+    id: str
+    user_id: Optional[str] = None
+    title: str
+    source_novel: str
+    source_author: str
+    chapter_count: int = 0
+    status: ProjectStatus = ProjectStatus.IDLE
+    script_id: Optional[str] = None
+    task_id: Optional[str] = None
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class ProjectExport(BaseModel):
+    id: str
+    project_id: str
+    script_id: Optional[str] = None
+    format: ExportFormat
+    status: str = "done"
+    download_url: str
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class DistributionJob(BaseModel):
+    id: str
+    project_id: str
+    script_id: str
+    title: str
+    description: str
+    resolution: str
+    ratio: str
+    duration: int
+    platforms: List[DistributionPlatform] = Field(default_factory=list)
+    watermark: bool = True
+    generate_audio: bool = True
+    status: DistributionStatus = DistributionStatus.PENDING
+    video_url: Optional[str] = None
+    external_docs: List[str] = Field(default_factory=list)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
 
 
 class ScriptSourceChapter(BaseModel):
-    """前端分卷/分章后的结构化章节"""
-    index: int = Field(..., ge=1, description="章节序号")
-    title: str = Field(..., min_length=1, description="章节标题")
-    content: str = Field(..., min_length=1, description="章节正文")
-    word_count: int = Field(default=0, ge=0, description="章节字数")
+    index: int = Field(..., ge=1)
+    title: str = Field(..., min_length=1)
+    content: str = Field(..., min_length=1)
+    word_count: int = Field(default=0, ge=0)
 
 
 class ScriptSourcePayload(BaseModel):
-    """前端上传的结构化原著数据"""
-    mode: str = Field(default="chapter_json", description="源数据模式")
-    total_word_count: int = Field(default=0, ge=0, description="全文字数")
-    chapter_count: int = Field(default=0, ge=0, description="章节数")
-    chapters: List[ScriptSourceChapter] = Field(default_factory=list, description="章节列表")
+    mode: str = Field(default="chapter_json")
+    total_word_count: int = Field(default=0, ge=0)
+    chapter_count: int = Field(default=0, ge=0)
+    chapters: List[ScriptSourceChapter] = Field(default_factory=list)
 
 
 class ProcessingStep(str, Enum):
-    """处理步骤"""
     DIALOGUE_EXTRACTION = "dialogue_extraction"
     CHARACTER_EXTRACTION = "character_extraction"
     MAIN_PLOT_EXTRACTION = "main_plot_extraction"
@@ -108,7 +180,6 @@ class ProcessingStep(str, Enum):
 
 
 class ProcessingStatus(str, Enum):
-    """处理状态"""
     PENDING = "pending"
     PROCESSING = "processing"
     COMPLETED = "completed"
@@ -116,71 +187,122 @@ class ProcessingStatus(str, Enum):
 
 
 class ProcessingTask(BaseModel):
-    """处理任务模型"""
-    id: str = Field(..., description="任务唯一标识")
-    script_id: str = Field(..., description="关联剧本ID")
-    steps: List[ProcessingStep] = Field(default=[], description="待处理步骤")
-    current_step: Optional[ProcessingStep] = Field(None, description="当前步骤")
-    status: ProcessingStatus = Field(default=ProcessingStatus.PENDING, description="任务状态")
-    progress: float = Field(default=0.0, description="处理进度 0-100")
-    error_message: Optional[str] = Field(None, description="错误信息")
-    # 新增：中间结果存储
-    step_results: Dict[str, Any] = Field(default={}, description="各步骤的处理结果")
-    created_at: datetime = Field(default_factory=datetime.now, description="创建时间")
-    updated_at: datetime = Field(default_factory=datetime.now, description="更新时间")
+    id: str
+    script_id: str
+    project_id: Optional[str] = None
+    steps: List[ProcessingStep] = Field(default_factory=list)
+    current_step: Optional[ProcessingStep] = None
+    status: ProcessingStatus = ProcessingStatus.PENDING
+    progress: float = 0.0
+    task_type: str = "convert"
+    error_message: Optional[str] = None
+    step_results: Dict[str, Any] = Field(default_factory=dict)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
 
 
 class ScriptCreateRequest(BaseModel):
-    """创建剧本请求"""
-    title: str = Field(..., min_length=1, max_length=255, description="剧本标题")
-    type: ScriptType = Field(..., description="剧本类型")
-    text: str = Field(..., min_length=1, description="原始文本")
-    source_payload: Optional[ScriptSourcePayload] = Field(
-        default=None,
-        description="前端预处理后的结构化原著 JSON",
-    )
+    title: str = Field(..., min_length=1, max_length=255)
+    type: ScriptType
+    text: str = Field(..., min_length=1)
+    project_id: Optional[str] = None
+    source_payload: Optional[ScriptSourcePayload] = None
+
+
+class ProjectCreateRequest(BaseModel):
+    title: str = Field(..., min_length=1, max_length=255)
+    source_novel: str = Field(default="未命名原著")
+    source_author: str = Field(default="未知作者")
+    chapter_count: int = Field(default=0, ge=0)
+    user_id: Optional[str] = None
+
+
+class ProjectUpdateRequest(BaseModel):
+    title: Optional[str] = Field(default=None, min_length=1, max_length=255)
+    source_novel: Optional[str] = None
+    source_author: Optional[str] = None
+    chapter_count: Optional[int] = Field(default=None, ge=0)
+    status: Optional[ProjectStatus] = None
+    script_id: Optional[str] = None
+    task_id: Optional[str] = None
 
 
 class TaskListItem(BaseModel):
-    """任务列表项"""
-    id: str = Field(..., description="任务唯一标识")
-    script_id: str = Field(..., description="关联剧本ID")
-    script_title: str = Field(..., description="关联剧本标题")
-    title: str = Field(..., description="任务标题")
-    type: str = Field(default="convert", description="任务类型")
-    status: str = Field(..., description="前端展示状态")
-    progress: int = Field(..., ge=0, le=100, description="任务进度")
-    current_step: Optional[str] = Field(None, description="当前执行步骤")
-    error_message: Optional[str] = Field(None, description="错误信息")
-    created_at: datetime = Field(default_factory=datetime.now, description="创建时间")
-    updated_at: datetime = Field(default_factory=datetime.now, description="更新时间")
+    id: str
+    project_id: Optional[str] = None
+    script_id: str
+    script_title: str
+    title: str
+    type: str = "convert"
+    status: str
+    progress: int = Field(..., ge=0, le=100)
+    current_step: Optional[str] = None
+    error_message: Optional[str] = None
+    created_at: datetime
+    updated_at: datetime
 
 
 class TaskPagination(BaseModel):
-    """分页信息"""
-    page: int = Field(..., ge=1)
-    size: int = Field(..., ge=1)
-    total: int = Field(..., ge=0)
-    pages: int = Field(..., ge=0)
+    page: int
+    size: int
+    total: int
+    pages: int
 
 
 class TaskListResponse(BaseModel):
-    """任务列表响应数据"""
     tasks: List[TaskListItem] = Field(default_factory=list)
     pagination: TaskPagination
 
 
 class TaskDetailResponse(BaseModel):
-    """任务详情响应数据"""
     task: TaskListItem
 
 
 class TaskCreateRequest(BaseModel):
-    """创建任务请求"""
-    script_id: str = Field(..., min_length=1, description="关联剧本ID")
+    script_id: str = Field(..., min_length=1)
+    project_id: Optional[str] = None
 
 
 class TaskUpdateRequest(BaseModel):
-    """更新任务请求"""
-    status: Optional[str] = Field(None, description="任务状态")
-    priority: Optional[int] = Field(None, ge=0, description="预留优先级字段")
+    status: Optional[str] = None
+    priority: Optional[int] = Field(default=None, ge=0)
+
+
+class AuthRegisterRequest(BaseModel):
+    email: EmailStr
+    password: str = Field(..., min_length=6, max_length=128)
+
+
+class AuthLoginRequest(BaseModel):
+    email: EmailStr
+    password: str = Field(..., min_length=6, max_length=128)
+
+
+class AuthResponse(BaseModel):
+    token: str
+    user: UserPublic
+
+
+class ExportResponse(BaseModel):
+    export: ProjectExport
+
+
+class DistributionCreateRequest(BaseModel):
+    project_id: str
+    script_id: str
+    title: str = Field(..., min_length=1, max_length=255)
+    description: str = Field(default="")
+    resolution: str = Field(default="1080p")
+    ratio: str = Field(default="9:16")
+    duration: int = Field(default=60, ge=5, le=600)
+    watermark: bool = True
+    generate_audio: bool = True
+    platforms: List[DistributionPlatform] = Field(default_factory=list)
+
+
+class DistributionActionRequest(BaseModel):
+    platforms: List[DistributionPlatform] = Field(default_factory=list)
+
+
+class DistributionResponse(BaseModel):
+    job: DistributionJob
