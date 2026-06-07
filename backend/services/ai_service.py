@@ -27,19 +27,19 @@ class AIService:
         if not os.getenv("DEEPSEEK_API_KEY"):
             return self._extract_dialogues_local(text)
         
-        prompt = f"""从以下文本中提取所有对话内容，并以JSON格式返回：
-        {text[:3000]}
-        
-        输出格式：
-        [
-            {{
+        # 按段落分批处理，每批最多8000字符
+        prompt = self._build_chunked_prompt(
+            text,
+            task="从以下文本中提取所有对话内容",
+            output_format="""[
+            {
                 "id": "唯一标识",
                 "content": "对话内容",
                 "start_pos": 起始位置,
                 "end_pos": 结束位置
-            }}
-        ]
-        """
+            }
+        ]""",
+        )
         
         response = await self._call_ai(prompt)
         try:
@@ -77,18 +77,15 @@ class AIService:
         if not os.getenv("DEEPSEEK_API_KEY"):
             return self._extract_characters_local(text)
         
-        prompt = f"""从以下小说文本中提取人物角色和描写类型：
-        {text[:3000]}
-        
-        请识别主要人物（3-5个）和次要人物，以及场景描写、心理描写、肖像描写、动作描写。
-        
-        输出格式：
-        {{
-            "main_characters": [{{"id": "xxx", "name": "角色名", "role": "main", "description": "描述", "traits": ["性格特征"]}}],
-            "supporting_characters": [{{"id": "xxx", "name": "角色名", "role": "supporting", "description": "描述", "traits": []}}],
-            "descriptions": [{{"type": "scenery|psychology|portrait|action", "content": "内容"}}]
-        }}
-        """
+        prompt = self._build_chunked_prompt(
+            text,
+            task="从以下小说文本中提取人物角色和描写类型。请识别主要人物（3-5个）和次要人物，以及场景描写、心理描写、肖像描写、动作描写。",
+            output_format="""{
+            "main_characters": [{"id": "xxx", "name": "角色名", "role": "main", "description": "描述", "traits": ["性格特征"]}],
+            "supporting_characters": [{"id": "xxx", "name": "角色名", "role": "supporting", "description": "描述", "traits": []}],
+            "descriptions": [{"type": "scenery|psychology|portrait|action", "content": "内容"}]
+        }""",
+        )
         
         response = await self._call_ai(prompt)
         try:
@@ -154,14 +151,11 @@ class AIService:
         if not os.getenv("DEEPSEEK_API_KEY"):
             return self._extract_main_plot_local(text)
         
-        prompt = f"""请用简洁的语言概括以下小说文本的主线剧情：
-        {text[:4000]}
-        
-        输出要求：
-        1. 不超过300字
-        2. 包含主要人物和核心冲突
-        3. 简洁明了
-        """
+        prompt = self._build_chunked_prompt(
+            text,
+            task="请用简洁的语言概括以下小说文本的主线剧情，不超过300字，包含主要人物和核心冲突。",
+            output_format="直接返回剧情概括文本，不要用JSON格式",
+        )
         
         response = await self._call_ai(prompt)
         return response.strip() if response else self._extract_main_plot_local(text)
@@ -183,21 +177,17 @@ class AIService:
             return self._tag_dialogue_speakers_local(text, characters)
         
         character_names = ", ".join([c["name"] for c in characters])
-        prompt = f"""请为以下文本中的对话标记说话人：
-        人物列表：{character_names}
-        
-        文本：
-        {text[:3000]}
-        
-        输出格式：
-        [
-            {{
+        prompt = self._build_chunked_prompt(
+            text,
+            task=f"请为以下文本中的对话标记说话人。人物列表：{character_names}",
+            output_format="""[
+            {
                 "id": "对话ID",
                 "speaker_name": "说话人姓名或null",
                 "content": "对话内容"
-            }}
-        ]
-        """
+            }
+        ]""",
+        )
         
         response = await self._call_ai(prompt)
         try:
@@ -316,17 +306,11 @@ class AIService:
         if not os.getenv("DEEPSEEK_API_KEY"):
             return self._detect_useless_lines_local(text)
         
-        prompt = f"""找出以下文本中无用的行号（从1开始）：
-        {text[:3000]}
-        
-        无用行包括：
-        1. 纯粹的分隔线（如=============）
-        2. 无意义的重复字符
-        3. 纯粹的感叹词
-        
-        输出格式：
-        [行号1, 行号2, ...]
-        """
+        prompt = self._build_chunked_prompt(
+            text,
+            task="找出以下文本中无用的行号（从1开始）。无用行包括：纯粹的分隔线（如=============）、无意义的重复字符、纯粹的感叹词。",
+            output_format="[行号1, 行号2, ...]",
+        )
         
         response = await self._call_ai(prompt)
         try:
@@ -355,15 +339,9 @@ class AIService:
         if not os.getenv("DEEPSEEK_API_KEY"):
             return self._polish_script_local(text)
         
-        prompt = f"""请润色以下剧本文本：
-        {text[:4000]}
-        
-        润色要求：
-        1. 清理多余空白和重复内容
-        2. 优化对话表达
-        3. 保持剧本格式
-        4. 不改变原意
-        """
+        prompt = f"""请润色以下剧本文本，清理多余空白和重复内容，优化对话表达，保持剧本格式，不改变原意：
+
+{text[:12000]}"""
         
         response = await self._call_ai(prompt)
         return response.strip() if response else self._polish_script_local(text)
@@ -373,6 +351,160 @@ class AIService:
         text = re.sub(r'\n{3,}', '\n\n', text)
         return text.strip()
     
+    async def generate_yaml(self, text: str, title: str = "未命名剧本") -> str:
+        """生成YAML格式的结构化剧本"""
+        if not os.getenv("DEEPSEEK_API_KEY"):
+            return self._generate_yaml_local(text, title)
+        
+        prompt = f"""将以下剧本内容转换为YAML格式的结构化剧本：
+
+{text[:10000]}
+
+输出格式要求：
+```yaml
+script:
+  title: "{title}"
+  episodes:
+    - id: ep_01
+      title: "剧集标题"
+      cold_open:
+        intent: "冷开场意图"
+      scenes:
+        - id: sc_001
+          type: "INT. / EXT."
+          location: "地点"
+          time: "时间"
+          summary: "场景概要"
+          beats:
+            - type: "action|dialogue"
+              character: "角色名（对话时填写）"
+              description: "描述"
+```
+请严格按照以上YAML格式输出。"""
+        
+        response = await self._call_ai(prompt)
+        if response:
+            # 去掉 markdown 代码块标记
+            result = response.strip()
+            if result.startswith("```yaml"):
+                result = result[7:]
+            if result.startswith("```"):
+                result = result[3:]
+            if result.endswith("```"):
+                result = result[:-3]
+            return result.strip()
+        return self._generate_yaml_local(text, title)
+    
+    def _generate_yaml_local(self, text: str, title: str = "未命名剧本") -> str:
+        """本地生成基本YAML"""
+        lines = text.strip().split("\n")
+        scenes = []
+        current_scene = None
+        
+        for line in lines:
+            line = line.strip()
+            if not line:
+                continue
+            if line.startswith("INT.") or line.startswith("EXT."):
+                if current_scene:
+                    scenes.append(current_scene)
+                current_scene = {"heading": line, "beats": []}
+            elif current_scene is not None:
+                current_scene["beats"].append(line)
+        
+        if current_scene:
+            scenes.append(current_scene)
+        
+        if not scenes:
+            scenes = [{"heading": "INT. 未知地点 - 白天", "beats": [l for l in lines[:20] if l.strip()]}]
+        
+        yaml_lines = [
+            f"script:",
+            f'  title: "{title}"',
+            f"  episodes:",
+            f"    - id: ep_01",
+            f'      title: "第1集"',
+            f"      scenes:",
+        ]
+        
+        for i, scene in enumerate(scenes):
+            yaml_lines.append(f"        - id: sc_{i+1:03d}")
+            yaml_lines.append(f'          type: "{scene["heading"][:4].strip()}"')
+            yaml_lines.append(f'          summary: "{scene["heading"]}"')
+            yaml_lines.append(f"          beats:")
+            for beat in scene["beats"][:5]:
+                yaml_lines.append(f'            - description: "{beat[:60]}"')
+        
+        return "\n".join(yaml_lines)
+    
+    async def process_chapters(self, chapters: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """逐章处理小说文本，每章独立调用AI"""
+        results = []
+        for chapter in chapters:
+            chapter_text = chapter.get("content", "")
+            chapter_title = chapter.get("title", f"第{chapter.get('index', '?')}章")
+            
+            if not chapter_text.strip():
+                results.append({
+                    "index": chapter.get("index"),
+                    "title": chapter_title,
+                    "dialogues": [],
+                    "characters": {"main_characters": [], "supporting_characters": [], "descriptions": []},
+                    "main_plot": "",
+                    "scenes": [],
+                    "error": "章节内容为空"
+                })
+                continue
+            
+            # 每章独立处理
+            try:
+                dialogues = await self.extract_dialogues(chapter_text)
+                characters = await self.extract_characters(chapter_text)
+                main_plot = await self.extract_main_plot(chapter_text)
+                
+                results.append({
+                    "index": chapter.get("index"),
+                    "title": chapter_title,
+                    "dialogues": dialogues,
+                    "characters": characters,
+                    "main_plot": main_plot,
+                })
+            except Exception as e:
+                results.append({
+                    "index": chapter.get("index"),
+                    "title": chapter_title,
+                    "error": str(e),
+                })
+        
+        return results
+    
+    def _build_chunked_prompt(self, text: str, task: str, output_format: str = "") -> str:
+        """构建分块提示词，支持长文本处理"""
+        max_chars = 8000  # 每段最多8000字符
+        
+        if len(text) <= max_chars:
+            prompt = f"""{task}：
+{text}
+
+{output_format or ""}"""
+        else:
+            # 分多段处理
+            chunks = []
+            for i in range(0, len(text), max_chars):
+                chunks.append(text[i:i + max_chars])
+            
+            prompt = f"""{task}（文本较长，已分为{len(chunks)}段）：
+
+=== 第1段 ===
+{chunks[0]}
+
+=== 第2段（最后一段）===
+{chunks[-1] if len(chunks) > 1 else ""}
+
+{output_format or ""}"""
+        
+        return prompt
+
     async def _call_ai(self, prompt: str) -> str:
         """调用DeepSeek API"""
         try:

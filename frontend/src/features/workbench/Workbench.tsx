@@ -29,6 +29,7 @@ import { useNovelStore } from "@/store/useNovelStore";
 import mammoth from "mammoth";
 import { useNavigate } from "react-router-dom";
 import { useToastStore } from "@/store/useToastStore";
+import { detectChapters, extractChapterContents } from "@/lib/chapterUtils";
 
 type AssistantTab = "chat" | "yaml" | "history";
 
@@ -85,6 +86,10 @@ export default function Workbench() {
   const [showEditor, setShowEditor] = useState(false);
   const [importText, setImportText] = useState("");
   const [dragOver, setDragOver] = useState(false);
+  // 提升到 Workbench 以便左侧"原始文本"面板也能实时看到处理结果
+  const [processedText, setProcessedText] = useState("");
+  // 动态生成的 YAML
+  const [yamlOutput, setYamlOutput] = useState("");
   const chatEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const currentScript = useScriptStore((s) =>
@@ -212,13 +217,30 @@ export default function Workbench() {
       return;
     }
 
+    // 检测章节
+    const detectedChapters = detectChapters(text);
+    if (detectedChapters.length < 3) {
+      addToast({
+        type: "error",
+        title: "章节不足",
+        message: `仅检测到 ${detectedChapters.length} 个章节，至少需要 3 个章节才能进行转换`,
+      });
+      return;
+    }
+
+    // 提取所有章节内容
+    const allIndices = new Set(detectedChapters.map((ch) => ch.index));
+    const chaptersWithContent = extractChapterContents(text, detectedChapters, allIndices);
+
     const projectId = `proj_${Date.now().toString(36)}`;
+    const projectTitle = detectedChapters[0]?.title?.replace(/^第[一二三四五六七八九十百千零\d]+[章节部回卷集]\s*/, "") || "新项目";
+
     const project = {
       id: projectId,
-      title: "新项目",
-      sourceNovel: "导入文本",
+      title: projectTitle,
+      sourceNovel: detectedChapters[0]?.title || "导入文本",
       sourceAuthor: "未知作者",
-      chapterCount: 1,
+      chapterCount: chaptersWithContent.length,
       status: "idle" as const,
       createdAt: new Date().toISOString(),
     };
@@ -229,53 +251,53 @@ export default function Workbench() {
     const novelData = {
       id: novelId,
       projectId,
-      title: project.title,
+      title: projectTitle,
       author: "未知作者",
-      totalChapters: 1,
+      totalChapters: chaptersWithContent.length,
       totalWordCount: text.length,
-      chapters: [{
-        index: 1,
-        title: "全文",
-        wordCount: text.length,
-        content: text,
-      }],
+      chapters: chaptersWithContent,
       fullText: text,
       createdAt: new Date().toISOString(),
     };
     addNovel(novelData);
     setCurrentNovel(novelId);
 
+    // 每章对应一个 Episode，首个 episode 包含 sourceText
+    const episodes = chaptersWithContent.map((ch, i) => ({
+      id: `${projectId}_episode_${i + 1}`,
+      title: ch.title,
+      coldOpen: i === 0 ? undefined : undefined,
+      scenes: [
+        {
+          id: `${projectId}_scene_${i}_1`,
+          code: `SC-${(i + 1).toString().padStart(3, "0")}`,
+          title: "等待处理",
+          location: "等待分析",
+          intent: `第${i + 1}章 ${ch.title} 的原始文本，请启动 AI 转换`,
+          beats: [],
+          status: "draft" as const,
+        },
+      ],
+    }));
+
     const scriptId = `script_${Date.now().toString(36)}`;
     const initialScriptData = {
       id: scriptId,
       projectId,
-      title: project.title,
+      title: projectTitle,
       sourceText: text,
-      episodes: [
-        {
-          id: `${scriptId}_episode_1`,
-          title: project.title,
-          coldOpen: "等待 AI 分析",
-          scenes: [
-            {
-              id: `${scriptId}_scene_1`,
-              code: "SC-001",
-              title: "等待处理",
-              location: "等待分析",
-              intent: "导入的原始文本尚未处理，请启动 AI 转换",
-              beats: [],
-              status: "draft" as const,
-            },
-          ],
-        },
-      ],
+      episodes,
     };
     upsertScript(initialScriptData);
     setCurrentScript(scriptId);
 
     setShowImportPanel(false);
     setImportText("");
-    addToast({ type: "success", title: "文本导入成功" });
+    addToast({
+      type: "success",
+      title: "文本导入成功",
+      message: `已识别 ${chaptersWithContent.length} 个章节，进入工作台开始 AI 转换`,
+    });
   };
 
   useEffect(() => {
@@ -439,12 +461,24 @@ episode:
           </CollapsibleSection>
 
           <CollapsibleSection
-            title="原始文本"
+            title={processedText ? "处理文本" : "原始文本"}
             icon={<FileText className="h-3 w-3" />}
           >
             {currentScript?.sourceText ? (
               <div className="space-y-2">
-                {selectedChapterIndex !== null && hasNovelData ? (
+                {processedText ? (
+                  /* 实时显示处理中的文本 */
+                  <div>
+                    <p className="text-xs font-medium text-foreground mb-2">
+                      处理文本（实时更新）
+                    </p>
+                    <div className="rounded-lg border border-(--accent-soft)/30 p-3 bg-(--accent-light)">
+                      <pre className="text-xs text-(--text-subtle) leading-6 whitespace-pre-wrap max-h-[350px] overflow-y-auto">
+                        {processedText}
+                      </pre>
+                    </div>
+                  </div>
+                ) : selectedChapterIndex !== null && hasNovelData ? (
                   /* 显示选中章节的内容 */
                   <div>
                     <p className="text-xs font-medium text-foreground mb-2">
@@ -558,107 +592,85 @@ episode:
             </p>
           </div>
 
-          {/* Episode Card */}
-          <div className="card mb-4">
-            <div className="flex items-center justify-between mb-3">
-              <div>
-                <p className="text-xs uppercase tracking-[0.22em] text-(--text-faint)">
-                  Episode Container
-                </p>
-                <p className="mt-1 text-sm text-foreground">
-                  {hasData && currentScript?.episodes[0]?.title
-                    ? currentScript.episodes[0].title
-                    : "暂无活跃项目"}
-                </p>
-              </div>
-              <div className="flex items-center gap-2">
-                {hasData && (
-                  <button
-                    type="button"
-                    onClick={() => setShowEditor(!showEditor)}
-                    className="px-3 py-1 rounded-md text-xs bg-(--accent-soft) text-white hover:bg-(--accent-soft)/90 transition-colors"
-                  >
-                    {showEditor ? "AI转换" : "编辑器"}
-                  </button>
-                )}
-                <span
-                  className={`badge ${hasData ? "badge-primary" : "badge-muted"}`}
+          {/* Episode Cards */}
+          {hasData && currentScript?.episodes && currentScript.episodes.length > 0 ? (
+            <div className="space-y-4">
+              {currentScript.episodes.map((episode, epIdx) => (
+                <div key={episode.id} className="card">
+                  <div className="flex items-center justify-between mb-3">
+                    <div>
+                      <p className="text-xs uppercase tracking-[0.22em] text-(--text-faint)">
+                        Episode {epIdx + 1}
+                      </p>
+                      <p className="mt-1 text-sm text-foreground">
+                        {episode.title || `剧集 ${epIdx + 1}`}
+                      </p>
+                    </div>
+                    <span className={`badge ${episode.scenes.some(s => s.status !== "draft") ? "badge-primary" : "badge-muted"}`}>
+                      {episode.scenes.length} 场景
+                    </span>
+                  </div>
+                  {showEditor && episode.scenes.length > 0 && (
+                    <div className="space-y-2 mt-3">
+                      {episode.scenes.map((scene, i) => (
+                        <div
+                          key={scene.id}
+                          className="group flex items-start gap-3 rounded-xl border border-(--line-soft) px-4 py-3 hover:bg-(--muted) transition-colors cursor-pointer"
+                        >
+                          <span className="mt-1 flex h-5 w-5 shrink-0 items-center justify-center rounded bg-(--accent-light) text-xs text-(--accent-soft)">
+                            {i + 1}
+                          </span>
+                          <div className="min-w-0 flex-1">
+                            <p className="text-sm text-foreground">{scene.title}</p>
+                            <p className="mt-0.5 text-xs text-(--text-subtle)">
+                              {scene.location || "等待分析"} · {scene.beats.length} 节拍
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ))}
+              <div className="flex items-center gap-2 mt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowEditor(!showEditor)}
+                  className="px-3 py-1 rounded-md text-xs bg-(--accent-soft) text-white hover:bg-(--accent-soft)/90 transition-colors"
                 >
-                  {hasData ? "已启用" : "等待导入"}
+                  {showEditor ? "收起详情" : "展开详情"}
+                </button>
+                <span className={`badge ${hasData ? "badge-primary" : "badge-muted"}`}>
+                  {currentScript.episodes.length} 集
                 </span>
               </div>
             </div>
-
-            {showEditor && hasScenes && currentScript?.episodes[0]?.scenes && currentScript.episodes[0].scenes.length > 0 ? (
-              <div className="space-y-3 mt-4">
-                {currentScript.episodes[0].scenes.map((scene, i) => (
-                  <div
-                    key={scene.id}
-                    className="group flex items-start gap-3 rounded-xl border border-(--line-soft) px-4 py-3 hover:bg-(--muted) transition-colors cursor-pointer"
-                  >
-                    <span className="mt-1 flex h-5 w-5 shrink-0 items-center justify-center rounded bg-(--accent-light) text-xs text-(--accent-soft)">
-                      {i + 1}
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm text-foreground">{scene.title}</p>
-                      <p className="mt-0.5 text-xs text-(--text-subtle)">
-                        {scene.location || "等待分析"} · {scene.beats.length} 节拍
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      className="mt-0.5 rounded-md p-1 text-(--text-faint) opacity-0 group-hover:opacity-100 hover:text-foreground hover:bg-white transition-all"
-                    >
-                      <Plus className="h-3.5 w-3.5" />
-                    </button>
-                  </div>
-                ))}
+          ) : (
+            <div className="card mb-4">
+              <div className="flex items-center justify-between mb-3">
+                <div>
+                  <p className="text-xs uppercase tracking-[0.22em] text-(--text-faint)">
+                    Episode Container
+                  </p>
+                  <p className="mt-1 text-sm text-foreground">暂无活跃项目</p>
+                </div>
+                <span className="badge badge-muted">等待导入</span>
               </div>
-            ) : hasData && !currentScript?.episodes[0]?.scenes.length ? (
-              <p className="text-sm text-(--text-subtle) leading-6">
-                文本已导入，等待 AI 分析生成场景结构。
-              </p>
-            ) : (
               <p className="text-sm text-(--text-subtle) leading-6">
                 完成文本导入和 AI 转换后，场景结构将在此展示。
               </p>
-            )}
-          </div>
+            </div>
+          )}
 
-          {/* Empty or Scene Detail */}
-          {showEditor && hasScenes && currentScript?.episodes[0]?.scenes && currentScript.episodes[0].scenes.length > 0 ? (
-            <div className="flex-1 space-y-3">
-              {/* Current Scene Detail */}
-              <div className="rounded-xl border border-(--accent-soft)/30 bg-(--accent-light) px-4 py-3">
-                <div className="flex items-center gap-2 mb-2">
-                  <span className="text-xs font-medium text-(--accent-soft)">
-                    {currentScript.episodes[0].scenes[0]?.location || "等待分析"}
-                  </span>
-                  <span className="text-xs text-(--text-faint)">夜晚</span>
-                </div>
-                <p className="text-sm text-foreground leading-6">
-                  {currentScript.episodes[0].scenes[0]?.intent || currentScript.episodes[0].scenes[0]?.title || "等待 AI 分析生成场景内容"}
-                </p>
-                <div className="mt-3 flex items-center gap-2">
-                  <button
-                    type="button"
-                    className="inline-flex items-center gap-1 rounded-md border border-(--line-soft) px-2.5 py-1 text-xs text-(--text-subtle) hover:text-foreground hover:bg-white transition-colors"
-                  >
-                    <WandSparkles className="h-3 w-3" />
-                    AI 润色
-                  </button>
-                  <button
-                    type="button"
-                    className="inline-flex items-center gap-1 rounded-md border border-(--line-soft) px-2.5 py-1 text-xs text-(--text-subtle) hover:text-foreground hover:bg-white transition-colors"
-                  >
-                    <Lightbulb className="h-3 w-3" />
-                    建议情绪
-                  </button>
-                </div>
+          {/* AI Convert Panel or Import Panel */}
+          {hasData && !showEditor ? (
+            <AIConvertPanel processedText={processedText} setProcessedText={setProcessedText} setYamlOutput={setYamlOutput} />
+          ) : showEditor ? (
+            <div className="flex-1 flex items-center justify-center rounded-xl border-2 border-dashed border-(--line-soft) p-8">
+              <div className="text-center">
+                <p className="text-sm text-(--text-subtle)">切换到「AI转换」模式开始处理文本</p>
               </div>
             </div>
-          ) : hasData ? (
-            <AIConvertPanel />
           ) : showImportPanel ? (
             <div className="flex flex-1 flex-col overflow-hidden rounded-xl border-2 border-(--accent-soft)/50 bg-white p-4 animate-scale-in">
               <div className="flex items-center justify-between mb-4">
@@ -948,12 +960,12 @@ episode:
                 <>
                   <div className="flex items-center justify-between mb-2">
                     <p className="text-xs text-(--text-subtle)">
-                      episode_01.yaml
+                      {yamlOutput ? "script.yaml" : "episode_01.yaml"}
                     </p>
                     <button
                       type="button"
                       onClick={() => {
-                        navigator.clipboard.writeText(demoYaml);
+                        navigator.clipboard.writeText(yamlOutput || demoYaml);
                         setCopiedYaml(true);
                         setTimeout(() => setCopiedYaml(false), 2000);
                       }}
@@ -968,7 +980,7 @@ episode:
                     </button>
                   </div>
                   <pre className="flex-1 overflow-auto rounded-xl bg-[#0d1117] p-4 text-xs leading-5">
-                    <code className="text-[#e6edf3] font-mono">{demoYaml}</code>
+                    <code className="text-[#e6edf3] font-mono">{yamlOutput || demoYaml}</code>
                   </pre>
                 </>
               ) : (
@@ -1071,10 +1083,15 @@ const AI_STEPS = [
   { id: "export", label: "导出剧本", desc: "生成 JSON/YAML 格式剧本" },
 ];
 
-function AIConvertPanel() {
+interface AIConvertPanelProps {
+  processedText: string;
+  setProcessedText: (text: string) => void;
+  setYamlOutput: (yaml: string) => void;
+}
+
+function AIConvertPanel({ processedText, setProcessedText, setYamlOutput }: AIConvertPanelProps) {
   const [currentStep, setCurrentStep] = useState(0);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [processedText, setProcessedText] = useState("");
   const [adaptType, setAdaptType] = useState<"short" | "long">("long");
   const [completedSteps, setCompletedSteps] = useState<Set<string>>(new Set());
   const [isComplete, setIsComplete] = useState(false);
@@ -1102,10 +1119,11 @@ function AIConvertPanel() {
         body: JSON.stringify({ text }),
       });
       const data = await response.json();
-      if (data.success) {
+      console.log(`API response for ${endpoint}:`, data);
+      if (data.status === "success" && data.data && data.data.text) {
         return data.data.text;
       } else {
-        console.error(`API error for ${endpoint}:`, data.message);
+        console.error(`API error for ${endpoint}:`, data.message || "Unknown error");
         return text;
       }
     } catch (error) {
@@ -1196,12 +1214,45 @@ function AIConvertPanel() {
   };
 
   const processAll = async () => {
-    for (let i = currentStep; i < AI_STEPS.length; i++) {
-      if (AI_STEPS[i].id === "structure") {
-        continue;
+    const text = processedText || originalText;
+    if (!text.trim()) return;
+
+    setIsProcessing(true);
+    setCurrentStep(1);
+
+    try {
+      const response = await fetch(`${apiBase}/api/workbench/process/all`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          text,
+          script_type: adaptType === "long" ? "long" : "short",
+          title: currentNovel?.title || "未命名剧本",
+        }),
+      });
+      const data = await response.json();
+      console.log("Process all response:", data);
+
+      if (data.status === "success" && data.data) {
+        setProcessedText(data.data.text);
+        if (data.data.yaml) {
+          setYamlOutput(data.data.yaml);
+        }
+        // 标记所有步骤为完成
+        const allDone = new Set(AI_STEPS.filter(s => s.id !== "structure").map(s => s.id));
+        setCompletedSteps(allDone);
+        setCurrentStep(AI_STEPS.length);
+        setIsComplete(true);
+        saveScript(data.data.text);
+        addToast({ type: "success", title: "AI 转换完成，已生成结构化剧本" });
+      } else {
+        addToast({ type: "error", title: "转换失败", message: data.message || "后端返回异常" });
       }
-      await processStep(AI_STEPS[i].id);
-      setCurrentStep(i + 1);
+    } catch (error) {
+      console.error("Process all failed:", error);
+      addToast({ type: "error", title: "转换失败", message: "无法连接后端服务" });
+    } finally {
+      setIsProcessing(false);
     }
   };
 
@@ -1261,6 +1312,7 @@ function AIConvertPanel() {
               onClick={() => {
                 setCurrentStep(0);
                 setProcessedText("");
+                setYamlOutput("");
                 setCompletedSteps(new Set());
                 setIsComplete(false);
               }}
@@ -1406,6 +1458,7 @@ function AIConvertPanel() {
             onClick={() => {
               setCurrentStep(0);
               setProcessedText("");
+              setYamlOutput("");
               setCompletedSteps(new Set());
             }}
             className="flex-1 px-4 py-2 rounded-lg border border-(--line-soft) text-sm text-(--text-subtle) hover:bg-(--muted) transition-colors"
