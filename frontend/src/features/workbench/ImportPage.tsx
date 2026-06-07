@@ -26,16 +26,9 @@ import { useTaskStore } from "@/store/useTaskStore";
 import { useToastStore } from "@/store/useToastStore";
 import { useNovelStore } from "@/store/useNovelStore";
 import mammoth from "mammoth";
+import { detectChapters, type ChapterPreview } from "@/lib/chapterUtils";
 
 type ImportStep = "upload" | "preview" | "configure" | "confirm" | "converting";
-
-interface ChapterPreview {
-  index: number;
-  title: string;
-  wordCount: number;
-  startPos?: number;
-  endPos?: number;
-}
 
 export default function ImportPage() {
   const navigate = useNavigate();
@@ -148,149 +141,6 @@ export default function ImportPage() {
 
     return () => window.clearInterval(interval);
   }, [setTasks, step]);
-
-  const detectChapters = (text: string): ChapterPreview[] => {
-    const lines = text.split("\n");
-
-    // 更全面的章节检测正则表达式，支持多种语言和格式
-    const chapterPatterns = [
-      // 中文格式 - 支持更多变体
-      /^第[一二三四五六七八九十百千零\d]+[章节部回卷集]/,
-      /^第\s*[一二三四五六七八九十百千零\d]+\s*[章节部回卷集]/,
-      /^[一二三四五六七八九十百千零\d]+[章节部回卷集]/,  // 不带"第"字的格式
-      /^第[一二三四五六七八九十百千零\d]+[\s\-_][章节部回卷集]?/,  // 带分隔符的格式
-      /^卷[一二三四五六七八九十百千零\d]+/,  // "卷一"格式
-      /^[卷部篇][一二三四五六七八九十百千零\d]+/,  // "卷一"、"部一"格式
-      // 带标题的格式
-      /^第[一二三四五六七八九十百千零\d]+[章节部回卷集]\s+.*/,
-      /^[一二三四五六七八九十百千零\d]+[章节部回卷集]\s+.*/,
-      // 日文格式
-      /^[一二三四五六七八九十百千零\d]+[章節部回巻集]/,
-      // 英文格式
-      /^Chapter\s+\d+/i,
-      /^Part\s+\d+/i,
-      /^Volume\s+\d+/i,
-      /^VOLUME\s+\d+/i,
-      /^Book\s+\d+/i,
-      /^Episode\s+\d+/i,
-      /^Ep\.\s*\d+/i,
-      /^Act\s+\d+/i,
-      /^Section\s+\d+/i,
-      // 简写格式
-      /^[Cc]h\.\s*\d+/,
-      /^[Vv]ol\.\s*\d+/,
-      // 数字开头的格式
-      /^\d+\s*[章节部回卷集]/,
-      /^\d+[\.\-\s][章节部回卷集]?/,
-    ];
-
-    // 需要过滤的关键词
-    const filterKeywords = [
-      '插图', '插图页', 'color', 'COLOR', 'illustration', 'Illustration',
-      'postscript', 'Postscript', '后记', '序', '序章', '前言',
-      '目录', 'contents', 'Contents', 'CONTENTS',
-      '作者简介', '作者紹介', 'about the author'
-    ];
-
-    const detected: ChapterPreview[] = [];
-    let currentChapter: ChapterPreview | null = null;
-    let currentCharPos = 0; // 记录当前字符位置
-
-    lines.forEach((line) => {
-      const trimmed = line.trim();
-      const lineStartPos = currentCharPos;
-      const lineEndPos = lineStartPos + line.length + 1; // +1 是换行符
-
-      // 检查是否匹配任何章节模式
-      const matchesPattern = chapterPatterns.some((pattern) => pattern.test(trimmed));
-
-      // 额外的验证规则
-      const isValidChapter = matchesPattern &&
-        // 检查是否包含过滤关键词
-        !filterKeywords.some(keyword => trimmed.includes(keyword)) &&
-        // 检查是否包含特殊引号（如 『第一章』这种情况）
-        !/[『「【（『“”""]/.test(trimmed) &&
-        // 检查长度
-        trimmed.length <= 100 &&
-        // 检查是否为纯章节标题格式（避免误匹配普通文本）
-        (
-          // 明确有章节关键词的情况
-          /第[一二三四五六七八九十百千零\d]+[章节部回卷集]/.test(trimmed) ||
-          /[卷部篇][一二三四五六七八九十百千零\d]+/.test(trimmed) ||
-          /Chapter\s+\d+/i.test(trimmed) ||
-          /Volume\s+\d+/i.test(trimmed)
-        );
-
-      if (isValidChapter) {
-        // 保存前一个章节的结束位置
-        if (currentChapter) {
-          currentChapter.endPos = lineStartPos;
-        }
-
-        // 开始新章节
-        currentChapter = {
-          index: detected.length + 1,
-          title: trimmed.slice(0, 80),
-          wordCount: 0,
-          startPos: lineStartPos,
-        };
-        detected.push(currentChapter);
-      } else if (currentChapter) {
-        // 累加当前章节的字数
-        currentChapter.wordCount += trimmed.length;
-      }
-
-      currentCharPos = lineEndPos;
-    });
-
-    // 设置最后一个章节的结束位置
-    if (currentChapter) {
-      (currentChapter as ChapterPreview).endPos = text.length;
-    }
-
-    // 如果检测到的章节不足3个且文本较长，尝试其他方式
-    if (detected.length < 3 && text.trim().length > 1000) {
-      // 基于换行段落来智能分段
-      const paragraphs = text
-        .split(/\n\n+/)
-        .filter((p) => p.trim().length > 100); // 只保留超过100字的段落
-
-      if (paragraphs.length >= 3) {
-        // 将长段落分成3个虚拟章节
-        const chapterSize = Math.ceil(paragraphs.length / 3);
-        const newChapters: ChapterPreview[] = [];
-        let currentPos = 0;
-
-        for (let i = 0; i < 3; i++) {
-          const start = i * chapterSize;
-          const end = Math.min(start + chapterSize, paragraphs.length);
-          const chapterParagraphs = paragraphs.slice(start, end);
-
-          if (chapterParagraphs.length > 0) {
-            const chapterText = chapterParagraphs.join("\n\n");
-            const chapterStartPos = text.indexOf(chapterText, currentPos);
-            const chapterEndPos = chapterStartPos + chapterText.length;
-            currentPos = chapterEndPos;
-
-            newChapters.push({
-              index: i + 1,
-              title: `第 ${i + 1} 部分（约 ${chapterParagraphs.length} 段）`,
-              wordCount: chapterText.length,
-              startPos: chapterStartPos,
-              endPos: chapterEndPos,
-            });
-          }
-        }
-
-        // 如果成功创建了章节，替换检测到的章节
-        if (newChapters.length >= 3) {
-          return newChapters;
-        }
-      }
-    }
-
-    return detected;
-  };
 
   // 调试函数：分析文本中可能的章节标题
   const analyzeChapterPatterns = (text: string): string[] => {
@@ -443,8 +293,8 @@ export default function ImportPage() {
     if (firstChapter && firstChapter.title) {
       const chapterTitle = firstChapter.title.replace(/[第卷章回部]/g, "").trim();
       if (chapterTitle && chapterTitle.length > 0) {
-        projectTitle = chapterTitle.length > 20 
-          ? chapterTitle.substring(0, 20) + "..." 
+        projectTitle = chapterTitle.length > 20
+          ? chapterTitle.substring(0, 20) + "..."
           : chapterTitle;
       }
     }
