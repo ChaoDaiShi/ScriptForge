@@ -1,23 +1,36 @@
-import type { IncomingMessage, ServerResponse } from "node:http";
-
 const DEFAULT_BACKEND_URL = "http://127.0.0.1:8000";
 
-type ProxyRequest = IncomingMessage & {
+declare const process:
+  | {
+      env?: Record<string, string | undefined>;
+    }
+  | undefined;
+
+declare const Buffer:
+  | {
+      from(input: ArrayBuffer): Uint8Array;
+    }
+  | undefined;
+
+type HeaderMap = Record<string, string | string[] | undefined>;
+
+type ProxyRequest = {
   method?: string;
-  headers: IncomingMessage["headers"];
+  headers: HeaderMap;
   query: Record<string, string | string[] | undefined>;
 };
 
-type ProxyResponse = ServerResponse<IncomingMessage> & {
+type ProxyResponse = {
   status: (code: number) => ProxyResponse;
   json: (body: unknown) => void;
-  send: (body: Buffer) => void;
+  send: (body: Uint8Array) => void;
+  setHeader: (name: string, value: string) => void;
 };
 
 function resolveBackendUrl() {
   const rawUrl =
-    process.env.BACKEND_URL ??
-    process.env.VITE_BACKEND_URL ??
+    process?.env?.BACKEND_URL ??
+    process?.env?.VITE_BACKEND_URL ??
     DEFAULT_BACKEND_URL;
 
   return rawUrl.replace(/\/+$/, "");
@@ -25,8 +38,8 @@ function resolveBackendUrl() {
 
 function resolveBackendApiPrefix() {
   return (
-    process.env.BACKEND_API_PREFIX ??
-    process.env.VITE_BACKEND_API_PREFIX ??
+    process?.env?.BACKEND_API_PREFIX ??
+    process?.env?.VITE_BACKEND_API_PREFIX ??
     "/api"
   ).replace(/\/+$/, "");
 }
@@ -38,6 +51,13 @@ function resolveTargetPath(pathParam: string | string[] | undefined) {
 
   const normalizedPath = segments.map(encodeURIComponent).join("/");
   return normalizedPath ? `/${normalizedPath}` : "/";
+}
+
+function normalizeHeaderValue(value: string | string[] | undefined, fallback = "") {
+  if (Array.isArray(value)) {
+    return value.join(", ");
+  }
+  return value ?? fallback;
 }
 
 function copyResponseHeaders(
@@ -82,24 +102,32 @@ export default async function handler(
   });
 
   try {
-    const upstreamResponse = await fetch(targetUrl, {
+    const fetchInit: RequestInit & { duplex?: "half" } = {
       method: request.method,
       headers: {
-        accept: request.headers.accept ?? "*/*",
-        authorization: request.headers.authorization ?? "",
-        "content-type": request.headers["content-type"] ?? "",
+        accept: normalizeHeaderValue(request.headers.accept, "*/*"),
+        authorization: normalizeHeaderValue(request.headers.authorization),
+        "content-type": normalizeHeaderValue(request.headers["content-type"]),
       },
       body:
         request.method && ["GET", "HEAD"].includes(request.method)
           ? undefined
           : (request as unknown as RequestInit["body"]),
-      duplex: "half",
+    };
+
+    if (fetchInit.body !== undefined) {
+      fetchInit.duplex = "half";
+    }
+
+    const upstreamResponse = await fetch(targetUrl, {
+      ...fetchInit,
     });
 
     copyResponseHeaders(upstreamResponse.headers, response);
+    const bytes = new Uint8Array(await upstreamResponse.arrayBuffer());
     response
       .status(upstreamResponse.status)
-      .send(Buffer.from(await upstreamResponse.arrayBuffer()));
+      .send(Buffer ? Buffer.from(bytes.buffer) : bytes);
   } catch (error) {
     response.status(502).json({
       error: "Backend proxy request failed",
