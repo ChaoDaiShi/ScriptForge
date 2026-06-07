@@ -196,7 +196,11 @@ function StepIndicator({ current }: { current: DistributeStep }) {
                       : "bg-[var(--muted)] text-[var(--text-faint)]"
                 }`}
               >
-                {isDone ? <Check className="h-4 w-4" /> : step.label.slice(0, 1)}
+                {isDone ? (
+                  <Check className="h-4 w-4" />
+                ) : (
+                  step.label.slice(0, 1)
+                )}
               </div>
               <span
                 className={`hidden text-xs font-medium sm:inline ${
@@ -238,7 +242,9 @@ function StatusChip({
         ? "bg-amber-100 text-amber-700"
         : "bg-[var(--muted)] text-[var(--text-subtle)]";
   return (
-    <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium ${toneClass}`}>
+    <span
+      className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium ${toneClass}`}
+    >
       {label}
     </span>
   );
@@ -424,7 +430,9 @@ function SelectStep({
                     <button
                       key={option.value}
                       type="button"
-                      onClick={() => setConfig({ ...config, ratio: option.value })}
+                      onClick={() =>
+                        setConfig({ ...config, ratio: option.value })
+                      }
                       className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition-all ${
                         config.ratio === option.value
                           ? "border-[#7bb8e8] bg-[rgba(123,184,232,0.08)] text-[#7bb8e8]"
@@ -485,8 +493,12 @@ function SelectStep({
                           : "border-transparent bg-white/70 hover:border-[var(--line-medium)]"
                       }`}
                     >
-                      <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${platform.bg}`}>
-                        <PlatformIcon className={`h-5 w-5 ${platform.accent}`} />
+                      <div
+                        className={`flex h-10 w-10 items-center justify-center rounded-xl ${platform.bg}`}
+                      >
+                        <PlatformIcon
+                          className={`h-5 w-5 ${platform.accent}`}
+                        />
                       </div>
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center justify-between gap-3">
@@ -567,7 +579,8 @@ function SelectStep({
                 {selectedPlatforms.length + selectedAssets.length}
               </p>
               <p className="mt-1 text-sm text-[var(--text-subtle)]">
-                {selectedPlatforms.length} 个平台 + {selectedAssets.length} 项交付物
+                {selectedPlatforms.length} 个平台 + {selectedAssets.length}{" "}
+                项交付物
               </p>
             </div>
             <div className="rounded-2xl border border-[var(--line-soft)] bg-[var(--muted)]/50 p-4">
@@ -708,7 +721,9 @@ function GenerateStep({
                   >
                     {done ? <Check className="h-4 w-4" /> : index + 1}
                   </div>
-                  <span className="text-sm text-[var(--text-subtle)]">{item}</span>
+                  <span className="text-sm text-[var(--text-subtle)]">
+                    {item}
+                  </span>
                 </div>
               );
             })}
@@ -781,7 +796,8 @@ function DistributeStepView({
                   {config.watermark ? " · 含水印" : ""}
                 </p>
                 <p className="mt-2 text-sm leading-6 text-[var(--text-subtle)]">
-                  {config.description || "未填写分发说明，将按默认交付文案执行。"}
+                  {config.description ||
+                    "未填写分发说明，将按默认交付文案执行。"}
                 </p>
               </div>
               <a
@@ -821,7 +837,9 @@ function DistributeStepView({
                   }`}
                 >
                   <div className="mb-4 flex items-center gap-3">
-                    <div className={`flex h-11 w-11 items-center justify-center rounded-xl ${platform.bg}`}>
+                    <div
+                      className={`flex h-11 w-11 items-center justify-center rounded-xl ${platform.bg}`}
+                    >
                       <PlatformIcon className={`h-5 w-5 ${platform.accent}`} />
                     </div>
                     <div>
@@ -908,7 +926,9 @@ function DistributeStepView({
             onClick={onDistributeAll}
             disabled={
               selectedPlatforms.length === 0 ||
-              visiblePlatforms.some((platform) => platformStatus[platform.key] === "running")
+              visiblePlatforms.some(
+                (platform) => platformStatus[platform.key] === "running",
+              )
             }
             className="mt-5 inline-flex w-full items-center justify-center gap-2.5 rounded-2xl bg-[#7bb8e8] px-6 py-3.5 text-sm font-medium text-white shadow-lg shadow-[rgba(123,184,232,0.25)] transition-all hover:bg-[#6aadd8] disabled:cursor-not-allowed disabled:opacity-40"
           >
@@ -999,12 +1019,17 @@ function DistributeStepView({
                           {job.title}
                         </p>
                         <p className="mt-1 text-xs text-[var(--text-subtle)]">
-                          {job.platforms.join(" / ")} · {formatTime(job.updated_at)}
+                          {job.platforms.join(" / ")} ·{" "}
+                          {formatTime(job.updated_at)}
                         </p>
                       </div>
                       <StatusChip
-                        label={job.status === "completed" ? "已完成" : job.status}
-                        tone={job.status === "completed" ? "success" : "neutral"}
+                        label={
+                          job.status === "completed" ? "已完成" : job.status
+                        }
+                        tone={
+                          job.status === "completed" ? "success" : "neutral"
+                        }
                       />
                     </div>
                     <p className="mt-2 text-xs leading-5 text-[var(--text-subtle)]">
@@ -1064,7 +1089,8 @@ function CompleteStep({
             分发与交付已完成
           </h2>
           <p className="mx-auto mt-2 max-w-2xl text-sm leading-6 text-[var(--text-subtle)]">
-            已完成 {selectedPlatforms.length} 个平台分发，并生成 {selectedAssets.length} 项交付物。
+            已完成 {selectedPlatforms.length} 个平台分发，并生成{" "}
+            {selectedAssets.length} 项交付物。
             现在可以前往任务中心看审核状态，或去资产页管理导出结果。
           </p>
 
@@ -1146,18 +1172,21 @@ export default function WorkbenchDistributeSection() {
   const [generateProgress, setGenerateProgress] = useState(0);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [showConfig, setShowConfig] = useState(true);
-  const [distributionJobId, setDistributionJobId] = useState<string | null>(null);
-  const [selectedPlatforms, setSelectedPlatforms] = useState<DistributionPlatform[]>([
-    "wechat",
-    "douyin",
-  ]);
+  const [distributionJobId, setDistributionJobId] = useState<string | null>(
+    null,
+  );
+  const [selectedPlatforms, setSelectedPlatforms] = useState<
+    DistributionPlatform[]
+  >(["wechat", "douyin"]);
   const [selectedAssets, setSelectedAssets] = useState<DeliveryAsset[]>([
     "yaml",
     "pdf",
   ]);
-  const [platformStatus, setPlatformStatus] =
-    useState<PlatformStatus>(defaultPlatformStatus);
-  const [assetStatus, setAssetStatus] = useState<AssetStatus>(defaultAssetStatus);
+  const [platformStatus, setPlatformStatus] = useState<PlatformStatus>(
+    defaultPlatformStatus,
+  );
+  const [assetStatus, setAssetStatus] =
+    useState<AssetStatus>(defaultAssetStatus);
   const [history, setHistory] = useState<DistributionJob[]>([]);
 
   useEffect(() => {
@@ -1256,7 +1285,9 @@ export default function WorkbenchDistributeSection() {
       window.clearInterval(interval);
       setGenerateProgress(100);
       setDistributionJobId(job.id);
-      setVideoUrl(job.video_url ?? "https://example.com/generated-drama-video.mp4");
+      setVideoUrl(
+        job.video_url ?? "https://example.com/generated-drama-video.mp4",
+      );
       setPlatformStatus(defaultPlatformStatus);
       setAssetStatus(defaultAssetStatus);
       setHistory((prev) => [job, ...prev].slice(0, 8));
@@ -1292,9 +1323,11 @@ export default function WorkbenchDistributeSection() {
 
     setPlatformStatus((current) => ({ ...current, [platform]: "running" }));
     try {
-      await dispatchDistributionJob(currentScript.projectId, distributionJobId, [
-        platform,
-      ]);
+      await dispatchDistributionJob(
+        currentScript.projectId,
+        distributionJobId,
+        [platform],
+      );
       setPlatformStatus((current) => ({ ...current, [platform]: "success" }));
       addToast({
         type: "success",
@@ -1332,7 +1365,11 @@ export default function WorkbenchDistributeSection() {
 
     setAssetStatus((current) => ({ ...current, [asset]: "running" }));
     try {
-      await createProjectExport(currentScript.projectId, asset, currentScript.id);
+      await createProjectExport(
+        currentScript.projectId,
+        asset,
+        currentScript.id,
+      );
       await fetchProjectExports(currentScript.projectId);
       setAssetStatus((current) => ({ ...current, [asset]: "success" }));
       addToast({

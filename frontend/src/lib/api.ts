@@ -15,7 +15,10 @@ function authHeaders() {
     return {};
   }
   try {
-    const parsed = JSON.parse(auth) as { user?: { id?: string }; token?: string };
+    const parsed = JSON.parse(auth) as {
+      user?: { id?: string };
+      token?: string;
+    };
     return {
       ...(parsed.user?.id ? { "X-User-Id": parsed.user.id } : {}),
       ...(parsed.token ? { Authorization: `Bearer ${parsed.token}` } : {}),
@@ -52,7 +55,13 @@ export interface ApiEnvelope<T> {
 
 export type ScriptType = "feature_film" | "short_film";
 export type TaskStatus = "queued" | "running" | "review" | "done" | "failed";
-export type ProjectStatus = "idle" | "importing" | "converting" | "ready" | "distributing" | "failed";
+export type ProjectStatus =
+  | "idle"
+  | "importing"
+  | "converting"
+  | "ready"
+  | "distributing"
+  | "failed";
 export type ExportFormat = "yaml" | "pdf" | "json" | "share";
 export type DistributionPlatform = "douyin" | "wechat";
 
@@ -194,12 +203,18 @@ export interface TaskListPayload {
   };
 }
 
-export async function apiJson<T>(path: string, init?: RequestInit): Promise<ApiEnvelope<T>> {
+export async function apiJson<T>(
+  path: string,
+  init?: RequestInit,
+): Promise<ApiEnvelope<T>> {
   const response = await apiFetch(path, init);
   return (await response.json()) as ApiEnvelope<T>;
 }
 
-export async function registerWithEmail(payload: { email: string; password: string }) {
+export async function registerWithEmail(payload: {
+  email: string;
+  password: string;
+}) {
   const response = await apiJson<AuthPayload>("auth/register", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -208,7 +223,10 @@ export async function registerWithEmail(payload: { email: string; password: stri
   return response.data;
 }
 
-export async function loginWithEmail(payload: { email: string; password: string }) {
+export async function loginWithEmail(payload: {
+  email: string;
+  password: string;
+}) {
   const response = await apiJson<AuthPayload>("auth/login", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -223,19 +241,22 @@ export async function fetchMe() {
 }
 
 export async function fetchCredits() {
-  const response = await apiJson<{ credits: number; credits_used: number }>("auth/credits");
+  const response = await apiJson<{ credits: number; credits_used: number }>(
+    "auth/credits",
+  );
   return response.data;
 }
 
 export async function redeemCredits(code: string) {
-  const response = await apiJson<{ credits: number; credits_used: number; message: string }>(
-    "auth/credits/redeem",
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ code }),
-    },
-  );
+  const response = await apiJson<{
+    credits: number;
+    credits_used: number;
+    message: string;
+  }>("auth/credits/redeem", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ code }),
+  });
   return response.data;
 }
 
@@ -259,7 +280,10 @@ export async function fetchProjects() {
   return response.data.projects;
 }
 
-export async function updateProject(projectId: string, payload: Partial<BackendProject>) {
+export async function updateProject(
+  projectId: string,
+  payload: Partial<BackendProject>,
+) {
   const response = await apiJson<BackendProject>(`projects/${projectId}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
@@ -283,9 +307,15 @@ export async function createScript(payload: {
   return response.data;
 }
 
-export async function startScriptProcessing(scriptId: string, projectId?: string) {
+export async function startScriptProcessing(
+  scriptId: string,
+  projectId?: string,
+) {
   const query = projectId ? `?project_id=${encodeURIComponent(projectId)}` : "";
-  const response = await apiJson<{ task: BackendTask }>(`scripts/${scriptId}/process${query}`, { method: "POST" });
+  const response = await apiJson<{ task: BackendTask }>(
+    `scripts/${scriptId}/process${query}`,
+    { method: "POST" },
+  );
   return response.data.task;
 }
 
@@ -309,7 +339,10 @@ export async function fetchTask(taskId: string) {
 }
 
 export async function retryTask(taskId: string) {
-  const response = await apiJson<{ task: BackendTask }>(`tasks/${taskId}/retry`, { method: "POST" });
+  const response = await apiJson<{ task: BackendTask }>(
+    `tasks/${taskId}/retry`,
+    { method: "POST" },
+  );
   return response.data.task;
 }
 
@@ -317,16 +350,25 @@ export async function deleteTask(taskId: string) {
   await apiJson<{ task_id: string }>(`tasks/${taskId}`, { method: "DELETE" });
 }
 
-export async function createProjectExport(projectId: string, format: ExportFormat, scriptId?: string) {
+export async function createProjectExport(
+  projectId: string,
+  format: ExportFormat,
+  scriptId?: string,
+) {
   const query = scriptId ? `?script_id=${encodeURIComponent(scriptId)}` : "";
-  const response = await apiJson<{ export: ProjectExportRecord }>(`projects/${projectId}/exports/${format}${query}`, {
-    method: "POST",
-  });
+  const response = await apiJson<{ export: ProjectExportRecord }>(
+    `projects/${projectId}/exports/${format}${query}`,
+    {
+      method: "POST",
+    },
+  );
   return response.data.export;
 }
 
 export async function fetchProjectExports(projectId: string) {
-  const response = await apiJson<{ exports: ProjectExportRecord[] }>(`projects/${projectId}/exports`);
+  const response = await apiJson<{ exports: ProjectExportRecord[] }>(
+    `projects/${projectId}/exports`,
+  );
   return response.data.exports;
 }
 
@@ -342,27 +384,36 @@ export async function createDistributionJob(payload: {
   generate_audio: boolean;
   platforms: DistributionPlatform[];
 }) {
-  const response = await apiJson<{ job: DistributionJob }>(`projects/${payload.project_id}/distribution-jobs`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  });
-  return response.data.job;
-}
-
-export async function dispatchDistributionJob(projectId: string, jobId: string, platforms: DistributionPlatform[]) {
-  const response = await apiJson<{ job: DistributionJob; requested_platforms: DistributionPlatform[] }>(
-    `projects/${projectId}/distribution-jobs/${jobId}/dispatch`,
+  const response = await apiJson<{ job: DistributionJob }>(
+    `projects/${payload.project_id}/distribution-jobs`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ platforms }),
+      body: JSON.stringify(payload),
     },
   );
   return response.data.job;
 }
 
+export async function dispatchDistributionJob(
+  projectId: string,
+  jobId: string,
+  platforms: DistributionPlatform[],
+) {
+  const response = await apiJson<{
+    job: DistributionJob;
+    requested_platforms: DistributionPlatform[];
+  }>(`projects/${projectId}/distribution-jobs/${jobId}/dispatch`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ platforms }),
+  });
+  return response.data.job;
+}
+
 export async function fetchDistributionJobs(projectId: string) {
-  const response = await apiJson<{ jobs: DistributionJob[] }>(`projects/${projectId}/distribution-jobs`);
+  const response = await apiJson<{ jobs: DistributionJob[] }>(
+    `projects/${projectId}/distribution-jobs`,
+  );
   return response.data.jobs;
 }

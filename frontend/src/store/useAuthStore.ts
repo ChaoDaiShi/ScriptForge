@@ -1,6 +1,12 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import { loginWithEmail, registerWithEmail, fetchMe, fetchCredits, redeemCredits } from "@/lib/api";
+import {
+  loginWithEmail,
+  registerWithEmail,
+  fetchMe,
+  fetchCredits,
+  redeemCredits,
+} from "@/lib/api";
 import type { AuthUser } from "@/lib/api";
 
 interface AuthState {
@@ -90,7 +96,13 @@ export const useAuthStore = create<AuthState>()(
 
       logout: () => {
         localStorage.removeItem("scriptforge-auth");
-        set({ user: null, token: null, isLoggedIn: false, credits: 0, creditsUsed: 0 });
+        set({
+          user: null,
+          token: null,
+          isLoggedIn: false,
+          credits: 0,
+          creditsUsed: 0,
+        });
       },
 
       skipAuth: () => {
@@ -120,7 +132,13 @@ export const useAuthStore = create<AuthState>()(
           }
         } catch {
           localStorage.removeItem("scriptforge-auth");
-          set({ user: null, token: null, isLoggedIn: false, credits: 0, creditsUsed: 0 });
+          set({
+            user: null,
+            token: null,
+            isLoggedIn: false,
+            credits: 0,
+            creditsUsed: 0,
+          });
         }
       },
 
@@ -144,7 +162,10 @@ export const useAuthStore = create<AuthState>()(
       useCredit: () => {
         const state = get();
         if (state.credits > 0) {
-          set({ credits: state.credits - 1, creditsUsed: state.creditsUsed + 1 });
+          set({
+            credits: state.credits - 1,
+            creditsUsed: state.creditsUsed + 1,
+          });
           return true;
         }
         return false;

@@ -69,8 +69,12 @@ function RedeemSection() {
           <Gift className="h-4 w-4 text-purple-500" />
         </div>
         <div>
-          <p className="text-sm font-medium text-[hsl(var(--foreground))]">兑换码</p>
-          <p className="text-xs text-[var(--text-subtle)]">输入兑换码获取免费次数</p>
+          <p className="text-sm font-medium text-[hsl(var(--foreground))]">
+            兑换码
+          </p>
+          <p className="text-xs text-[var(--text-subtle)]">
+            输入兑换码获取免费次数
+          </p>
         </div>
       </div>
       <div className="flex gap-2">
@@ -186,7 +190,10 @@ export default function RechargePage() {
                 {plan.price}
               </p>
               <p className="mt-0.5 text-xs text-[var(--text-subtle)]">
-                每次低至 ¥{(parseFloat(plan.price.replace("¥", "")) / plan.credits).toFixed(1)}
+                每次低至 ¥
+                {(
+                  parseFloat(plan.price.replace("¥", "")) / plan.credits
+                ).toFixed(1)}
               </p>
             </div>
 
@@ -196,7 +203,10 @@ export default function RechargePage() {
                 "7×24 小时支持",
                 "无限制导出",
               ].map((f, j) => (
-                <div key={j} className="flex items-center gap-2 text-xs text-[var(--text-subtle)]">
+                <div
+                  key={j}
+                  className="flex items-center gap-2 text-xs text-[var(--text-subtle)]"
+                >
                   <Check className="h-3.5 w-3.5 text-green-500 shrink-0" />
                   {f}
                 </div>
@@ -241,7 +251,8 @@ export default function RechargePage() {
                   addToast({ type: "success", title: "邮箱已复制" });
                 }}
               >
-                {" "}contact@scriptforge.ai{" "}
+                {" "}
+                contact@scriptforge.ai{" "}
               </span>
               获取 API 批量方案和定制服务。
             </p>
