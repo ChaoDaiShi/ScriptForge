@@ -1,7 +1,4 @@
-"""
-API package.
-Contains all API-related modules including routes.
-"""
+"""API package."""
 from .routes import (
     text_router,
     workbench_router,
@@ -11,6 +8,8 @@ from .routes import (
     dashboard_router,
     settings_router,
     script_router,
+    auth_router,
+    projects_router,
 )
 
 __all__ = [
@@ -22,4 +21,6 @@ __all__ = [
     "dashboard_router",
     "settings_router",
     "script_router",
+    "auth_router",
+    "projects_router",
 ]

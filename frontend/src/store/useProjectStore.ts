@@ -9,7 +9,7 @@ export interface Project {
   sourceNovel: string;
   sourceAuthor: string;
   chapterCount: number;
-  status: "idle" | "importing" | "converting" | "ready";
+  status: "idle" | "importing" | "converting" | "ready" | "distributing" | "failed";
   createdAt: string;
 }
 

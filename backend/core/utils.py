@@ -11,6 +11,8 @@ import re
 from functools import wraps
 import time
 
+from fastapi.responses import JSONResponse
+
 
 # ============================================================
 # 响应格式化函数
@@ -20,22 +22,22 @@ def success_response(
     data: Any = None,
     message: str = "操作成功",
     code: int = 200
-) -> Dict[str, Any]:
+) -> JSONResponse:
     """统一成功响应格式"""
-    return {
+    return JSONResponse(status_code=code, content={
         "code": code,
         "status": "success",
         "message": message,
         "data": data,
         "timestamp": datetime.now(timezone.utc).isoformat()
-    }
+    })
 
 
 def error_response(
     message: str = "操作失败",
     code: int = 400,
     errors: Optional[Dict[str, Any]] = None
-) -> Dict[str, Any]:
+) -> JSONResponse:
     """统一错误响应格式"""
     response = {
         "code": code,
@@ -45,7 +47,7 @@ def error_response(
     }
     if errors:
         response["errors"] = errors
-    return response
+    return JSONResponse(status_code=code, content=response)
 
 
 # ============================================================

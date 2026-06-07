@@ -1,0 +1,18 @@
+[
+  {
+    "id": "e36a4eba-8854-4f1f-ab2e-b5e612872a28",
+    "email": "scriptforge-auth-check@example.com",
+    "password_hash": "74220cec07797b43f777c0096c227a98dc7da5576899ff07daf9dc0ace7a1e87",
+    "password_salt": "20ac99a8b650456bada72c0ef49d4a41",
+    "created_at": "2026-06-07T12:41:39.277156",
+    "updated_at": "2026-06-07T12:41:39.277162"
+  },
+  {
+    "id": "a3dde654-e6b4-4df1-bca7-88dba110020e",
+    "email": "2595006848@qq.com",
+    "password_hash": "0d14b0c1fe332ebf3549f17cbc084940813a08f95293ba69640f37e74ff69fac",
+    "password_salt": "b27aae9c84b042aaad045c067928e3e5",
+    "created_at": "2026-06-07T12:42:38.142042",
+    "updated_at": "2026-06-07T12:42:38.142050"
+  }
+]

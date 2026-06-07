@@ -8,35 +8,30 @@ from fastapi.middleware.cors import CORSMiddleware
 sys.path.append(str(Path(__file__).parent))
 
 from api import (
+    assets_router,
+    auth_router,
+    dashboard_router,
+    insights_router,
+    projects_router,
+    script_router,
+    settings_router,
+    tasks_router,
     text_router,
     workbench_router,
-    assets_router,
-    tasks_router,
-    insights_router,
-    dashboard_router,
-    settings_router,
-    script_router,
 )
-from core import success_response
 from core.database import probe_supabase
 
-app = FastAPI(title="ScriptForge API", version="0.1.0")
+app = FastAPI(title="ScriptForge API", version="0.2.0")
 
 frontend_origin = os.getenv("FRONTEND_ORIGIN", "http://localhost:5173")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        frontend_origin, 
-        "http://127.0.0.1:5173",
-        "http://localhost:5174",
-        "http://127.0.0.1:5174",
-    ],
+    allow_origins=[frontend_origin, "http://127.0.0.1:5173", "http://localhost:5174", "http://127.0.0.1:5174"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Register all routers
 app.include_router(text_router)
 app.include_router(workbench_router)
 app.include_router(assets_router)
@@ -45,6 +40,8 @@ app.include_router(insights_router)
 app.include_router(dashboard_router)
 app.include_router(settings_router)
 app.include_router(script_router)
+app.include_router(auth_router)
+app.include_router(projects_router)
 
 
 def service_payload() -> dict:
@@ -55,6 +52,8 @@ def service_payload() -> dict:
         "endpoints": [
             "/health",
             "/api/health",
+            "/api/auth/*",
+            "/api/projects/*",
             "/api/text/*",
             "/api/workbench/*",
             "/api/assets/*",
@@ -75,6 +74,4 @@ def root():
 @app.get("/health")
 @app.get("/api/health")
 def health():
-    return {
-        **service_payload(),
-    }
+    return {**service_payload()}

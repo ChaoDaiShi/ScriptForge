@@ -8,7 +8,10 @@ import uuid
 import os
 import httpx
 from dotenv import load_dotenv
-from openai import AsyncOpenAI
+try:
+    from openai import AsyncOpenAI
+except ImportError:
+    AsyncOpenAI = None
 
 # Load environment variables
 load_dotenv()
@@ -194,7 +197,7 @@ script:
     
     async def extract_dialogues(self, text: str) -> List[Dict[str, Any]]:
         """提取对话（步骤1）"""
-        if not os.getenv("DEEPSEEK_API_KEY"):
+        if not os.getenv("DEEPSEEK_API_KEY") or self.client is None:
             return self._extract_dialogues_local(text)
         
         # 按段落分批处理，每批最多8000字符
@@ -244,7 +247,7 @@ script:
     
     async def extract_characters(self, text: str) -> Dict[str, Any]:
         """提取人物和描写类型（步骤2）"""
-        if not os.getenv("DEEPSEEK_API_KEY"):
+        if not os.getenv("DEEPSEEK_API_KEY") or self.client is None:
             return self._extract_characters_local(text)
         
         prompt = self._build_chunked_prompt(
@@ -318,7 +321,7 @@ script:
     
     async def extract_main_plot(self, text: str) -> str:
         """提取主线（步骤3）"""
-        if not os.getenv("DEEPSEEK_API_KEY"):
+        if not os.getenv("DEEPSEEK_API_KEY") or self.client is None:
             return self._extract_main_plot_local(text)
         
         prompt = self._build_chunked_prompt(
@@ -343,7 +346,7 @@ script:
     
     async def tag_dialogue_speakers(self, text: str, characters: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """标记对话主体（步骤4）"""
-        if not os.getenv("DEEPSEEK_API_KEY"):
+        if not os.getenv("DEEPSEEK_API_KEY") or self.client is None:
             return self._tag_dialogue_speakers_local(text, characters)
         
         character_names = ", ".join([c["name"] for c in characters])
@@ -390,7 +393,7 @@ script:
     
     async def analyze_scene(self, description: str, scene_number: int) -> Dict[str, Any]:
         """分析场景（步骤6）"""
-        if not os.getenv("DEEPSEEK_API_KEY"):
+        if not os.getenv("DEEPSEEK_API_KEY") or self.client is None:
             return self._analyze_scene_local(description, scene_number)
         
         prompt = f"""分析以下场景描述：
@@ -443,7 +446,7 @@ script:
     
     async def convert_psychology(self, psychology_text: str, character_name: str) -> str:
         """转化心理描写（步骤7）"""
-        if not os.getenv("DEEPSEEK_API_KEY"):
+        if not os.getenv("DEEPSEEK_API_KEY") or self.client is None:
             return self._convert_psychology_local(psychology_text, character_name)
         
         prompt = f"""将以下心理描写转化为动作或神态描写：
@@ -473,7 +476,7 @@ script:
     
     async def detect_useless_lines(self, text: str) -> List[int]:
         """检测无用语句（步骤9）"""
-        if not os.getenv("DEEPSEEK_API_KEY"):
+        if not os.getenv("DEEPSEEK_API_KEY") or self.client is None:
             return self._detect_useless_lines_local(text)
         
         prompt = self._build_chunked_prompt(
@@ -506,7 +509,7 @@ script:
     
     async def polish_script(self, text: str) -> str:
         """润色剧本（步骤11）"""
-        if not os.getenv("DEEPSEEK_API_KEY"):
+        if not os.getenv("DEEPSEEK_API_KEY") or self.client is None:
             return self._polish_script_local(text)
         
         prompt = f"""请润色以下剧本文本，清理多余空白和重复内容，优化对话表达，保持剧本格式，不改变原意：
