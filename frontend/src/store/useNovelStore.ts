@@ -58,6 +58,23 @@ export const useNovelStore = create<NovelState>()(
     }),
     {
       name: "novel-storage",
+      onRehydrateStorage: () => () => {
+        try {
+          const keys = Object.keys(localStorage);
+          const novelKeys = keys.filter(key => key.startsWith("novel-storage"));
+          if (novelKeys.length > 0) {
+            const totalSize = novelKeys.reduce((acc, key) => {
+              const value = localStorage.getItem(key);
+              return acc + (value ? value.length : 0);
+            }, 0);
+            if (totalSize > 3 * 1024 * 1024) {
+              novelKeys.forEach(key => localStorage.removeItem(key));
+            }
+          }
+        } catch (e) {
+          console.warn("Failed to clean up localStorage:", e);
+        }
+      },
     }
   )
 );

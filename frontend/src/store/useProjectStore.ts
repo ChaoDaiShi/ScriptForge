@@ -38,6 +38,23 @@ export const useProjectStore = create<ProjectState>()(
     }),
     {
       name: "project-storage",
+      onRehydrateStorage: () => () => {
+        try {
+          const keys = Object.keys(localStorage);
+          const projectKeys = keys.filter(key => key.startsWith("project-storage"));
+          if (projectKeys.length > 0) {
+            const totalSize = projectKeys.reduce((acc, key) => {
+              const value = localStorage.getItem(key);
+              return acc + (value ? value.length : 0);
+            }, 0);
+            if (totalSize > 4 * 1024 * 1024) {
+              projectKeys.forEach(key => localStorage.removeItem(key));
+            }
+          }
+        } catch (e) {
+          console.warn("Failed to clean up localStorage:", e);
+        }
+      },
     }
   )
 );

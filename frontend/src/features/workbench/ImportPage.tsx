@@ -407,10 +407,6 @@ export default function ImportPage() {
   };
 
   const handleGoToWorkbench = async () => {
-    if (!adaptType) {
-      addToast({ type: "error", title: "请选择改编形式", message: "请先选择影视作品剧本或电影剧本" });
-      return;
-    }
     if (!pasteContent.trim()) {
       addToast({ type: "error", title: "请导入文本", message: "请先上传或粘贴小说文本内容" });
       return;

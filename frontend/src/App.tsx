@@ -15,8 +15,8 @@ function App() {
       <Routes>
         <Route path="/" element={<Layout />}>
           <Route index element={<Navigate to="/workbench" replace />} />
-          <Route path="import" element={<ImportPage />} />
           <Route path="workbench" element={<Workbench />} />
+          <Route path="import" element={<ImportPage />} />
           <Route path="tasks" element={<TasksPage />} />
           <Route path="assets" element={<AssetsPage />} />
           <Route path="insights" element={<InsightsPage />} />

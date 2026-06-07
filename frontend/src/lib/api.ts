@@ -93,6 +93,20 @@ export interface BackendTask {
   updated_at: string;
 }
 
+export interface ScriptSourceChapterPayload {
+  index: number;
+  title: string;
+  content: string;
+  word_count: number;
+}
+
+export interface ScriptSourcePayload {
+  mode: "chapter_json";
+  total_word_count: number;
+  chapter_count: number;
+  chapters: ScriptSourceChapterPayload[];
+}
+
 export interface TaskListPayload {
   tasks: BackendTask[];
   pagination: {
@@ -118,6 +132,7 @@ export async function createScript(payload: {
   title: string;
   type: ScriptType;
   text: string;
+  source_payload?: ScriptSourcePayload;
 }) {
   const response = await apiJson<BackendScript>("scripts", {
     method: "POST",

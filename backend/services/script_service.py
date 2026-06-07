@@ -23,6 +23,7 @@ from schemas.script_schema import (
     SceneHeading,
     Script,
     ScriptCreateRequest,
+    ScriptSourcePayload,
     ScriptType,
     TaskListItem,
 )
@@ -62,12 +63,33 @@ class ScriptService:
         return f"{script.title} · 剧本转换"
 
     @staticmethod
+    def _compose_original_text(
+        text: str,
+        source_payload: Optional[ScriptSourcePayload],
+    ) -> str:
+        if not source_payload or not source_payload.chapters:
+            return text.strip()
+
+        sections: list[str] = []
+        for chapter in source_payload.chapters:
+            title = chapter.title.strip()
+            content = chapter.content.strip()
+            if not content:
+                continue
+            sections.append(f"{title}\n{content}")
+
+        return "\n\n".join(sections).strip() or text.strip()
+
+    @staticmethod
     async def create_script(request: ScriptCreateRequest) -> Script:
         script = Script(
             id=str(uuid4()),
             title=request.title,
             type=request.type,
-            original_text=request.text,
+            original_text=ScriptService._compose_original_text(
+                request.text,
+                request.source_payload,
+            ),
         )
         return ScriptService._get_repository().create_script(script)
 
