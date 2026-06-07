@@ -21,7 +21,7 @@ class Character(BaseModel):
     """人物模型"""
     id: str = Field(..., description="人物唯一标识")
     name: str = Field(..., description="人物名称")
-    role: CharacterRole = Field(..., description="角色类型")
+    role: CharacterRole = Field(default=CharacterRole.SUPPORTING, description="角色类型")
     description: Optional[str] = Field(None, description="人物描述")
     traits: List[str] = Field(default=[], description="人物特征")
 
@@ -56,9 +56,10 @@ class Scene(BaseModel):
     """场景模型"""
     id: str = Field(..., description="场景唯一标识")
     heading: SceneHeading = Field(..., description="场景头")
+    content: Optional[str] = Field(None, description="场景内容")
     dialogues: List[Dialogue] = Field(default=[], description="对话列表")
     descriptions: List[Dict[str, Any]] = Field(default=[], description="描写列表")
-    characters: List[str] = Field(default=[], description="出场人物ID列表")
+    characters: List[Character] = Field(default=[], description="出场人物列表")
 
 
 class Script(BaseModel):
@@ -123,6 +124,8 @@ class ProcessingTask(BaseModel):
     status: ProcessingStatus = Field(default=ProcessingStatus.PENDING, description="任务状态")
     progress: float = Field(default=0.0, description="处理进度 0-100")
     error_message: Optional[str] = Field(None, description="错误信息")
+    # 新增：中间结果存储
+    step_results: Dict[str, Any] = Field(default={}, description="各步骤的处理结果")
     created_at: datetime = Field(default_factory=datetime.now, description="创建时间")
     updated_at: datetime = Field(default_factory=datetime.now, description="更新时间")
 

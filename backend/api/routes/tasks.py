@@ -57,7 +57,7 @@ async def get_task(task_id: str):
     if not task:
         return error_response(message="任务不存在", code=404)
 
-    item = ScriptService.serialize_task(task)
+    item = await ScriptService.serialize_task(task)
     if not item:
         return error_response(message="关联剧本不存在", code=404)
 
@@ -76,7 +76,7 @@ async def create_task(request: TaskCreateRequest):
         return error_response(message="剧本不存在", code=404)
 
     task = await ScriptService.create_processing_task(request.script_id)
-    item = ScriptService.serialize_task(task)
+    item = await ScriptService.serialize_task(task)
     if not item:
         raise HTTPException(status_code=500, detail="任务创建成功但序列化失败")
 
@@ -106,7 +106,7 @@ async def update_task(
     if updates:
         return error_response(message="当前仅支持读取任务状态，暂不支持直接修改", code=400)
 
-    item = ScriptService.serialize_task(task)
+    item = await ScriptService.serialize_task(task)
     if not item:
         return error_response(message="关联剧本不存在", code=404)
 
@@ -144,7 +144,7 @@ async def retry_task(task_id: str):
         return error_response(message="任务不存在", code=404)
 
     retried_task = await ScriptService.create_processing_task(task.script_id)
-    item = ScriptService.serialize_task(retried_task)
+    item = await ScriptService.serialize_task(retried_task)
     if not item:
         return error_response(message="重试任务创建失败", code=500)
 

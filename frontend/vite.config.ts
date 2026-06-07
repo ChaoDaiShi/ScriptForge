@@ -26,6 +26,7 @@ export default defineConfig(({ mode }) => {
         "/api": {
           target: backendUrl,
           changeOrigin: true,
+          timeout: 120000, // 增加代理超时时间到120秒
         },
       },
     },

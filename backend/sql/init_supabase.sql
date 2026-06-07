@@ -30,3 +30,13 @@ create table if not exists public.tasks (
 
 create index if not exists idx_tasks_script_id on public.tasks(script_id);
 create index if not exists idx_tasks_status on public.tasks(status);
+
+-- 禁用 RLS 策略，允许所有操作（开发环境）
+alter table public.scripts disable row level security;
+alter table public.tasks disable row level security;
+alter table public.scriptforge_health disable row level security;
+
+-- 或者，如果需要启用 RLS，添加以下策略
+-- create policy "Enable read access for all users" on public.scripts for all using (true);
+-- create policy "Enable read access for all users" on public.tasks for all using (true);
+-- create policy "Enable read access for all users" on public.scriptforge_health for all using (true);

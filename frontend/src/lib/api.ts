@@ -8,13 +8,21 @@ export function apiUrl(path: string) {
 }
 
 export async function apiFetch(path: string, init?: RequestInit) {
-  const response = await fetch(apiUrl(path), init);
+  // 临时禁用超时机制进行测试
+  try {
+    const response = await fetch(apiUrl(path), init);
 
-  if (!response.ok) {
-    throw new Error(`API request failed: ${response.status}`);
+    if (!response.ok) {
+      throw new Error(`API request failed: ${response.status}`);
+    }
+
+    return response;
+  } catch (error) {
+    if (error instanceof Error && error.name === "AbortError") {
+      throw new Error("请求超时，请检查网络连接或稍后重试");
+    }
+    throw error;
   }
-
-  return response;
 }
 
 export interface ApiEnvelope<T> {
@@ -113,8 +121,11 @@ export async function apiJson<T>(
   path: string,
   init?: RequestInit,
 ): Promise<ApiEnvelope<T>> {
+  console.log(`Calling API: ${path}`, init ? init.method || 'GET' : 'GET');
   const response = await apiFetch(path, init);
-  return response.json() as Promise<ApiEnvelope<T>>;
+  const json = await response.json();
+  console.log(`API response for ${path}:`, json);
+  return json as ApiEnvelope<T>;
 }
 
 export async function createScript(payload: {
@@ -131,25 +142,20 @@ export async function createScript(payload: {
     body: JSON.stringify(payload),
   });
 
+  console.log("createScript response:", response);
+  console.log("createScript returning:", response.data);
   return response.data;
 }
 
 export async function startScriptProcessing(scriptId: string) {
-  const response = await apiJson<{
-    id: string;
-    script_id: string;
-    steps: string[];
-    current_step?: string | null;
-    status: string;
-    progress: number;
-    error_message?: string | null;
-    created_at: string;
-    updated_at: string;
-  }>(`scripts/${scriptId}/process`, {
-    method: "POST",
-  });
+  const response = await apiJson<{ task: BackendTask }>(
+    `scripts/${scriptId}/process`,
+    {
+      method: "POST",
+    },
+  );
 
-  return response.data;
+  return response.data.task;
 }
 
 export async function fetchScript(scriptId: string) {
