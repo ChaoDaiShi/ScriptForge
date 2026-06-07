@@ -1598,23 +1598,28 @@ function AIConvertPanel({ processedText, setProcessedText, setYamlOutput, setAna
               </div>
 
               {/* 场景内容 - 独立滚动 */}
-              <div className="px-4 py-3 space-y-2">
+              <div className="px-4 py-3 space-y-1.5">
                 {scene.lines.map((line, li) => {
-                  if (line.type === "empty") return <div key={li} className="h-2" />;
+                  if (line.type === "empty") return <div key={li} className="h-1.5" />;
                   if (line.type === "action") {
                     return (
-                      <p key={li} className="text-sm text-(--text-subtle) leading-relaxed">
-                        {line.text}
-                      </p>
+                      <div key={li} className="flex items-start gap-2 py-1.5 pl-1.5 border-l-2 border-(--line-soft) rounded-sm">
+                        <span className="shrink-0 mt-0.5 text-[10px] leading-none text-(--text-faint) select-none">
+                          🎬
+                        </span>
+                        <p className="text-xs text-(--text-faint) italic leading-relaxed flex-1">
+                          {line.text}
+                        </p>
+                      </div>
                     );
                   }
                   if (line.type === "dialogue") {
                     return (
-                      <div key={li} className="flex gap-3 items-start">
-                        <span className="shrink-0 mt-0.5 text-xs font-semibold text-(--accent-soft) bg-(--accent-light) px-2 py-0.5 rounded">
+                      <div key={li} className="flex gap-3 items-start py-1.5 px-2 rounded-lg bg-(--accent-light)/30 hover:bg-(--accent-light)/50 transition-colors">
+                        <span className="shrink-0 mt-px text-xs font-bold text-(--accent-soft) bg-(--accent-soft)/10 border border-(--accent-soft)/20 px-2 py-0.5 rounded-md min-w-[3rem] text-center">
                           {line.speaker}
                         </span>
-                        <p className="text-sm text-foreground leading-relaxed">
+                        <p className="text-sm text-foreground font-medium leading-relaxed">
                           {line.text}
                         </p>
                       </div>
