@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import json
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any, Optional
 
 from core.database import get_supabase_client
@@ -21,6 +23,10 @@ def _iso_now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+def _local_users_path() -> Path:
+    return Path(__file__).resolve().parent.parent / ".local_data" / "users.json"
+
+
 class SupabaseScriptRepository:
     """基于 Supabase 的用户、项目、剧本、任务与分发仓储。"""
 
@@ -29,18 +35,33 @@ class SupabaseScriptRepository:
 
     def create_user(self, user: User) -> User:
         payload = user.model_dump(mode="json")
-        self.client.table("users").insert(payload).execute()
+        try:
+            self.client.table("users").insert(payload).execute()
+        except Exception as error:
+            if not self._is_missing_users_table(error):
+                raise
+            self._create_local_user(user)
         return user
 
     def get_user_by_email(self, email: str) -> Optional[User]:
-        response = self.client.table("users").select("*").eq("email", email).limit(1).execute()
-        rows = response.data or []
-        return User.model_validate(rows[0]) if rows else None
+        try:
+            response = self.client.table("users").select("*").eq("email", email).limit(1).execute()
+            rows = response.data or []
+            return User.model_validate(rows[0]) if rows else None
+        except Exception as error:
+            if not self._is_missing_users_table(error):
+                raise
+            return self._get_local_user_by_email(email)
 
     def get_user(self, user_id: str) -> Optional[User]:
-        response = self.client.table("users").select("*").eq("id", user_id).limit(1).execute()
-        rows = response.data or []
-        return User.model_validate(rows[0]) if rows else None
+        try:
+            response = self.client.table("users").select("*").eq("id", user_id).limit(1).execute()
+            rows = response.data or []
+            return User.model_validate(rows[0]) if rows else None
+        except Exception as error:
+            if not self._is_missing_users_table(error):
+                raise
+            return self._get_local_user(user_id)
 
     def create_project(self, project: Project) -> Project:
         self.client.table("projects").insert(project.model_dump(mode="json")).execute()
@@ -231,3 +252,41 @@ class SupabaseScriptRepository:
     @staticmethod
     def _row_to_distribution(row: dict[str, Any]) -> DistributionJob:
         return DistributionJob.model_validate(row)
+
+    @staticmethod
+    def _is_missing_users_table(error: Exception) -> bool:
+        message = str(error)
+        return "PGRST205" in message and "public.users" in message
+
+    @staticmethod
+    def _read_local_users() -> list[dict[str, Any]]:
+        path = _local_users_path()
+        if not path.exists():
+            return []
+        return json.loads(path.read_text() or "[]")
+
+    @staticmethod
+    def _write_local_users(rows: list[dict[str, Any]]) -> None:
+        path = _local_users_path()
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(rows, ensure_ascii=False, indent=2))
+
+    @classmethod
+    def _create_local_user(cls, user: User) -> None:
+        rows = cls._read_local_users()
+        rows.append(user.model_dump(mode="json"))
+        cls._write_local_users(rows)
+
+    @classmethod
+    def _get_local_user_by_email(cls, email: str) -> Optional[User]:
+        for row in cls._read_local_users():
+            if row.get("email") == email:
+                return User.model_validate(row)
+        return None
+
+    @classmethod
+    def _get_local_user(cls, user_id: str) -> Optional[User]:
+        for row in cls._read_local_users():
+            if row.get("id") == user_id:
+                return User.model_validate(row)
+        return None
