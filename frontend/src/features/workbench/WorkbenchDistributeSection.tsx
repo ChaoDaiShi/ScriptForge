@@ -1,31 +1,47 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
-  Sparkles,
-  Video,
-  Globe,
-  Send,
-  Check,
-  Loader2,
-  ArrowRight,
-  ExternalLink,
-  Settings2,
-  FileVideo,
-  Smartphone,
-  Share2,
   AlertCircle,
-  Music,
-  ChevronDown,
-  ChevronUp,
-  Film,
+  ArrowRight,
+  Check,
   CheckCircle2,
   Circle,
+  ExternalLink,
+  FileJson,
+  FileText,
+  Film,
+  Globe,
+  Loader2,
+  MonitorPlay,
+  Music,
   RefreshCw,
+  Send,
+  Settings2,
+  Share2,
+  ShieldCheck,
+  Smartphone,
+  Sparkles,
+  Video,
+  WandSparkles,
+  Zap,
 } from "lucide-react";
+import {
+  createDistributionJob,
+  createProjectExport,
+  dispatchDistributionJob,
+  fetchDistributionJobs,
+  fetchProjectExports,
+  type DistributionJob,
+  type DistributionPlatform,
+} from "@/lib/api";
+import { useProjectStore } from "@/store/useProjectStore";
 import { useScriptStore } from "@/store/useScriptStore";
-import { createDistributionJob, dispatchDistributionJob } from "@/lib/api";
 import { useToastStore } from "@/store/useToastStore";
+import { useAuthStore } from "@/store/useAuthStore";
 
 type DistributeStep = "select" | "generate" | "distribute" | "complete";
+type DeliveryAsset = "yaml" | "pdf" | "json" | "share";
+type AsyncStatus = "idle" | "running" | "success" | "error";
 
 interface DramaConfig {
   title: string;
@@ -37,9 +53,15 @@ interface DramaConfig {
   generateAudio: boolean;
 }
 
-interface PlatformStatus {
-  wechat: "idle" | "uploading" | "success" | "error";
-  douyin: "idle" | "uploading" | "success" | "error";
+type PlatformStatus = Record<DistributionPlatform, AsyncStatus>;
+type AssetStatus = Record<DeliveryAsset, AsyncStatus>;
+
+interface DeliveryAssetOption {
+  key: DeliveryAsset;
+  label: string;
+  desc: string;
+  accent: string;
+  icon: typeof FileText;
 }
 
 const ratioOptions = [
@@ -56,9 +78,100 @@ const resolutionOptions = [
   { value: "4K", label: "4K 超清" },
 ];
 
+const platformOptions: Array<{
+  key: DistributionPlatform;
+  name: string;
+  desc: string;
+  accent: string;
+  bg: string;
+  icon: typeof Smartphone;
+  steps: string[];
+}> = [
+  {
+    key: "wechat",
+    name: "微信视频号",
+    desc: "短剧媒资管理 API",
+    accent: "text-green-600",
+    bg: "bg-[rgba(16,185,129,0.1)]",
+    icon: Smartphone,
+    steps: ["媒资上传", "提审配置", "版权确认"],
+  },
+  {
+    key: "douyin",
+    name: "抖音",
+    desc: "抖音云媒资管理",
+    accent: "text-fuchsia-600",
+    bg: "bg-[rgba(217,70,239,0.1)]",
+    icon: Share2,
+    steps: ["视频上传", "自动转码", "内容库送审"],
+  },
+];
+
+const deliveryAssetOptions: DeliveryAssetOption[] = [
+  {
+    key: "yaml",
+    label: "YAML 模型包",
+    desc: "给 AI 工具流或技术团队的结构化脚本交付物",
+    accent: "text-sky-600",
+    icon: FileJson,
+  },
+  {
+    key: "pdf",
+    label: "PDF 水印稿",
+    desc: "用于制片、片场或外部合作方查阅的版式稿",
+    accent: "text-rose-600",
+    icon: FileText,
+  },
+  {
+    key: "json",
+    label: "JSON 数据包",
+    desc: "标准化接口数据，可直接给下游系统消费",
+    accent: "text-emerald-600",
+    icon: FileJson,
+  },
+  {
+    key: "share",
+    label: "协作分享链接",
+    desc: "给团队成员在线预览与审批的轻量链接",
+    accent: "text-violet-600",
+    icon: Globe,
+  },
+];
+
+const defaultConfig: DramaConfig = {
+  title: "",
+  description: "",
+  resolution: "1080p",
+  ratio: "9:16",
+  duration: 60,
+  watermark: true,
+  generateAudio: true,
+};
+
+const defaultPlatformStatus: PlatformStatus = {
+  wechat: "idle",
+  douyin: "idle",
+};
+
+const defaultAssetStatus: AssetStatus = {
+  yaml: "idle",
+  pdf: "idle",
+  json: "idle",
+  share: "idle",
+};
+
+function formatTime(value: string) {
+  return new Date(value).toLocaleString("zh-CN", {
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
 function StepIndicator({ current }: { current: DistributeStep }) {
   const steps: { key: DistributeStep; label: string }[] = [
-    { key: "select", label: "配置" },
+    { key: "select", label: "准备" },
     { key: "generate", label: "生成" },
     { key: "distribute", label: "分发" },
     { key: "complete", label: "完成" },
@@ -67,30 +180,26 @@ function StepIndicator({ current }: { current: DistributeStep }) {
   const currentIdx = steps.findIndex((s) => s.key === current);
 
   return (
-    <div className="flex items-center justify-center gap-0 mb-8">
-      {steps.map((s, i) => {
-        const isActive = i === currentIdx;
-        const isDone = i < currentIdx;
+    <div className="mb-8 flex items-center justify-center gap-0">
+      {steps.map((step, index) => {
+        const isActive = index === currentIdx;
+        const isDone = index < currentIdx;
         return (
-          <div key={s.key} className="flex items-center">
+          <div key={step.key} className="flex items-center">
             <div className="flex items-center gap-2">
               <div
-                className={`flex h-7 w-7 items-center justify-center rounded-full text-xs font-medium transition-all duration-500 ${
+                className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-medium transition-all duration-500 ${
                   isDone
                     ? "bg-green-100 text-green-600"
                     : isActive
-                      ? "bg-[rgba(123,184,232,0.12)] text-[#7bb8e8] ring-2 ring-[rgba(123,184,232,0.25)]"
+                      ? "bg-[rgba(123,184,232,0.12)] text-[#7bb8e8] ring-2 ring-[rgba(123,184,232,0.2)]"
                       : "bg-[var(--muted)] text-[var(--text-faint)]"
                 }`}
               >
-                {isDone ? (
-                  <Check className="h-3.5 w-3.5" />
-                ) : (
-                  s.label.slice(0, 1)
-                )}
+                {isDone ? <Check className="h-4 w-4" /> : step.label.slice(0, 1)}
               </div>
               <span
-                className={`hidden text-xs font-medium transition-colors sm:inline ${
+                className={`hidden text-xs font-medium sm:inline ${
                   isActive
                     ? "text-[hsl(var(--foreground))]"
                     : isDone
@@ -98,12 +207,12 @@ function StepIndicator({ current }: { current: DistributeStep }) {
                       : "text-[var(--text-faint)]"
                 }`}
               >
-                {s.label}
+                {step.label}
               </span>
             </div>
-            {i < steps.length - 1 && (
+            {index < steps.length - 1 && (
               <div
-                className={`mx-3 h-px w-8 transition-colors duration-500 ${
+                className={`mx-3 h-px w-9 ${
                   isDone ? "bg-green-300" : "bg-[var(--line-soft)]"
                 }`}
               />
@@ -115,404 +224,491 @@ function StepIndicator({ current }: { current: DistributeStep }) {
   );
 }
 
-// ── Select Step ──────────────────────────────────────────
+function StatusChip({
+  label,
+  tone = "neutral",
+}: {
+  label: string;
+  tone?: "neutral" | "success" | "warning";
+}) {
+  const toneClass =
+    tone === "success"
+      ? "bg-green-100 text-green-700"
+      : tone === "warning"
+        ? "bg-amber-100 text-amber-700"
+        : "bg-[var(--muted)] text-[var(--text-subtle)]";
+  return (
+    <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium ${toneClass}`}>
+      {label}
+    </span>
+  );
+}
+
+function SectionCard({
+  title,
+  description,
+  action,
+  children,
+}: {
+  title: string;
+  description: string;
+  action?: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="rounded-[28px] border border-[var(--line-soft)] bg-white p-5 shadow-[var(--shadow-card)] transition-shadow hover:shadow-[var(--shadow-surface)]">
+      <div className="mb-5 flex items-start justify-between gap-4">
+        <div>
+          <h2 className="font-serif text-xl font-semibold text-[hsl(var(--foreground))]">
+            {title}
+          </h2>
+          <p className="mt-1 text-sm leading-6 text-[var(--text-subtle)]">
+            {description}
+          </p>
+        </div>
+        {action}
+      </div>
+      {children}
+    </section>
+  );
+}
 
 function SelectStep({
   config,
   setConfig,
   currentScript,
+  currentProjectTitle,
+  credits,
+  selectedPlatforms,
+  selectedAssets,
   showConfig,
   setShowConfig,
+  togglePlatform,
+  toggleAsset,
   onStart,
 }: {
   config: DramaConfig;
-  setConfig: (c: DramaConfig) => void;
-  currentScript: ReturnType<typeof useScriptStore.getState>["scripts"][number] | undefined;
+  setConfig: (next: DramaConfig) => void;
+  currentScript:
+    | ReturnType<typeof useScriptStore.getState>["scripts"][number]
+    | undefined;
+  currentProjectTitle?: string;
+  credits: number;
+  selectedPlatforms: DistributionPlatform[];
+  selectedAssets: DeliveryAsset[];
   showConfig: boolean;
-  setShowConfig: (v: boolean) => void;
+  setShowConfig: (next: boolean) => void;
+  togglePlatform: (platform: DistributionPlatform) => void;
+  toggleAsset: (asset: DeliveryAsset) => void;
   onStart: () => void;
 }) {
-  return (
-    <div className="animate-fade-in-up space-y-5">
-      {/* Script Card */}
-      <div className="group relative overflow-hidden rounded-2xl border border-[var(--line-soft)] bg-white transition-all duration-300 hover:border-[var(--line-medium)] hover:shadow-[var(--shadow-surface)]">
-        <div className="absolute inset-0 bg-linear-to-br from-[rgba(123,184,232,0.03)] to-transparent pointer-events-none" />
-        <div className="relative p-5">
-          <div className="flex items-start justify-between gap-4">
-            <div className="min-w-0 flex-1">
-              <p className="text-xs uppercase tracking-[0.22em] text-[var(--text-faint)] mb-1.5">
-                选择剧本
-              </p>
-              <p className="text-sm font-medium text-[hsl(var(--foreground))]">
-                {currentScript
-                  ? currentScript.title
-                  : "请先选择一个已完成的剧本"}
-              </p>
-              {currentScript && (
-                <p className="mt-0.5 text-xs text-[var(--text-subtle)]">
-                  {currentScript.episodes.length} 集 · 已就绪
-                </p>
-              )}
-            </div>
-            {currentScript && (
-              <span className="shrink-0 inline-flex items-center gap-1 rounded-full bg-[rgba(16,185,129,0.1)] px-3 py-1 text-xs font-medium text-green-600">
-                <Check className="h-3 w-3" />
-                {currentScript.episodes.length} 集
-              </span>
-            )}
-          </div>
+  const canStart = Boolean(currentScript && selectedPlatforms.length > 0);
 
-          {!currentScript && (
-            <div className="mt-4 rounded-xl bg-[var(--muted)] border border-[var(--line-soft)] p-4">
-              <div className="flex items-start gap-3">
-                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-amber-400" />
-                <p className="text-xs text-[var(--text-subtle)] leading-6">
-                  请先在"导入文本"中完成剧本导入和 AI
-                  转换，再回到此处进行视频生成与分发。
+  return (
+    <div className="space-y-5 animate-fade-in-up">
+      <div className="grid gap-5 xl:grid-cols-[1.3fr_0.9fr]">
+        <SectionCard
+          title="分发对象与视频配置"
+          description="先确定要生成的交付版本，再决定同步到哪些平台。"
+          action={
+            <button
+              type="button"
+              onClick={() => setShowConfig(!showConfig)}
+              className="inline-flex items-center gap-2 rounded-xl border border-[var(--line-soft)] px-3 py-2 text-xs font-medium text-[var(--text-subtle)] transition-colors hover:border-[var(--line-medium)] hover:text-[hsl(var(--foreground))]"
+            >
+              <Settings2 className="h-4 w-4" />
+              {showConfig ? "收起配置" : "展开配置"}
+            </button>
+          }
+        >
+          <div className="mb-5 rounded-2xl border border-[var(--line-soft)] bg-[linear-gradient(135deg,rgba(123,184,232,0.10),rgba(255,255,255,0.95))] p-4">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-xs uppercase tracking-[0.2em] text-[var(--text-faint)]">
+                  当前项目
+                </p>
+                <p className="mt-1 text-base font-medium text-[hsl(var(--foreground))]">
+                  {currentProjectTitle ?? "尚未绑定项目"}
+                </p>
+                <p className="mt-1 text-sm text-[var(--text-subtle)]">
+                  {currentScript
+                    ? `${currentScript.title} · ${currentScript.episodes.length} 集可用于分发`
+                    : "请先在导入文本中完成剧本生成，再来这里做制作与交付。"}
                 </p>
               </div>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Config Section */}
-      <div className="overflow-hidden rounded-2xl border border-[var(--line-soft)] bg-white transition-all duration-300">
-        <button
-          type="button"
-          onClick={() => setShowConfig(!showConfig)}
-          className="flex w-full items-center justify-between p-5 hover:bg-[var(--muted)]/50 transition-colors"
-        >
-          <div className="flex items-center gap-3">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[rgba(123,184,232,0.08)]">
-              <Settings2 className="h-4 w-4 text-[#7bb8e8]" />
-            </div>
-            <div className="text-left">
-              <p className="text-sm font-medium text-[hsl(var(--foreground))]">
-                视频生成配置
-              </p>
-              <p className="text-xs text-[var(--text-subtle)]">
-                分辨率、比例、水印等参数
-              </p>
+              {currentScript ? (
+                <StatusChip label="已就绪" tone="success" />
+              ) : (
+                <StatusChip label="待剧本生成" tone="warning" />
+              )}
             </div>
           </div>
-          {showConfig ? (
-            <ChevronUp className="h-4 w-4 text-[var(--text-faint)]" />
-          ) : (
-            <ChevronDown className="h-4 w-4 text-[var(--text-faint)]" />
-          )}
-        </button>
 
-        {showConfig && (
-          <div className="animate-fade-in border-t border-[var(--line-soft)] px-5 pb-5 pt-4 space-y-5">
-            {/* Title & Description */}
-            <div className="grid gap-4 sm:grid-cols-2">
+          {showConfig && (
+            <div className="mb-5 grid gap-4 md:grid-cols-2">
               <div>
-                <label className="block text-xs font-medium text-[hsl(var(--foreground))] mb-1.5">
+                <label className="mb-1.5 block text-xs font-medium text-[hsl(var(--foreground))]">
                   短剧名称
                 </label>
                 <input
                   type="text"
                   value={config.title}
-                  onChange={(e) =>
-                    setConfig({ ...config, title: e.target.value })
+                  onChange={(event) =>
+                    setConfig({ ...config, title: event.target.value })
                   }
-                  placeholder="输入短剧名称"
-                  className="w-full rounded-xl border border-[var(--line-medium)] bg-white px-4 py-2.5 text-sm text-[hsl(var(--foreground))] placeholder:text-[var(--text-subtle)] outline-none transition-all focus:border-[#7bb8e8] focus:ring-2 focus:ring-[rgba(123,184,232,0.12)]"
+                  placeholder="输入最终交付片名"
+                  className="w-full rounded-xl border border-[var(--line-medium)] bg-white px-4 py-2.5 text-sm outline-none transition-all focus:border-[#7bb8e8] focus:ring-2 focus:ring-[rgba(123,184,232,0.12)]"
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-[hsl(var(--foreground))] mb-1.5">
+                <label className="mb-1.5 block text-xs font-medium text-[hsl(var(--foreground))]">
                   时长（秒）
                 </label>
                 <input
                   type="number"
-                  value={config.duration}
-                  onChange={(e) =>
-                    setConfig({
-                      ...config,
-                      duration: parseInt(e.target.value) || 60,
-                    })
-                  }
                   min={5}
                   max={300}
-                  className="w-full rounded-xl border border-[var(--line-medium)] bg-white px-4 py-2.5 text-sm text-[hsl(var(--foreground))] outline-none transition-all focus:border-[#7bb8e8] focus:ring-2 focus:ring-[rgba(123,184,232,0.12)]"
+                  value={config.duration}
+                  onChange={(event) =>
+                    setConfig({
+                      ...config,
+                      duration: parseInt(event.target.value, 10) || 60,
+                    })
+                  }
+                  className="w-full rounded-xl border border-[var(--line-medium)] bg-white px-4 py-2.5 text-sm outline-none transition-all focus:border-[#7bb8e8] focus:ring-2 focus:ring-[rgba(123,184,232,0.12)]"
                 />
               </div>
-            </div>
-
-            {/* Description */}
-            <div>
-              <label className="block text-xs font-medium text-[hsl(var(--foreground))] mb-1.5">
-                短剧描述
-              </label>
-              <textarea
-                value={config.description}
-                onChange={(e) =>
-                  setConfig({ ...config, description: e.target.value })
-                }
-                placeholder="输入短剧简介，将作为视频生成 prompt 的一部分"
-                rows={2}
-                className="w-full rounded-xl border border-[var(--line-medium)] bg-white px-4 py-2.5 text-sm text-[hsl(var(--foreground))] placeholder:text-[var(--text-subtle)] outline-none transition-all focus:border-[#7bb8e8] focus:ring-2 focus:ring-[rgba(123,184,232,0.12)] resize-y"
-              />
-            </div>
-
-            {/* Resolution & Ratio */}
-            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="md:col-span-2">
+                <label className="mb-1.5 block text-xs font-medium text-[hsl(var(--foreground))]">
+                  分发说明
+                </label>
+                <textarea
+                  rows={3}
+                  value={config.description}
+                  onChange={(event) =>
+                    setConfig({ ...config, description: event.target.value })
+                  }
+                  placeholder="填写给平台运营、外部协作方或 AI 生成链路的备注说明"
+                  className="w-full rounded-xl border border-[var(--line-medium)] bg-white px-4 py-2.5 text-sm outline-none transition-all focus:border-[#7bb8e8] focus:ring-2 focus:ring-[rgba(123,184,232,0.12)]"
+                />
+              </div>
               <div>
-                <label className="block text-xs font-medium text-[hsl(var(--foreground))] mb-2">
+                <p className="mb-2 text-xs font-medium text-[hsl(var(--foreground))]">
                   分辨率
-                </label>
-                <div className="flex flex-wrap gap-1.5">
-                  {resolutionOptions.map((opt) => (
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {resolutionOptions.map((option) => (
                     <button
-                      key={opt.value}
+                      key={option.value}
                       type="button"
                       onClick={() =>
-                        setConfig({ ...config, resolution: opt.value })
+                        setConfig({ ...config, resolution: option.value })
                       }
                       className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition-all ${
-                        config.resolution === opt.value
-                          ? "border-[#7bb8e8] bg-[rgba(123,184,232,0.08)] text-[#7bb8e8] shadow-sm"
+                        config.resolution === option.value
+                          ? "border-[#7bb8e8] bg-[rgba(123,184,232,0.08)] text-[#7bb8e8]"
                           : "border-[var(--line-soft)] text-[var(--text-subtle)] hover:border-[var(--line-medium)] hover:text-[hsl(var(--foreground))]"
                       }`}
                     >
-                      {opt.label}
+                      {option.label}
                     </button>
                   ))}
                 </div>
               </div>
               <div>
-                <label className="block text-xs font-medium text-[hsl(var(--foreground))] mb-2">
+                <p className="mb-2 text-xs font-medium text-[hsl(var(--foreground))]">
                   画面比例
-                </label>
-                <div className="flex flex-wrap gap-1.5">
-                  {ratioOptions.map((opt) => (
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {ratioOptions.map((option) => (
                     <button
-                      key={opt.value}
+                      key={option.value}
                       type="button"
-                      onClick={() =>
-                        setConfig({ ...config, ratio: opt.value })
-                      }
+                      onClick={() => setConfig({ ...config, ratio: option.value })}
                       className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition-all ${
-                        config.ratio === opt.value
-                          ? "border-[#7bb8e8] bg-[rgba(123,184,232,0.08)] text-[#7bb8e8] shadow-sm"
+                        config.ratio === option.value
+                          ? "border-[#7bb8e8] bg-[rgba(123,184,232,0.08)] text-[#7bb8e8]"
                           : "border-[var(--line-soft)] text-[var(--text-subtle)] hover:border-[var(--line-medium)] hover:text-[hsl(var(--foreground))]"
                       }`}
                     >
-                      {opt.label}
+                      {option.label}
                     </button>
                   ))}
                 </div>
               </div>
-            </div>
-
-            {/* Toggles */}
-            <div className="flex flex-wrap gap-6">
-              <label className="flex items-center gap-2 cursor-pointer group">
+              <label className="inline-flex items-center gap-2 text-sm text-[var(--text-subtle)]">
                 <input
                   type="checkbox"
                   checked={config.watermark}
-                  onChange={(e) =>
-                    setConfig({ ...config, watermark: e.target.checked })
+                  onChange={(event) =>
+                    setConfig({ ...config, watermark: event.target.checked })
                   }
-                  className="h-4 w-4 rounded border-[var(--line-medium)] text-[#7bb8e8] focus:ring-[rgba(123,184,232,0.2)]"
+                  className="h-4 w-4 rounded border-[var(--line-medium)] text-[#7bb8e8]"
                 />
-                <span className="text-sm text-[var(--text-subtle)] group-hover:text-[hsl(var(--foreground))] transition-colors">
-                  添加水印
-                </span>
+                添加专属水印
               </label>
-              <label className="flex items-center gap-2 cursor-pointer group">
+              <label className="inline-flex items-center gap-2 text-sm text-[var(--text-subtle)]">
                 <input
                   type="checkbox"
                   checked={config.generateAudio}
-                  onChange={(e) =>
-                    setConfig({ ...config, generateAudio: e.target.checked })
+                  onChange={(event) =>
+                    setConfig({
+                      ...config,
+                      generateAudio: event.target.checked,
+                    })
                   }
-                  className="h-4 w-4 rounded border-[var(--line-medium)] text-[#7bb8e8] focus:ring-[rgba(123,184,232,0.2)]"
+                  className="h-4 w-4 rounded border-[var(--line-medium)] text-[#7bb8e8]"
                 />
-                <span className="text-sm text-[var(--text-subtle)] group-hover:text-[hsl(var(--foreground))] transition-colors">
-                  <Music className="mr-1 inline h-3.5 w-3.5" />
-                  生成同步音频
-                </span>
+                <Music className="h-4 w-4" />
+                生成同步音频
               </label>
             </div>
-          </div>
-        )}
-      </div>
+          )}
 
-      {/* Start Button */}
-      <button
-        type="button"
-        onClick={onStart}
-        disabled={!currentScript}
-        className="group relative inline-flex w-full items-center justify-center gap-2.5 overflow-hidden rounded-2xl bg-[#7bb8e8] px-6 py-3.5 text-sm font-medium text-white shadow-lg shadow-[rgba(123,184,232,0.25)] transition-all hover:bg-[#6aadd8] hover:shadow-xl hover:shadow-[rgba(123,184,232,0.3)] disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:shadow-lg"
-      >
-        <span className="absolute inset-0 bg-linear-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000 disabled:hidden" />
-        <Sparkles className="h-5 w-5" />
-        开始制作短剧视频
-      </button>
-
-      {/* Platform Info */}
-      <div className="grid grid-cols-3 gap-3">
-        {[
-          {
-            icon: <Sparkles className="h-5 w-5 text-[#7bb8e8]" />,
-            bg: "bg-[rgba(123,184,232,0.08)]",
-            title: "火山方舟",
-            desc: "Seedance 视频生成",
-          },
-          {
-            icon: <Smartphone className="h-5 w-5 text-green-500" />,
-            bg: "bg-[rgba(16,185,129,0.08)]",
-            title: "微信视频号",
-            desc: "短剧媒资管理分发",
-          },
-          {
-            icon: <Share2 className="h-5 w-5 text-purple-500" />,
-            bg: "bg-[rgba(168,85,247,0.08)]",
-            title: "抖音",
-            desc: "抖音云媒资托管分发",
-          },
-        ].map((p, i) => (
-          <div
-            key={i}
-            className="group rounded-xl border border-[var(--line-soft)] bg-white p-4 text-center transition-all duration-300 hover:border-[var(--line-medium)] hover:shadow-[var(--shadow-surface)] hover:-translate-y-0.5"
-          >
-            <div
-              className={`mx-auto mb-2.5 flex h-10 w-10 items-center justify-center rounded-full ${p.bg} transition-transform duration-300 group-hover:scale-110`}
-            >
-              {p.icon}
+          <div className="grid gap-4 lg:grid-cols-2">
+            <div className="rounded-2xl border border-[var(--line-soft)] bg-[var(--muted)]/55 p-4">
+              <p className="mb-3 text-sm font-medium text-[hsl(var(--foreground))]">
+                选择分发平台
+              </p>
+              <div className="space-y-3">
+                {platformOptions.map((platform) => {
+                  const PlatformIcon = platform.icon;
+                  const selected = selectedPlatforms.includes(platform.key);
+                  return (
+                    <button
+                      key={platform.key}
+                      type="button"
+                      onClick={() => togglePlatform(platform.key)}
+                      className={`flex w-full items-start gap-3 rounded-2xl border p-3 text-left transition-all ${
+                        selected
+                          ? "border-[#7bb8e8] bg-white shadow-[var(--shadow-card)]"
+                          : "border-transparent bg-white/70 hover:border-[var(--line-medium)]"
+                      }`}
+                    >
+                      <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${platform.bg}`}>
+                        <PlatformIcon className={`h-5 w-5 ${platform.accent}`} />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center justify-between gap-3">
+                          <p className="text-sm font-medium text-[hsl(var(--foreground))]">
+                            {platform.name}
+                          </p>
+                          {selected ? (
+                            <CheckCircle2 className="h-4 w-4 text-[#7bb8e8]" />
+                          ) : (
+                            <Circle className="h-4 w-4 text-[var(--text-faint)]" />
+                          )}
+                        </div>
+                        <p className="mt-1 text-xs leading-5 text-[var(--text-subtle)]">
+                          {platform.desc}
+                        </p>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
-            <p className="text-xs font-medium text-[hsl(var(--foreground))]">
-              {p.title}
-            </p>
-            <p className="mt-0.5 text-xs text-[var(--text-subtle)]">{p.desc}</p>
+
+            <div className="rounded-2xl border border-[var(--line-soft)] bg-[var(--muted)]/55 p-4">
+              <p className="mb-3 text-sm font-medium text-[hsl(var(--foreground))]">
+                选择并行交付物
+              </p>
+              <div className="space-y-3">
+                {deliveryAssetOptions.map((asset) => {
+                  const AssetIcon = asset.icon;
+                  const selected = selectedAssets.includes(asset.key);
+                  return (
+                    <button
+                      key={asset.key}
+                      type="button"
+                      onClick={() => toggleAsset(asset.key)}
+                      className={`flex w-full items-start gap-3 rounded-2xl border p-3 text-left transition-all ${
+                        selected
+                          ? "border-[#7bb8e8] bg-white shadow-[var(--shadow-card)]"
+                          : "border-transparent bg-white/70 hover:border-[var(--line-medium)]"
+                      }`}
+                    >
+                      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white">
+                        <AssetIcon className={`h-5 w-5 ${asset.accent}`} />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center justify-between gap-3">
+                          <p className="text-sm font-medium text-[hsl(var(--foreground))]">
+                            {asset.label}
+                          </p>
+                          {selected ? (
+                            <CheckCircle2 className="h-4 w-4 text-[#7bb8e8]" />
+                          ) : (
+                            <Circle className="h-4 w-4 text-[var(--text-faint)]" />
+                          )}
+                        </div>
+                        <p className="mt-1 text-xs leading-5 text-[var(--text-subtle)]">
+                          {asset.desc}
+                        </p>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
           </div>
-        ))}
+        </SectionCard>
+
+        <SectionCard
+          title="分发摘要"
+          description="确认这次分发的体量、资源消耗和交付边界。"
+        >
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
+            <div className="rounded-2xl border border-[var(--line-soft)] bg-[var(--muted)]/50 p-4">
+              <p className="text-xs uppercase tracking-[0.18em] text-[var(--text-faint)]">
+                计划生成
+              </p>
+              <p className="mt-2 text-3xl font-semibold text-[hsl(var(--foreground))]">
+                {selectedPlatforms.length + selectedAssets.length}
+              </p>
+              <p className="mt-1 text-sm text-[var(--text-subtle)]">
+                {selectedPlatforms.length} 个平台 + {selectedAssets.length} 项交付物
+              </p>
+            </div>
+            <div className="rounded-2xl border border-[var(--line-soft)] bg-[var(--muted)]/50 p-4">
+              <p className="text-xs uppercase tracking-[0.18em] text-[var(--text-faint)]">
+                剩余额度
+              </p>
+              <p className="mt-2 text-3xl font-semibold text-[hsl(var(--foreground))]">
+                {credits}
+              </p>
+              <p className="mt-1 text-sm text-[var(--text-subtle)]">
+                当前账号可继续发起的视频生成次数
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-4 rounded-2xl border border-[var(--line-soft)] bg-white p-4">
+            <p className="text-sm font-medium text-[hsl(var(--foreground))]">
+              本次流程会自动完成
+            </p>
+            <div className="mt-3 space-y-2 text-sm text-[var(--text-subtle)]">
+              <div className="flex items-start gap-2">
+                <WandSparkles className="mt-0.5 h-4 w-4 text-[#7bb8e8]" />
+                Seedance 生成视频，并保留可回放的任务记录。
+              </div>
+              <div className="flex items-start gap-2">
+                <ShieldCheck className="mt-0.5 h-4 w-4 text-emerald-500" />
+                为平台分发和外部交付物分别写入状态回执。
+              </div>
+              <div className="flex items-start gap-2">
+                <Zap className="mt-0.5 h-4 w-4 text-amber-500" />
+                完成后可继续前往任务中心查看审核与下载状态。
+              </div>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={onStart}
+            disabled={!canStart}
+            className="mt-5 inline-flex w-full items-center justify-center gap-2.5 rounded-2xl bg-[#7bb8e8] px-6 py-3.5 text-sm font-medium text-white shadow-lg shadow-[rgba(123,184,232,0.25)] transition-all hover:bg-[#6aadd8] disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            <Sparkles className="h-5 w-5" />
+            开始生成并准备分发
+          </button>
+        </SectionCard>
       </div>
     </div>
   );
 }
 
-// ── Generate Step ────────────────────────────────────────
-
 function GenerateStep({
   generateProgress,
   generating,
+  selectedPlatforms,
+  selectedAssets,
 }: {
   generateProgress: number;
   generating: boolean;
+  selectedPlatforms: DistributionPlatform[];
+  selectedAssets: DeliveryAsset[];
 }) {
   const isComplete = generateProgress >= 100;
 
   return (
     <div className="flex items-center justify-center py-8">
-      <div className="w-full max-w-lg animate-fade-in-up">
-        <div className="rounded-2xl border border-[var(--line-soft)] bg-white p-8 text-center shadow-[var(--shadow-surface)]">
-          {/* Animated Icon */}
+      <div className="w-full max-w-3xl animate-fade-in-up">
+        <div className="rounded-[32px] border border-[var(--line-soft)] bg-white p-8 text-center shadow-[var(--shadow-surface)]">
           <div className="relative mx-auto mb-6 flex h-24 w-24 items-center justify-center">
             <div
               className={`absolute inset-0 rounded-full transition-all duration-700 ${
                 isComplete
-                  ? "bg-green-50 scale-100"
-                  : "bg-[rgba(123,184,232,0.08)] animate-pulse"
+                  ? "scale-100 bg-green-50"
+                  : "animate-pulse bg-[rgba(123,184,232,0.08)]"
               }`}
             />
             <div
-              className={`relative flex h-16 w-16 items-center justify-center rounded-full transition-all duration-500 ${
-                isComplete
-                  ? "bg-green-100"
-                  : "bg-[rgba(123,184,232,0.12)]"
+              className={`relative flex h-16 w-16 items-center justify-center rounded-full ${
+                isComplete ? "bg-green-100" : "bg-[rgba(123,184,232,0.12)]"
               }`}
             >
               {generating ? (
                 <Loader2 className="h-8 w-8 animate-spin text-[#7bb8e8]" />
               ) : isComplete ? (
-                <Check className="h-8 w-8 text-green-500 animate-scale-in" />
+                <Check className="h-8 w-8 text-green-500" />
               ) : (
                 <Film className="h-8 w-8 text-[#7bb8e8]" />
               )}
             </div>
           </div>
 
-          <h2 className="font-serif text-2xl font-semibold text-[hsl(var(--foreground))] mb-2">
-            {isComplete
-              ? "视频生成完成！"
-              : "火山方舟 Seedance 正在生成..."}
+          <h2 className="font-serif text-3xl font-semibold text-[hsl(var(--foreground))]">
+            {isComplete ? "视频生成完成" : "Seedance 正在准备交付主片"}
           </h2>
-          <p className="mx-auto mb-8 max-w-md text-sm leading-6 text-[var(--text-subtle)]">
+          <p className="mx-auto mt-2 max-w-2xl text-sm leading-6 text-[var(--text-subtle)]">
             {isComplete
-              ? "短剧视频已成功生成，即将进入分发环节。"
-              : "正在将剧本逐场景转化为视频画面，基于 Seedance 2.0 模型进行多模态生成。"}
+              ? "主视频已经生成完成，接下来会进入平台分发与导出物交付阶段。"
+              : `正在合成主视频，并为 ${selectedPlatforms.length} 个平台和 ${selectedAssets.length} 项交付物准备元数据。`}
           </p>
 
-          {/* Progress Bar */}
-          <div className="mx-auto max-w-xs mb-8">
-            <div className="flex items-center justify-between text-xs text-[var(--text-subtle)] mb-2">
+          <div className="mx-auto mt-8 max-w-xl">
+            <div className="mb-2 flex items-center justify-between text-xs text-[var(--text-subtle)]">
               <span>生成进度</span>
               <span className="font-medium tabular-nums">
                 {Math.round(generateProgress)}%
               </span>
             </div>
-            <div className="h-2.5 overflow-hidden rounded-full bg-[var(--muted)]">
+            <div className="h-3 overflow-hidden rounded-full bg-[var(--muted)]">
               <div
-                className="h-full rounded-full bg-linear-to-r from-[#7bb8e8] to-purple-500 transition-all duration-700 ease-out"
+                className="h-full rounded-full bg-linear-to-r from-[#7bb8e8] via-sky-400 to-emerald-400 transition-all duration-700 ease-out"
                 style={{ width: `${Math.min(generateProgress, 100)}%` }}
               />
             </div>
           </div>
 
-          {/* Generation Steps */}
-          <div className="mx-auto max-w-sm space-y-2.5">
+          <div className="mt-8 grid gap-3 md:grid-cols-2">
             {[
-              { label: "解析剧本结构", threshold: 10 },
-              { label: "生成场景分镜", threshold: 30 },
-              { label: "多模态视频合成", threshold: 60 },
-              { label: "音频同步处理", threshold: 85 },
-              { label: "视频封装输出", threshold: 100 },
-            ].map((step, i) => {
-              const done = generateProgress >= step.threshold;
+              "解析剧本结构与镜头节拍",
+              "根据比例与分辨率渲染画面",
+              "同步音频与片头水印策略",
+              "写入分发元数据与导出队列",
+            ].map((item, index) => {
+              const done = generateProgress >= (index + 1) * 25;
               return (
                 <div
-                  key={i}
-                  className={`flex items-center gap-3 rounded-xl px-4 py-2.5 transition-all duration-500 ${
+                  key={item}
+                  className={`flex items-center gap-3 rounded-2xl border px-4 py-3 text-left ${
                     done
-                      ? "bg-[rgba(16,185,129,0.04)]"
-                      : "bg-transparent opacity-50"
+                      ? "border-green-100 bg-green-50/60"
+                      : "border-[var(--line-soft)] bg-[var(--muted)]/40"
                   }`}
                 >
                   <div
-                    className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full transition-all duration-500 ${
+                    className={`flex h-7 w-7 items-center justify-center rounded-full ${
                       done
                         ? "bg-green-100 text-green-600"
-                        : "bg-[var(--muted)] text-[var(--text-faint)]"
+                        : "bg-white text-[var(--text-faint)]"
                     }`}
                   >
-                    {done ? (
-                      <Check className="h-3.5 w-3.5" />
-                    ) : (
-                      <span className="text-xs">{i + 1}</span>
-                    )}
+                    {done ? <Check className="h-4 w-4" /> : index + 1}
                   </div>
-                  <span
-                    className={`text-sm transition-colors duration-500 ${
-                      done
-                        ? "text-[hsl(var(--foreground))]"
-                        : "text-[var(--text-subtle)]"
-                    }`}
-                  >
-                    {step.label}
-                  </span>
-                  {done && !isComplete && (
-                    <div className="ml-auto flex items-center gap-1.5">
-                      <div className="h-1.5 w-1.5 rounded-full bg-[#7bb8e8] animate-pulse" />
-                      <span className="text-xs text-[#7bb8e8]">处理中</span>
-                    </div>
-                  )}
-                  {done && isComplete && (
-                    <Check className="ml-auto h-4 w-4 text-green-500" />
-                  )}
+                  <span className="text-sm text-[var(--text-subtle)]">{item}</span>
                 </div>
               );
             })}
@@ -523,395 +719,711 @@ function GenerateStep({
   );
 }
 
-// ── Distribute Step ──────────────────────────────────────
-
 function DistributeStepView({
   config,
   videoUrl,
+  selectedPlatforms,
+  selectedAssets,
   platformStatus,
-  onDistributeWechat,
-  onDistributeDouyin,
+  assetStatus,
+  history,
+  onDistributePlatform,
   onDistributeAll,
+  onExportAsset,
   onComplete,
 }: {
   config: DramaConfig;
   videoUrl: string | null;
+  selectedPlatforms: DistributionPlatform[];
+  selectedAssets: DeliveryAsset[];
   platformStatus: PlatformStatus;
-  onDistributeWechat: () => void;
-  onDistributeDouyin: () => void;
+  assetStatus: AssetStatus;
+  history: DistributionJob[];
+  onDistributePlatform: (platform: DistributionPlatform) => void;
   onDistributeAll: () => void;
+  onExportAsset: (asset: DeliveryAsset) => void;
   onComplete: () => void;
 }) {
-  const allDone =
-    platformStatus.wechat === "success" &&
-    platformStatus.douyin === "success";
+  const platformDone = selectedPlatforms.every(
+    (platform) => platformStatus[platform] === "success",
+  );
+  const assetDone =
+    selectedAssets.length === 0 ||
+    selectedAssets.every((asset) => assetStatus[asset] === "success");
+  const canComplete = platformDone && assetDone;
+
+  const visiblePlatforms = platformOptions.filter((item) =>
+    selectedPlatforms.includes(item.key),
+  );
+  const visibleAssets = deliveryAssetOptions.filter((item) =>
+    selectedAssets.includes(item.key),
+  );
 
   return (
-    <div className="animate-fade-in-up space-y-5">
-      {/* Video Preview */}
-      {videoUrl && (
-        <div className="group overflow-hidden rounded-2xl border border-[var(--line-soft)] bg-white transition-all duration-300 hover:border-[var(--line-medium)] hover:shadow-[var(--shadow-surface)]">
-          <div className="p-5">
-            <div className="flex items-center gap-4">
-              <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-[rgba(123,184,232,0.08)] transition-transform duration-300 group-hover:scale-105">
-                <FileVideo className="h-7 w-7 text-[#7bb8e8]" />
+    <div className="space-y-5 animate-fade-in-up">
+      <div className="grid gap-5 xl:grid-cols-[1.25fr_0.85fr]">
+        <SectionCard
+          title="主片与平台分发"
+          description="先确认生成结果，再并行把同一主片推送到目标平台。"
+        >
+          <div className="mb-5 rounded-[28px] border border-[var(--line-soft)] bg-[linear-gradient(135deg,rgba(123,184,232,0.10),rgba(255,255,255,1))] p-5">
+            <div className="flex flex-col gap-4 md:flex-row md:items-center">
+              <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-white shadow-[var(--shadow-card)]">
+                <MonitorPlay className="h-8 w-8 text-[#7bb8e8]" />
               </div>
               <div className="min-w-0 flex-1">
-                <p className="text-sm font-medium text-[hsl(var(--foreground))] truncate">
-                  {config.title || "短剧视频"}
+                <p className="text-lg font-medium text-[hsl(var(--foreground))]">
+                  {config.title || "未命名短剧交付片"}
                 </p>
-                <p className="text-xs text-[var(--text-subtle)] mt-0.5">
-                  {config.resolution} · {config.ratio} · {config.duration}秒
+                <p className="mt-1 text-sm text-[var(--text-subtle)]">
+                  {config.resolution} · {config.ratio} · {config.duration} 秒
                   {config.generateAudio ? " · 含音频" : ""}
+                  {config.watermark ? " · 含水印" : ""}
+                </p>
+                <p className="mt-2 text-sm leading-6 text-[var(--text-subtle)]">
+                  {config.description || "未填写分发说明，将按默认交付文案执行。"}
                 </p>
               </div>
-              <button
-                type="button"
-                className="shrink-0 inline-flex items-center gap-1.5 rounded-xl border border-[var(--line-medium)] px-4 py-2 text-xs font-medium text-[var(--text-subtle)] transition-all hover:border-[#7bb8e8] hover:text-[#7bb8e8] hover:bg-[rgba(123,184,232,0.04)]"
+              <a
+                href={videoUrl ?? "#"}
+                target="_blank"
+                rel="noreferrer"
+                className={`inline-flex items-center justify-center gap-2 rounded-2xl border px-4 py-2.5 text-sm font-medium transition-colors ${
+                  videoUrl
+                    ? "border-[var(--line-medium)] text-[hsl(var(--foreground))] hover:border-[#7bb8e8] hover:text-[#7bb8e8]"
+                    : "cursor-not-allowed border-[var(--line-soft)] text-[var(--text-faint)]"
+                }`}
               >
-                <ExternalLink className="h-3.5 w-3.5" />
-                预览
-              </button>
+                <ExternalLink className="h-4 w-4" />
+                打开预览
+              </a>
             </div>
           </div>
-        </div>
-      )}
 
-      {/* Platform Cards */}
-      <div className="grid gap-4 sm:grid-cols-2">
-        {[
-          {
-            key: "wechat" as const,
-            name: "微信视频号",
-            desc: "短剧媒资管理 API",
-            icon: <Smartphone className="h-5 w-5 text-green-500" />,
-            bg: "bg-[rgba(16,185,129,0.08)]",
-            steps: ["媒资上传", "剧目提审", "剧目授权"],
-            status: platformStatus.wechat,
-            onDistribute: onDistributeWechat,
-            successColor: "#10b981",
-          },
-          {
-            key: "douyin" as const,
-            name: "抖音",
-            desc: "抖音云媒资管理",
-            icon: <Share2 className="h-5 w-5 text-purple-500" />,
-            bg: "bg-[rgba(168,85,247,0.08)]",
-            steps: ["视频上传", "自动转码", "内容库送审"],
-            status: platformStatus.douyin,
-            onDistribute: onDistributeDouyin,
-            successColor: "#a855f7",
-          },
-        ].map((platform) => (
-          <div
-            key={platform.key}
-            className={`group overflow-hidden rounded-2xl border transition-all duration-300 ${
-              platform.status === "success"
-                ? "border-green-200 bg-[rgba(16,185,129,0.02)]"
-                : platform.status === "uploading"
-                  ? "border-[#7bb8e8]/30 bg-[rgba(123,184,232,0.02)]"
-                  : "border-[var(--line-soft)] bg-white hover:border-[var(--line-medium)] hover:shadow-[var(--shadow-surface)]"
-            }`}
-          >
-            <div className="p-5">
-              <div className="flex items-center gap-3 mb-4">
+          <div className="grid gap-4 md:grid-cols-2">
+            {visiblePlatforms.map((platform) => {
+              const PlatformIcon = platform.icon;
+              const status = platformStatus[platform.key];
+              const success = status === "success";
+              const running = status === "running";
+              const failed = status === "error";
+              return (
                 <div
-                  className={`flex h-11 w-11 items-center justify-center rounded-xl ${platform.bg} transition-transform duration-300 group-hover:scale-110`}
+                  key={platform.key}
+                  className={`rounded-[26px] border p-5 transition-all ${
+                    success
+                      ? "border-green-200 bg-green-50/50"
+                      : failed
+                        ? "border-rose-200 bg-rose-50/50"
+                        : running
+                          ? "border-[#7bb8e8]/30 bg-[rgba(123,184,232,0.04)]"
+                          : "border-[var(--line-soft)] bg-white"
+                  }`}
                 >
-                  {platform.icon}
+                  <div className="mb-4 flex items-center gap-3">
+                    <div className={`flex h-11 w-11 items-center justify-center rounded-xl ${platform.bg}`}>
+                      <PlatformIcon className={`h-5 w-5 ${platform.accent}`} />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-[hsl(var(--foreground))]">
+                        {platform.name}
+                      </p>
+                      <p className="text-xs text-[var(--text-subtle)]">
+                        {platform.desc}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="mb-5 space-y-2">
+                    {platform.steps.map((item, index) => {
+                      const done = success ? true : index === 0 || running;
+                      return (
+                        <div
+                          key={item}
+                          className="flex items-center gap-2 text-xs text-[var(--text-subtle)]"
+                        >
+                          {done ? (
+                            <Check className="h-3.5 w-3.5 text-green-500" />
+                          ) : (
+                            <Circle className="h-3.5 w-3.5 text-[var(--text-faint)]" />
+                          )}
+                          {item}
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => onDistributePlatform(platform.key)}
+                    disabled={running || success}
+                    className="inline-flex w-full items-center justify-center gap-2 rounded-2xl px-4 py-2.5 text-sm font-medium transition-all disabled:cursor-not-allowed disabled:opacity-60"
+                    style={{
+                      backgroundColor: success
+                        ? "rgba(16,185,129,0.12)"
+                        : failed
+                          ? "rgba(244,63,94,0.12)"
+                          : running
+                            ? "var(--muted)"
+                            : "var(--accent-light)",
+                      color: success
+                        ? "#16a34a"
+                        : failed
+                          ? "#e11d48"
+                          : running
+                            ? "var(--text-subtle)"
+                            : "#7bb8e8",
+                    }}
+                  >
+                    {status === "idle" && (
+                      <>
+                        <Send className="h-4 w-4" />
+                        分发到{platform.name}
+                      </>
+                    )}
+                    {status === "running" && (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        正在分发...
+                      </>
+                    )}
+                    {status === "success" && (
+                      <>
+                        <Check className="h-4 w-4" />
+                        分发完成
+                      </>
+                    )}
+                    {status === "error" && (
+                      <>
+                        <RefreshCw className="h-4 w-4" />
+                        重试分发
+                      </>
+                    )}
+                  </button>
                 </div>
-                <div>
-                  <p className="text-sm font-medium text-[hsl(var(--foreground))]">
-                    {platform.name}
-                  </p>
-                  <p className="text-xs text-[var(--text-subtle)]">
-                    {platform.desc}
-                  </p>
-                </div>
-              </div>
+              );
+            })}
+          </div>
 
-              <div className="mb-5 space-y-1.5">
-                {platform.steps.map((step, i) => {
-                  const isThirdStep = i === 2;
-                  const isStepDone =
-                    platform.status === "success"
-                      ? true
-                      : !isThirdStep;
+          <button
+            type="button"
+            onClick={onDistributeAll}
+            disabled={
+              selectedPlatforms.length === 0 ||
+              visiblePlatforms.some((platform) => platformStatus[platform.key] === "running")
+            }
+            className="mt-5 inline-flex w-full items-center justify-center gap-2.5 rounded-2xl bg-[#7bb8e8] px-6 py-3.5 text-sm font-medium text-white shadow-lg shadow-[rgba(123,184,232,0.25)] transition-all hover:bg-[#6aadd8] disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            <Video className="h-5 w-5" />
+            一键并行分发到全部平台
+          </button>
+        </SectionCard>
+
+        <div className="space-y-5">
+          <SectionCard
+            title="交付物导出"
+            description="按设计文档要求，把结构化内容并行发给外部协作链路。"
+          >
+            <div className="space-y-3">
+              {visibleAssets.length > 0 ? (
+                visibleAssets.map((asset) => {
+                  const AssetIcon = asset.icon;
+                  const status = assetStatus[asset.key];
                   return (
                     <div
-                      key={i}
-                      className="flex items-center gap-2 text-xs text-[var(--text-subtle)]"
+                      key={asset.key}
+                      className="rounded-2xl border border-[var(--line-soft)] bg-[var(--muted)]/35 p-4"
                     >
-                      {isStepDone ? (
-                        <Check className="h-3.5 w-3.5 shrink-0 text-green-500" />
-                      ) : (
-                        <Circle className="h-3.5 w-3.5 shrink-0 text-[var(--text-faint)]" />
-                      )}
-                      {step}
+                      <div className="flex items-start gap-3">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white">
+                          <AssetIcon className={`h-5 w-5 ${asset.accent}`} />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-medium text-[hsl(var(--foreground))]">
+                            {asset.label}
+                          </p>
+                          <p className="mt-1 text-xs leading-5 text-[var(--text-subtle)]">
+                            {asset.desc}
+                          </p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => onExportAsset(asset.key)}
+                        disabled={status === "running" || status === "success"}
+                        className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl border border-[var(--line-soft)] bg-white px-4 py-2.5 text-sm font-medium text-[hsl(var(--foreground))] transition-colors hover:border-[#7bb8e8] hover:text-[#7bb8e8] disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        {status === "idle" && "生成交付物"}
+                        {status === "running" && (
+                          <>
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                            正在导出...
+                          </>
+                        )}
+                        {status === "success" && (
+                          <>
+                            <Check className="h-4 w-4 text-green-500" />
+                            导出完成
+                          </>
+                        )}
+                        {status === "error" && (
+                          <>
+                            <RefreshCw className="h-4 w-4" />
+                            重试导出
+                          </>
+                        )}
+                      </button>
                     </div>
                   );
-                })}
-              </div>
-
-              <button
-                type="button"
-                onClick={platform.onDistribute}
-                disabled={platform.status !== "idle"}
-                className="inline-flex w-full items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium transition-all disabled:opacity-60 disabled:cursor-not-allowed"
-                style={{
-                  backgroundColor:
-                    platform.status === "success"
-                      ? `${platform.successColor}12`
-                      : platform.status === "uploading"
-                        ? "var(--muted)"
-                        : "var(--accent-light)",
-                  color:
-                    platform.status === "success"
-                      ? platform.successColor
-                      : platform.status === "uploading"
-                        ? "var(--text-subtle)"
-                        : "#7bb8e8",
-                }}
-              >
-                {platform.status === "idle" && (
-                  <>
-                    <Send className="h-4 w-4" />
-                    分发到{platform.name}
-                  </>
-                )}
-                {platform.status === "uploading" && (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    正在分发...
-                  </>
-                )}
-                {platform.status === "success" && (
-                  <>
-                    <Check className="h-4 w-4" />
-                    分发完成
-                  </>
-                )}
-              </button>
+                })
+              ) : (
+                <div className="rounded-2xl border border-dashed border-[var(--line-soft)] bg-[var(--muted)]/40 p-4 text-sm text-[var(--text-subtle)]">
+                  当前没有选择额外导出物，本次只执行平台分发。
+                </div>
+              )}
             </div>
-          </div>
-        ))}
+          </SectionCard>
+
+          <SectionCard
+            title="最近分发回执"
+            description="保留最近的分发任务，方便快速回看与对照。"
+          >
+            <div className="space-y-3">
+              {history.length > 0 ? (
+                history.slice(0, 4).map((job) => (
+                  <div
+                    key={job.id}
+                    className="rounded-2xl border border-[var(--line-soft)] bg-[var(--muted)]/30 p-4"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-medium text-[hsl(var(--foreground))]">
+                          {job.title}
+                        </p>
+                        <p className="mt-1 text-xs text-[var(--text-subtle)]">
+                          {job.platforms.join(" / ")} · {formatTime(job.updated_at)}
+                        </p>
+                      </div>
+                      <StatusChip
+                        label={job.status === "completed" ? "已完成" : job.status}
+                        tone={job.status === "completed" ? "success" : "neutral"}
+                      />
+                    </div>
+                    <p className="mt-2 text-xs leading-5 text-[var(--text-subtle)]">
+                      {job.description || "未填写备注。"}
+                    </p>
+                  </div>
+                ))
+              ) : (
+                <div className="rounded-2xl border border-dashed border-[var(--line-soft)] bg-[var(--muted)]/35 p-4 text-sm text-[var(--text-subtle)]">
+                  还没有历史回执，完成本次分发后会自动记录。
+                </div>
+              )}
+            </div>
+          </SectionCard>
+        </div>
       </div>
 
-      {/* Action Buttons */}
-      {!allDone && (
-        <button
-          type="button"
-          onClick={onDistributeAll}
-          disabled={
-            platformStatus.wechat === "uploading" ||
-            platformStatus.douyin === "uploading"
-          }
-          className="group relative inline-flex w-full items-center justify-center gap-2.5 overflow-hidden rounded-2xl bg-[#7bb8e8] px-6 py-3.5 text-sm font-medium text-white shadow-lg shadow-[rgba(123,184,232,0.25)] transition-all hover:bg-[#6aadd8] hover:shadow-xl hover:shadow-[rgba(123,184,232,0.3)] disabled:opacity-40 disabled:cursor-not-allowed"
-        >
-          <span className="absolute inset-0 bg-linear-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000 disabled:hidden" />
-          <Globe className="h-5 w-5" />
-          一键全平台分发
-        </button>
-      )}
-
-      {allDone && (
+      {canComplete && (
         <button
           type="button"
           onClick={onComplete}
-          className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-green-500 px-6 py-3.5 text-sm font-medium text-white shadow-lg shadow-[rgba(16,185,129,0.25)] transition-all hover:bg-green-600 hover:shadow-xl"
+          className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-green-500 px-6 py-3.5 text-sm font-medium text-white shadow-lg shadow-[rgba(16,185,129,0.25)] transition-all hover:bg-green-600"
         >
           <CheckCircle2 className="h-5 w-5" />
-          完成，查看结果
+          全部交付完成，查看结果
         </button>
       )}
     </div>
   );
 }
 
-// ── Complete Step ────────────────────────────────────────
-
-function CompleteStep({ onReset }: { onReset: () => void }) {
+function CompleteStep({
+  selectedPlatforms,
+  selectedAssets,
+  onReset,
+  onOpenTasks,
+  onOpenAssets,
+}: {
+  selectedPlatforms: DistributionPlatform[];
+  selectedAssets: DeliveryAsset[];
+  onReset: () => void;
+  onOpenTasks: () => void;
+  onOpenAssets: () => void;
+}) {
   return (
     <div className="flex items-center justify-center py-8">
-      <div className="w-full max-w-lg animate-fade-in-up">
-        <div className="rounded-2xl border border-[var(--line-soft)] bg-white p-8 text-center shadow-[var(--shadow-surface)]">
+      <div className="w-full max-w-3xl animate-fade-in-up">
+        <div className="rounded-[32px] border border-[var(--line-soft)] bg-white p-8 text-center shadow-[var(--shadow-surface)]">
           <div className="mx-auto mb-6 flex h-24 w-24 items-center justify-center">
-            <div className="absolute h-24 w-24 rounded-full bg-green-50 animate-scale-in" />
+            <div className="absolute h-24 w-24 rounded-full bg-green-50" />
             <div className="relative flex h-16 w-16 items-center justify-center rounded-full bg-green-100">
               <Check className="h-8 w-8 text-green-500" />
             </div>
           </div>
 
-          <h2 className="font-serif text-2xl font-semibold text-[hsl(var(--foreground))] mb-2">
-            制作与分发完成！
+          <h2 className="font-serif text-3xl font-semibold text-[hsl(var(--foreground))]">
+            分发与交付已完成
           </h2>
-          <p className="mx-auto mb-8 max-w-md text-sm leading-6 text-[var(--text-subtle)]">
-            短剧视频已成功生成并分发至微信视频号和抖音平台。
-            请前往各平台查看审核状态。
+          <p className="mx-auto mt-2 max-w-2xl text-sm leading-6 text-[var(--text-subtle)]">
+            已完成 {selectedPlatforms.length} 个平台分发，并生成 {selectedAssets.length} 项交付物。
+            现在可以前往任务中心看审核状态，或去资产页管理导出结果。
           </p>
 
-          <div className="mx-auto mb-8 grid max-w-xs grid-cols-2 gap-4">
-            <div className="rounded-xl border border-[var(--line-soft)] bg-white p-5 text-center transition-all hover:border-green-200 hover:shadow-sm">
-              <Smartphone className="mx-auto mb-2 h-6 w-6 text-green-500" />
-              <p className="text-xs font-medium text-[hsl(var(--foreground))]">
-                微信
+          <div className="mx-auto mt-8 grid max-w-2xl gap-4 sm:grid-cols-3">
+            <div className="rounded-2xl border border-[var(--line-soft)] bg-[var(--muted)]/40 p-5">
+              <Video className="mx-auto h-6 w-6 text-[#7bb8e8]" />
+              <p className="mt-2 text-2xl font-semibold text-[hsl(var(--foreground))]">
+                {selectedPlatforms.length}
               </p>
-              <p className="text-xs text-green-500 mt-0.5">分发成功</p>
+              <p className="text-xs text-[var(--text-subtle)]">平台回执完成</p>
             </div>
-            <div className="rounded-xl border border-[var(--line-soft)] bg-white p-5 text-center transition-all hover:border-purple-200 hover:shadow-sm">
-              <Share2 className="mx-auto mb-2 h-6 w-6 text-purple-500" />
-              <p className="text-xs font-medium text-[hsl(var(--foreground))]">
-                抖音
+            <div className="rounded-2xl border border-[var(--line-soft)] bg-[var(--muted)]/40 p-5">
+              <FileJson className="mx-auto h-6 w-6 text-emerald-500" />
+              <p className="mt-2 text-2xl font-semibold text-[hsl(var(--foreground))]">
+                {selectedAssets.length}
               </p>
-              <p className="text-xs text-purple-500 mt-0.5">分发成功</p>
+              <p className="text-xs text-[var(--text-subtle)]">导出物已交付</p>
+            </div>
+            <div className="rounded-2xl border border-[var(--line-soft)] bg-[var(--muted)]/40 p-5">
+              <ShieldCheck className="mx-auto h-6 w-6 text-green-500" />
+              <p className="mt-2 text-2xl font-semibold text-[hsl(var(--foreground))]">
+                100%
+              </p>
+              <p className="text-xs text-[var(--text-subtle)]">流程完成率</p>
             </div>
           </div>
 
-          <button
-            type="button"
-            onClick={onReset}
-            className="inline-flex items-center gap-2 rounded-2xl bg-[#7bb8e8] px-6 py-3 text-sm font-medium text-white shadow-lg shadow-[rgba(123,184,232,0.25)] transition-all hover:bg-[#6aadd8] hover:shadow-xl"
-          >
-            <RefreshCw className="h-4 w-4" />
-            制作下一部短剧
-            <ArrowRight className="h-4 w-4" />
-          </button>
+          <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-center">
+            <button
+              type="button"
+              onClick={onOpenTasks}
+              className="inline-flex items-center justify-center gap-2 rounded-2xl border border-[var(--line-medium)] px-5 py-3 text-sm font-medium text-[hsl(var(--foreground))] transition-colors hover:border-[#7bb8e8] hover:text-[#7bb8e8]"
+            >
+              查看任务中心
+            </button>
+            <button
+              type="button"
+              onClick={onOpenAssets}
+              className="inline-flex items-center justify-center gap-2 rounded-2xl border border-[var(--line-medium)] px-5 py-3 text-sm font-medium text-[hsl(var(--foreground))] transition-colors hover:border-[#7bb8e8] hover:text-[#7bb8e8]"
+            >
+              前往资产页
+            </button>
+            <button
+              type="button"
+              onClick={onReset}
+              className="inline-flex items-center justify-center gap-2 rounded-2xl bg-[#7bb8e8] px-5 py-3 text-sm font-medium text-white transition-colors hover:bg-[#6aadd8]"
+            >
+              <RefreshCw className="h-4 w-4" />
+              继续分发下一部
+              <ArrowRight className="h-4 w-4" />
+            </button>
+          </div>
         </div>
       </div>
     </div>
   );
 }
 
-// ── Main Component ───────────────────────────────────────
-
 export default function WorkbenchDistributeSection() {
+  const navigate = useNavigate();
+  const addToast = useToastStore((state) => state.addToast);
+  const scripts = useScriptStore((state) => state.scripts);
+  const currentScriptId = useScriptStore((state) => state.currentScriptId);
+  const projects = useProjectStore((state) => state.projects);
+  const credits = useAuthStore((state) => state.credits);
+
+  const currentScript = useMemo(
+    () => scripts.find((script) => script.id === currentScriptId),
+    [scripts, currentScriptId],
+  );
+  const currentProject = useMemo(
+    () => projects.find((project) => project.id === currentScript?.projectId),
+    [projects, currentScript?.projectId],
+  );
+
   const [step, setStep] = useState<DistributeStep>("select");
-  const [config, setConfig] = useState<DramaConfig>({
-    title: "",
-    description: "",
-    resolution: "1080p",
-    ratio: "9:16",
-    duration: 60,
-    watermark: true,
-    generateAudio: true,
-  });
+  const [config, setConfig] = useState<DramaConfig>(defaultConfig);
   const [generating, setGenerating] = useState(false);
   const [generateProgress, setGenerateProgress] = useState(0);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
-  const [platformStatus, setPlatformStatus] = useState<PlatformStatus>({
-    wechat: "idle",
-    douyin: "idle",
-  });
-  const [showConfig, setShowConfig] = useState(false);
-  const addToast = useToastStore((s) => s.addToast);
+  const [showConfig, setShowConfig] = useState(true);
   const [distributionJobId, setDistributionJobId] = useState<string | null>(null);
+  const [selectedPlatforms, setSelectedPlatforms] = useState<DistributionPlatform[]>([
+    "wechat",
+    "douyin",
+  ]);
+  const [selectedAssets, setSelectedAssets] = useState<DeliveryAsset[]>([
+    "yaml",
+    "pdf",
+  ]);
+  const [platformStatus, setPlatformStatus] =
+    useState<PlatformStatus>(defaultPlatformStatus);
+  const [assetStatus, setAssetStatus] = useState<AssetStatus>(defaultAssetStatus);
+  const [history, setHistory] = useState<DistributionJob[]>([]);
 
-  const scripts = useScriptStore((s) => s.scripts);
-  const currentScriptId = useScriptStore((s) => s.currentScriptId);
-  const currentScript = scripts.find((s) => s.id === currentScriptId);
+  useEffect(() => {
+    if (!currentScript?.projectId) {
+      return;
+    }
+
+    let cancelled = false;
+    void (async () => {
+      try {
+        const jobs = await fetchDistributionJobs(currentScript.projectId);
+        if (!cancelled) {
+          setHistory(jobs);
+        }
+      } catch {
+        if (!cancelled) {
+          setHistory([]);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [currentScript?.projectId]);
+
+  const togglePlatform = (platform: DistributionPlatform) => {
+    setSelectedPlatforms((current) =>
+      current.includes(platform)
+        ? current.filter((item) => item !== platform)
+        : [...current, platform],
+    );
+  };
+
+  const toggleAsset = (asset: DeliveryAsset) => {
+    setSelectedAssets((current) =>
+      current.includes(asset)
+        ? current.filter((item) => item !== asset)
+        : [...current, asset],
+    );
+  };
+
+  const refreshHistory = async () => {
+    if (!currentScript?.projectId) return;
+    try {
+      const jobs = await fetchDistributionJobs(currentScript.projectId);
+      setHistory(jobs);
+    } catch {
+      // keep current history
+    }
+  };
 
   const handleGenerateVideo = async () => {
     if (!currentScript?.projectId) {
-      addToast({ type: "warning", title: "当前剧本未绑定项目" });
+      addToast({
+        type: "warning",
+        title: "当前剧本未绑定项目",
+        message: "请先完成导入与剧本生成，再进入一键分发页面。",
+      });
       return;
     }
+    if (selectedPlatforms.length === 0) {
+      addToast({
+        type: "warning",
+        title: "至少选择一个分发平台",
+      });
+      return;
+    }
+
     setGenerating(true);
     setStep("generate");
     setGenerateProgress(0);
 
-    const interval = setInterval(() => {
+    const interval = window.setInterval(() => {
       setGenerateProgress((prev) => {
-        if (prev >= 100) {
-          clearInterval(interval);
-          return 100;
-        }
-        return prev + Math.random() * 15;
+        if (prev >= 92) return prev;
+        return Math.min(prev + Math.random() * 18, 92);
       });
-    }, 2000);
+    }, 1200);
 
-    setTimeout(async () => {
-      clearInterval(interval);
+    try {
+      await new Promise((resolve) => window.setTimeout(resolve, 3200));
+      const job = await createDistributionJob({
+        project_id: currentScript.projectId,
+        script_id: currentScript.id,
+        title: config.title || currentScript.title,
+        description: config.description,
+        resolution: config.resolution,
+        ratio: config.ratio,
+        duration: config.duration,
+        watermark: config.watermark,
+        generate_audio: config.generateAudio,
+        platforms: selectedPlatforms,
+      });
+
+      window.clearInterval(interval);
       setGenerateProgress(100);
-      setGenerating(false);
-      try {
-        const job = await createDistributionJob({
-          project_id: currentScript.projectId,
-          script_id: currentScript.id,
-          title: config.title || currentScript.title,
-          description: config.description,
-          resolution: config.resolution,
-          ratio: config.ratio,
-          duration: config.duration,
-          watermark: config.watermark,
-          generate_audio: config.generateAudio,
-          platforms: ["wechat", "douyin"],
-        });
-        setDistributionJobId(job.id);
-        setVideoUrl(job.video_url ?? "https://example.com/generated-drama-video.mp4");
-      } catch (error) {
-        addToast({
-          type: "error",
-          title: "创建分发任务失败",
-          message: error instanceof Error ? error.message : "未知错误",
-        });
-      }
+      setDistributionJobId(job.id);
+      setVideoUrl(job.video_url ?? "https://example.com/generated-drama-video.mp4");
+      setPlatformStatus(defaultPlatformStatus);
+      setAssetStatus(defaultAssetStatus);
+      setHistory((prev) => [job, ...prev].slice(0, 8));
       setStep("distribute");
-    }, 15000);
+      addToast({
+        type: "success",
+        title: "视频主片已生成",
+        message: "可以开始平台分发与导出物交付。",
+      });
+    } catch (error) {
+      window.clearInterval(interval);
+      setStep("select");
+      addToast({
+        type: "error",
+        title: "创建分发任务失败",
+        message: error instanceof Error ? error.message : "未知错误",
+      });
+    } finally {
+      setGenerating(false);
+      setGenerateProgress(100);
+    }
   };
 
-  const handleDistributeToWechat = async () => {
-    setPlatformStatus((prev) => ({ ...prev, wechat: "uploading" }));
-    if (currentScript?.projectId && distributionJobId) {
-      await dispatchDistributionJob(currentScript.projectId, distributionJobId, ["wechat"]);
+  const handleDistributePlatform = async (platform: DistributionPlatform) => {
+    if (!currentScript?.projectId || !distributionJobId) {
+      addToast({
+        type: "warning",
+        title: "缺少分发任务",
+        message: "请先完成主片生成。",
+      });
+      return;
     }
-    await new Promise((r) => setTimeout(r, 1000));
-    setPlatformStatus((prev) => ({ ...prev, wechat: "success" }));
-  };
 
-  const handleDistributeToDouyin = async () => {
-    setPlatformStatus((prev) => ({ ...prev, douyin: "uploading" }));
-    if (currentScript?.projectId && distributionJobId) {
-      await dispatchDistributionJob(currentScript.projectId, distributionJobId, ["douyin"]);
+    setPlatformStatus((current) => ({ ...current, [platform]: "running" }));
+    try {
+      await dispatchDistributionJob(currentScript.projectId, distributionJobId, [
+        platform,
+      ]);
+      setPlatformStatus((current) => ({ ...current, [platform]: "success" }));
+      addToast({
+        type: "success",
+        title: `${platform === "wechat" ? "微信视频号" : "抖音"}分发完成`,
+      });
+      await refreshHistory();
+    } catch (error) {
+      setPlatformStatus((current) => ({ ...current, [platform]: "error" }));
+      addToast({
+        type: "error",
+        title: "平台分发失败",
+        message: error instanceof Error ? error.message : "未知错误",
+      });
     }
-    await new Promise((r) => setTimeout(r, 1000));
-    setPlatformStatus((prev) => ({ ...prev, douyin: "success" }));
   };
 
   const handleDistributeAll = async () => {
-    await Promise.all([handleDistributeToWechat(), handleDistributeToDouyin()]);
-    setStep("complete");
+    await Promise.all(
+      selectedPlatforms.map(async (platform) => {
+        if (platformStatus[platform] !== "success") {
+          await handleDistributePlatform(platform);
+        }
+      }),
+    );
+  };
+
+  const handleExportAsset = async (asset: DeliveryAsset) => {
+    if (!currentScript?.projectId) {
+      addToast({
+        type: "warning",
+        title: "当前项目不可导出",
+      });
+      return;
+    }
+
+    setAssetStatus((current) => ({ ...current, [asset]: "running" }));
+    try {
+      await createProjectExport(currentScript.projectId, asset, currentScript.id);
+      await fetchProjectExports(currentScript.projectId);
+      setAssetStatus((current) => ({ ...current, [asset]: "success" }));
+      addToast({
+        type: "success",
+        title: `${deliveryAssetOptions.find((item) => item.key === asset)?.label ?? asset}已生成`,
+      });
+    } catch (error) {
+      setAssetStatus((current) => ({ ...current, [asset]: "error" }));
+      addToast({
+        type: "error",
+        title: "交付物导出失败",
+        message: error instanceof Error ? error.message : "未知错误",
+      });
+    }
+  };
+
+  const resetFlow = () => {
+    setStep("select");
+    setConfig(defaultConfig);
+    setGenerating(false);
+    setGenerateProgress(0);
+    setVideoUrl(null);
+    setDistributionJobId(null);
+    setPlatformStatus(defaultPlatformStatus);
+    setAssetStatus(defaultAssetStatus);
+    setShowConfig(true);
   };
 
   return (
     <div className="flex h-full flex-col overflow-y-auto p-6">
-      {/* Header */}
-      <div className="mb-6">
-        <p className="text-xs uppercase tracking-[0.24em] text-[var(--text-faint)] mb-1.5">
-          <span className="inline-flex items-center gap-1.5">
-            <Video className="h-3.5 w-3.5 text-[#7bb8e8]" />
-            一键分发
-          </span>
-        </p>
-        <h1 className="font-serif text-3xl font-semibold tracking-tight text-[hsl(var(--foreground))]">
-          一键制作短剧
-        </h1>
-        <p className="mt-1.5 max-w-xl text-sm leading-6 text-[var(--text-subtle)]">
-          基于火山方舟 Seedance 视频生成模型，将结构化剧本转化为竖屏短剧视频，
-          一键分发至抖音和微信视频号。
-        </p>
+      <div className="mb-6 rounded-[32px] border border-[var(--line-soft)] bg-[linear-gradient(135deg,rgba(123,184,232,0.13),rgba(255,255,255,0.95))] p-6">
+        <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
+          <div>
+            <p className="text-xs uppercase tracking-[0.24em] text-[var(--text-faint)]">
+              <span className="inline-flex items-center gap-1.5">
+                <Video className="h-3.5 w-3.5 text-[#7bb8e8]" />
+                一键分发
+              </span>
+            </p>
+            <h1 className="mt-2 font-serif text-3xl font-semibold tracking-tight text-[hsl(var(--foreground))]">
+              短剧交付与平台分发控制台
+            </h1>
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--text-subtle)]">
+              把视频主片、平台投放和结构化交付物放在同一条流水线上处理。
+              先生成，再并行分发，再导出给外部协作团队。
+            </p>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-3">
+            <div className="rounded-2xl border border-white/70 bg-white/80 px-4 py-3 backdrop-blur">
+              <p className="text-xs uppercase tracking-[0.18em] text-[var(--text-faint)]">
+                平台
+              </p>
+              <p className="mt-1 text-2xl font-semibold text-[hsl(var(--foreground))]">
+                {selectedPlatforms.length}
+              </p>
+            </div>
+            <div className="rounded-2xl border border-white/70 bg-white/80 px-4 py-3 backdrop-blur">
+              <p className="text-xs uppercase tracking-[0.18em] text-[var(--text-faint)]">
+                导出物
+              </p>
+              <p className="mt-1 text-2xl font-semibold text-[hsl(var(--foreground))]">
+                {selectedAssets.length}
+              </p>
+            </div>
+            <div className="rounded-2xl border border-white/70 bg-white/80 px-4 py-3 backdrop-blur">
+              <p className="text-xs uppercase tracking-[0.18em] text-[var(--text-faint)]">
+                任务回执
+              </p>
+              <p className="mt-1 text-2xl font-semibold text-[hsl(var(--foreground))]">
+                {history.length}
+              </p>
+            </div>
+          </div>
+        </div>
       </div>
 
-      {/* Step Progress */}
       <StepIndicator current={step} />
 
-      {/* Step Content */}
       {step === "select" && (
         <SelectStep
           config={config}
           setConfig={setConfig}
           currentScript={currentScript}
+          currentProjectTitle={currentProject?.title}
+          credits={credits}
+          selectedPlatforms={selectedPlatforms}
+          selectedAssets={selectedAssets}
           showConfig={showConfig}
           setShowConfig={setShowConfig}
+          togglePlatform={togglePlatform}
+          toggleAsset={toggleAsset}
           onStart={handleGenerateVideo}
         />
       )}
@@ -920,6 +1432,8 @@ export default function WorkbenchDistributeSection() {
         <GenerateStep
           generateProgress={generateProgress}
           generating={generating}
+          selectedPlatforms={selectedPlatforms}
+          selectedAssets={selectedAssets}
         />
       )}
 
@@ -927,30 +1441,35 @@ export default function WorkbenchDistributeSection() {
         <DistributeStepView
           config={config}
           videoUrl={videoUrl}
+          selectedPlatforms={selectedPlatforms}
+          selectedAssets={selectedAssets}
           platformStatus={platformStatus}
-          onDistributeWechat={handleDistributeToWechat}
-          onDistributeDouyin={handleDistributeToDouyin}
+          assetStatus={assetStatus}
+          history={currentScript?.projectId ? history : []}
+          onDistributePlatform={handleDistributePlatform}
           onDistributeAll={handleDistributeAll}
+          onExportAsset={handleExportAsset}
           onComplete={() => setStep("complete")}
         />
       )}
 
       {step === "complete" && (
-        <CompleteStep onReset={() => {
-          setStep("select");
-          setConfig({
-            title: "",
-            description: "",
-            resolution: "1080p",
-            ratio: "9:16",
-            duration: 60,
-            watermark: true,
-            generateAudio: true,
-          });
-          setVideoUrl(null);
-          setPlatformStatus({ wechat: "idle", douyin: "idle" });
-          setShowConfig(false);
-        }} />
+        <CompleteStep
+          selectedPlatforms={selectedPlatforms}
+          selectedAssets={selectedAssets}
+          onReset={resetFlow}
+          onOpenTasks={() => navigate("/tasks")}
+          onOpenAssets={() => navigate("/assets")}
+        />
+      )}
+
+      {!currentScript && (
+        <div className="mt-5 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
+          <div className="flex items-start gap-2">
+            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+            当前还没有可分发的剧本。请先前往导入文本或工作台完成剧本生成。
+          </div>
+        </div>
       )}
     </div>
   );

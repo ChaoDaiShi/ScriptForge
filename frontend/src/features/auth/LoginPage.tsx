@@ -77,8 +77,8 @@ export default function LoginPage() {
             一键生成短剧。
           </h1>
           <p className="mt-4 text-base leading-relaxed text-[var(--text-subtle)]">
-            导入小说 → AI 结构化 → 生成短剧脚本 → 
-            多平台分发。ScriptForge 让创意直达观众。
+            导入小说 → AI 结构化 → 生成短剧脚本 → 多平台分发。ScriptForge
+            让创意直达观众。
           </p>
 
           <div className="mt-10 space-y-4">
@@ -169,7 +169,9 @@ export default function LoginPage() {
                   type={showPassword ? "text" : "password"}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder={mode === "register" ? "至少 6 位密码" : "输入密码"}
+                  placeholder={
+                    mode === "register" ? "至少 6 位密码" : "输入密码"
+                  }
                   required
                   minLength={6}
                   className="w-full rounded-xl border border-[var(--line-medium)] bg-white py-2.5 pl-10 pr-10 text-sm text-[hsl(var(--foreground))] placeholder:text-[var(--text-subtle)] outline-none transition-all focus:border-[#7bb8e8] focus:ring-2 focus:ring-[rgba(123,184,232,0.15)]"

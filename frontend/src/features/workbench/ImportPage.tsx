@@ -182,7 +182,7 @@ export default function ImportPage() {
       /^[Vv]ol\.\s*\d+/,
       // 数字开头的格式
       /^\d+\s*[章节部回卷集]/,
-      /^\d+[\.\-\s][章节部回卷集]?/,
+      /^\d+[.\s-][章节部回卷集]?/,
     ];
 
     // 需要过滤的关键词
@@ -418,14 +418,14 @@ export default function ImportPage() {
 
     // 为每个章节提取内容
     const chaptersWithContent = filteredSelectedChapterList.map((ch, idx) => {
-      let content = '';
-      if (ch.startPos !== undefined && ch.endPos !== undefined) {
-        content = pasteContent.slice(ch.startPos, ch.endPos);
-      } else {
-        // 如果没有位置信息，尝试从文本中提取
-        const lines = pasteContent.split('\n');
-        content = lines.slice((ch.index - 1) * 100, ch.index * 100).join('\n') || ch.title;
-      }
+      const content =
+        ch.startPos !== undefined && ch.endPos !== undefined
+          ? pasteContent.slice(ch.startPos, ch.endPos)
+          : (() => {
+              // 如果没有位置信息，尝试从文本中提取
+              const lines = pasteContent.split('\n');
+              return lines.slice((ch.index - 1) * 100, ch.index * 100).join('\n') || ch.title;
+            })();
 
       return {
         index: idx + 1,

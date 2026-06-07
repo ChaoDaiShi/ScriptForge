@@ -132,6 +132,8 @@ export interface AuthUser {
   id: string;
   email: string;
   created_at: string;
+  credits: number;
+  credits_used: number;
 }
 
 export interface AuthPayload {
@@ -217,6 +219,23 @@ export async function loginWithEmail(payload: { email: string; password: string 
 
 export async function fetchMe() {
   const response = await apiJson<AuthUser>("auth/me");
+  return response.data;
+}
+
+export async function fetchCredits() {
+  const response = await apiJson<{ credits: number; credits_used: number }>("auth/credits");
+  return response.data;
+}
+
+export async function redeemCredits(code: string) {
+  const response = await apiJson<{ credits: number; credits_used: number; message: string }>(
+    "auth/credits/redeem",
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ code }),
+    },
+  );
   return response.data;
 }
 

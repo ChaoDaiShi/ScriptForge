@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import { loginWithEmail, registerWithEmail, fetchMe } from "@/lib/api";
+import { loginWithEmail, registerWithEmail, fetchMe, fetchCredits, redeemCredits } from "@/lib/api";
 import type { AuthUser } from "@/lib/api";
 
 interface AuthState {
@@ -10,6 +10,8 @@ interface AuthState {
   hasSkipped: boolean;
   loading: boolean;
   error: string | null;
+  credits: number;
+  creditsUsed: number;
 
   login: (email: string, password: string) => Promise<void>;
   register: (email: string, password: string) => Promise<void>;
@@ -17,19 +19,25 @@ interface AuthState {
   skipAuth: () => void;
   restoreSession: () => Promise<void>;
   clearError: () => void;
+  refreshCredits: () => Promise<void>;
+  redeemCode: (code: string) => Promise<string>;
+  useCredit: () => boolean;
 }
 
 export const useAuthStore = create<AuthState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       user: null,
       token: null,
       isLoggedIn: false,
       hasSkipped: false,
       loading: false,
       error: null,
+      credits: 0,
+      creditsUsed: 0,
 
       login: async (email, password) => {
+        set({ loading: true, error: null });
         try {
           const payload = await loginWithEmail({ email, password });
           localStorage.setItem(
@@ -42,6 +50,8 @@ export const useAuthStore = create<AuthState>()(
             isLoggedIn: true,
             hasSkipped: false,
             loading: false,
+            credits: payload.user.credits ?? 0,
+            creditsUsed: payload.user.credits_used ?? 0,
           });
         } catch (err) {
           set({
@@ -66,6 +76,8 @@ export const useAuthStore = create<AuthState>()(
             isLoggedIn: true,
             hasSkipped: false,
             loading: false,
+            credits: payload.user.credits ?? 0,
+            creditsUsed: payload.user.credits_used ?? 0,
           });
         } catch (err) {
           set({
@@ -78,7 +90,7 @@ export const useAuthStore = create<AuthState>()(
 
       logout: () => {
         localStorage.removeItem("scriptforge-auth");
-        set({ user: null, token: null, isLoggedIn: false });
+        set({ user: null, token: null, isLoggedIn: false, credits: 0, creditsUsed: 0 });
       },
 
       skipAuth: () => {
@@ -96,20 +108,47 @@ export const useAuthStore = create<AuthState>()(
           };
           if (parsed.token) {
             set({ token: parsed.token });
-            // Try to verify the session with server
             const user = await fetchMe();
-            set({ user, isLoggedIn: true });
+            set({
+              user,
+              isLoggedIn: true,
+              credits: user.credits ?? 0,
+              creditsUsed: user.credits_used ?? 0,
+            });
           } else if (parsed.user) {
             set({ user: parsed.user as AuthUser });
           }
         } catch {
-          // Token invalid, clear it
           localStorage.removeItem("scriptforge-auth");
-          set({ user: null, token: null, isLoggedIn: false });
+          set({ user: null, token: null, isLoggedIn: false, credits: 0, creditsUsed: 0 });
         }
       },
 
       clearError: () => set({ error: null }),
+
+      refreshCredits: async () => {
+        try {
+          const data = await fetchCredits();
+          set({ credits: data.credits, creditsUsed: data.credits_used });
+        } catch {
+          // silently fail
+        }
+      },
+
+      redeemCode: async (code: string) => {
+        const data = await redeemCredits(code);
+        await get().refreshCredits?.();
+        return data.message;
+      },
+
+      useCredit: () => {
+        const state = get();
+        if (state.credits > 0) {
+          set({ credits: state.credits - 1, creditsUsed: state.creditsUsed + 1 });
+          return true;
+        }
+        return false;
+      },
     }),
     {
       name: "auth-store",
@@ -118,6 +157,8 @@ export const useAuthStore = create<AuthState>()(
         token: state.token,
         isLoggedIn: state.isLoggedIn,
         hasSkipped: state.hasSkipped,
+        credits: state.credits,
+        creditsUsed: state.creditsUsed,
       }),
     },
   ),

@@ -4,11 +4,13 @@ import Layout from "@/components/layout/Layout";
 import AssetsPage from "@/features/workbench/AssetsPage";
 import TasksPage from "@/features/workbench/TasksPage";
 import Workbench from "@/features/workbench/Workbench";
+import DistributePage from "@/features/workbench/DistributePage";
 import ImportPage from "@/features/workbench/ImportPage";
 import InsightsPage from "@/features/workbench/InsightsPage";
 import DashboardPage from "@/features/workbench/DashboardPage";
 import SettingsPage from "@/features/workbench/SettingsPage";
 import LoginPage from "@/features/auth/LoginPage";
+import RechargePage from "@/features/auth/RechargePage";
 import ToastContainer from "@/components/ui/ToastContainer";
 import { useAuthStore } from "@/store/useAuthStore";
 
@@ -43,6 +45,8 @@ function App() {
           <Route path="import" element={<ImportPage />} />
           <Route path="tasks" element={<TasksPage />} />
           <Route path="assets" element={<AssetsPage />} />
+          <Route path="distribute" element={<DistributePage />} />
+          <Route path="recharge" element={<RechargePage />} />
           <Route path="insights" element={<InsightsPage />} />
           <Route path="dashboard" element={<DashboardPage />} />
           <Route path="settings" element={<SettingsPage />} />
