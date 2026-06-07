@@ -82,6 +82,7 @@ export default function Workbench() {
   const [copiedYaml, setCopiedYaml] = useState(false);
   const [selectedChapterIndex, setSelectedChapterIndex] = useState<number | null>(null);
   const [showImportPanel, setShowImportPanel] = useState(false);
+  const [showEditor, setShowEditor] = useState(false);
   const [importText, setImportText] = useState("");
   const [dragOver, setDragOver] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
@@ -106,7 +107,10 @@ export default function Workbench() {
   );
   const setSelectedChapter = useNovelStore((s) => s.setSelectedChapter);
 
-  const hasData = !!currentScript && currentScript.episodes.length > 0 && currentScript.sourceText;
+  const hasData = !!currentScript && currentScript.sourceText;
+  const hasScenes = !!currentScript && currentScript.episodes.length > 0 &&
+    currentScript.episodes[0].scenes.length > 0 &&
+    currentScript.episodes[0].scenes.some(s => (s.intent && s.intent.trim()) || (s.code && s.code.trim()) || s.title !== "等待处理");
   const hasNovelData = !!currentNovel && currentNovel.chapters.length > 0;
 
   const ALLOWED_EXTENSIONS = [".txt", ".md", ".doc", ".docx"];
@@ -503,7 +507,7 @@ episode:
             icon={<ListTree className="h-3 w-3" />}
           >
             <div className="space-y-3">
-              {hasData && currentScript?.episodes[0]?.scenes && currentScript.episodes[0].scenes.length > 0 ? (
+              {hasScenes && currentScript?.episodes[0]?.scenes && currentScript.episodes[0].scenes.length > 0 ? (
                 currentScript.episodes[0].scenes.slice(0, 4).map((scene, i) => (
                   <div key={scene.id} className="flex gap-3">
                     <div className="flex flex-col items-center">
@@ -567,14 +571,25 @@ episode:
                     : "暂无活跃项目"}
                 </p>
               </div>
-              <span
-                className={`badge ${hasData ? "badge-primary" : "badge-muted"}`}
-              >
-                {hasData ? "已启用" : "等待导入"}
-              </span>
+              <div className="flex items-center gap-2">
+                {hasData && (
+                  <button
+                    type="button"
+                    onClick={() => setShowEditor(!showEditor)}
+                    className="px-3 py-1 rounded-md text-xs bg-(--accent-soft) text-white hover:bg-(--accent-soft)/90 transition-colors"
+                  >
+                    {showEditor ? "AI转换" : "编辑器"}
+                  </button>
+                )}
+                <span
+                  className={`badge ${hasData ? "badge-primary" : "badge-muted"}`}
+                >
+                  {hasData ? "已启用" : "等待导入"}
+                </span>
+              </div>
             </div>
 
-            {hasData && currentScript?.episodes[0]?.scenes && currentScript.episodes[0].scenes.length > 0 ? (
+            {showEditor && hasScenes && currentScript?.episodes[0]?.scenes && currentScript.episodes[0].scenes.length > 0 ? (
               <div className="space-y-3 mt-4">
                 {currentScript.episodes[0].scenes.map((scene, i) => (
                   <div
@@ -611,7 +626,7 @@ episode:
           </div>
 
           {/* Empty or Scene Detail */}
-          {hasData && currentScript?.episodes[0]?.scenes && currentScript.episodes[0].scenes.length > 0 ? (
+          {showEditor && hasScenes && currentScript?.episodes[0]?.scenes && currentScript.episodes[0].scenes.length > 0 ? (
             <div className="flex-1 space-y-3">
               {/* Current Scene Detail */}
               <div className="rounded-xl border border-(--accent-soft)/30 bg-(--accent-light) px-4 py-3">
@@ -1062,60 +1077,122 @@ function AIConvertPanel() {
   const [processedText, setProcessedText] = useState("");
   const [adaptType, setAdaptType] = useState<"short" | "long">("long");
   const [completedSteps, setCompletedSteps] = useState<Set<string>>(new Set());
+  const [isComplete, setIsComplete] = useState(false);
   const novels = useNovelStore((s) => s.novels);
   const currentNovelId = useNovelStore((s) => s.currentNovelId);
   const currentNovel = novels.find(n => n.id === currentNovelId);
   const { addToast } = useToastStore();
+  const upsertScript = useScriptStore((s) => s.upsertScript);
+  const scripts = useScriptStore((s) => s.scripts);
+  const currentScriptId = useScriptStore((s) => s.currentScriptId);
+  const currentScript = scripts.find(s => s.id === currentScriptId);
 
   const originalText = currentNovel?.fullText || "";
+  const displayText = processedText || originalText;
+
+  const apiBase = import.meta.env.VITE_API_URL || "http://localhost:8000";
+
+  const callApi = async (endpoint: string, text: string) => {
+    try {
+      const response = await fetch(`${apiBase}/api/workbench/process/${endpoint}`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ text }),
+      });
+      const data = await response.json();
+      if (data.success) {
+        return data.data.text;
+      } else {
+        console.error(`API error for ${endpoint}:`, data.message);
+        return text;
+      }
+    } catch (error) {
+      console.error(`Failed to call API ${endpoint}:`, error);
+      return text;
+    }
+  };
 
   const processStep = async (stepId: string) => {
     setIsProcessing(true);
-
-    await new Promise(resolve => setTimeout(resolve, 1500));
 
     let result = processedText || originalText;
 
     switch (stepId) {
       case "dialog":
-        result = markDialogs(result);
+        result = await callApi("dialog", result);
         break;
       case "character":
-        result = extractCharacters(result);
-        break;
-      case "description":
-        result = separateDescriptions(result);
+        result = await callApi("character", result);
         break;
       case "plot":
-        result = extractPlot(result);
+        result = await callApi("plot", result);
         break;
       case "speaker":
-        result = markSpeakers(result);
+        result = await callApi("speaker", result);
         break;
       case "scene":
-        result = generateSceneHeaders(result);
+        result = await callApi("scene-header", result);
         break;
       case "psychology":
-        result = convertPsychology(result);
+        result = await callApi("psychology", result);
         break;
       case "packaging":
         result = packageScenes(result);
         break;
       case "cleanup":
-        result = removeUseless(result);
+        result = await callApi("cleanup", result);
         break;
       case "polish":
-        result = polishText(result);
+        result = await callApi("polish", result);
         break;
       case "export":
         exportScript(result);
         break;
+      default:
+        break;
     }
 
     setProcessedText(result);
-    setCompletedSteps(prev => new Set([...prev, stepId]));
+    const newCompletedSteps = new Set([...completedSteps, stepId]);
+    setCompletedSteps(newCompletedSteps);
     setIsProcessing(false);
     addToast({ type: "success", title: `${AI_STEPS.find(s => s.id === stepId)?.label} 完成` });
+
+    if (newCompletedSteps.size >= AI_STEPS.length - 1) {
+      setIsComplete(true);
+      saveScript(result);
+    }
+  };
+
+  const saveScript = (scriptText: string) => {
+    if (!currentScript || !currentScriptId) return;
+
+    const scenes = scriptText.split("###").filter(s => s.trim()).map((sceneContent, i) => ({
+      id: `scene_${Date.now()}_${i}`,
+      title: `场景 ${i + 1}`,
+      location: "",
+      timeOfDay: "",
+      intent: "",
+      beats: [],
+      content: sceneContent.trim(),
+      code: "",
+      status: "draft" as const,
+    }));
+
+    const updatedScript = {
+      ...currentScript,
+      episodes: [
+        {
+          ...currentScript.episodes[0],
+          scenes: scenes.length > 0 ? scenes : currentScript.episodes[0].scenes,
+        },
+      ],
+    };
+
+    upsertScript(updatedScript);
+    addToast({ type: "success", title: "剧本已保存" });
   };
 
   const processAll = async () => {
@@ -1128,47 +1205,8 @@ function AIConvertPanel() {
     }
   };
 
-  const markDialogs = (text: string) => {
-    return text.replace(/(["“”「」『』]([^"“”「」『』]+)["“”「」『』])/g, (_, dialog) => {
-      const id = `|${Date.now()}-${Math.random().toString(36).substr(2, 9)}|`;
-      return `${dialog}${id}`;
-    });
-  };
-
-  const extractCharacters = (text: string) => {
-    return `=== 人物列表 ===\n***主要人物：***\n- 主角（待 AI 识别）\n- 配角（待 AI 识别）\n\n***次要人物：***\n- 路人甲（待 AI 识别）\n\n=== 原文 ===\n${text}`;
-  };
-
-  const separateDescriptions = (text: string) => {
-    return text.replace(/([。！？])\s*([^\n。！？]+?的(样子|神情|眼神|表情|外貌|相貌|面容|身材|衣着|穿着))/g, "$1\n***肖像描写***$2\n");
-  };
-
-  const extractPlot = (text: string) => {
-    return `=== 故事主线 ===\n***主线：***\n待 AI 分析...\n\n***转场：***\n待 AI 分析...\n\n=== 原文 ===\n${text}`;
-  };
-
-  const markSpeakers = (text: string) => {
-    return text.replace(/(["“”「」『』][^"“”「」『』]+["“”「」『』])/g, "***未知人物***$1");
-  };
-
-  const generateSceneHeaders = (text: string) => {
-    return `INT. 未知地点 - 白天\n\n${text}`;
-  };
-
-  const convertPsychology = (text: string) => {
-    return text.replace(/(心想|暗想|觉得|认为|想道?)\s*[：:]/g, "***主角***（内心）：");
-  };
-
   const packageScenes = (text: string) => {
     return `###\n${text.slice(0, Math.floor(text.length / 2))}\n###\n${text.slice(Math.floor(text.length / 2))}\n###`;
-  };
-
-  const removeUseless = (text: string) => {
-    return text.replace(/(啊啊啊|嗯嗯|啊啊|呜呜|哼哼|呵呵|哈哈)\s*/g, "");
-  };
-
-  const polishText = (text: string) => {
-    return text.replace(/。/g, "。\n").replace(/！/g, "！\n").replace(/？/g, "？\n");
   };
 
   const exportScript = (text: string) => {
@@ -1189,15 +1227,85 @@ function AIConvertPanel() {
     URL.revokeObjectURL(url);
   };
 
+  const processingStep = isProcessing ? AI_STEPS[currentStep] : null;
+
+  if (isComplete && processedText) {
+    return (
+      <div className="flex-1 flex p-4 gap-4">
+        <div className="w-1/3 flex flex-col">
+          <div className="mb-3">
+            <h4 className="font-serif text-sm text-(--text-subtle) mb-1">📄 原始文本</h4>
+            <p className="text-xs text-(--text-faint)">已归档</p>
+          </div>
+          <div className="flex-1 bg-(--muted) rounded-xl p-3 overflow-auto">
+            <div className="font-mono text-xs text-(--text-subtle) whitespace-pre-wrap">
+              {originalText}
+            </div>
+          </div>
+        </div>
+
+        <div className="flex-1 flex flex-col">
+          <div className="mb-3">
+            <h3 className="font-serif text-lg text-foreground mb-1">🎬 剧本内容</h3>
+            <p className="text-sm text-(--text-subtle)">AI 转换完成</p>
+          </div>
+          <div className="flex-1 bg-white rounded-xl border border-(--line-soft) p-4 overflow-auto">
+            <div className="font-mono text-sm text-foreground whitespace-pre-wrap">
+              {processedText}
+            </div>
+          </div>
+
+          <div className="mt-4 flex gap-3">
+            <button
+              type="button"
+              onClick={() => {
+                setCurrentStep(0);
+                setProcessedText("");
+                setCompletedSteps(new Set());
+                setIsComplete(false);
+              }}
+              className="flex-1 px-4 py-2 rounded-lg border border-(--line-soft) text-sm text-(--text-subtle) hover:bg-(--muted) transition-colors"
+            >
+              重新转换
+            </button>
+            <button
+              type="button"
+              onClick={() => exportScript(processedText)}
+              className="flex-1 px-4 py-2 rounded-lg bg-(--accent-soft) text-white text-sm hover:bg-(--accent-soft)/90 transition-colors"
+            >
+              导出剧本
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const handleReimport = () => {
+    window.location.href = "/import";
+  };
+
   return (
     <div className="flex-1 flex flex-col p-4">
-      <div className="mb-6">
-        <h3 className="font-serif text-lg text-foreground mb-2">AI 剧本转换</h3>
-        <p className="text-sm text-(--text-subtle)">按照以下步骤将小说文本转换为专业剧本格式</p>
+      <div className="mb-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="font-serif text-lg text-foreground">AI 剧本转换</h3>
+            <p className="text-xs text-(--text-subtle)">按照以下步骤将小说文本转换为专业剧本格式</p>
+          </div>
+          <button
+            type="button"
+            onClick={handleReimport}
+            className="flex items-center gap-1 px-3 py-1.5 rounded-lg border border-(--line-soft) text-sm text-(--text-subtle) hover:bg-(--muted) transition-colors"
+          >
+            <Upload className="h-4 w-4" />
+            重新选择文本
+          </button>
+        </div>
       </div>
 
-      <div className="mb-6">
-        <div className="flex items-center justify-between mb-3">
+      <div className="mb-4">
+        <div className="flex items-center justify-between">
           <span className="text-sm text-(--text-subtle)">剧本架构</span>
           <div className="flex gap-2">
             <button
@@ -1224,75 +1332,95 @@ function AIConvertPanel() {
         </div>
       </div>
 
-      <div className="mb-6 flex-1 overflow-auto">
-        <div className="bg-(--muted) rounded-xl p-4 min-h-[200px] font-mono text-sm text-foreground whitespace-pre-wrap overflow-auto">
-          {processedText || originalText || "等待导入文本..."}
+      <div className="flex-1 overflow-auto mb-4">
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-sm text-(--text-subtle)">
+            {isProcessing && processingStep ? (
+              <span className="flex items-center gap-2">
+                <span className="w-3 h-3 border-2 border-(--accent-soft) border-t-transparent rounded-full animate-spin" />
+                正在处理: {processingStep.label}
+              </span>
+            ) : processedText ? (
+              "已处理文本"
+            ) : (
+              "原始文本"
+            )}
+          </span>
+          <span className="text-xs text-(--text-faint)">
+            {displayText.length} 字符
+          </span>
+        </div>
+        <div className="bg-(--muted) rounded-xl p-4 min-h-[400px] font-mono text-sm text-foreground whitespace-pre-wrap overflow-auto">
+          {displayText || "等待导入文本..."}
         </div>
       </div>
 
-      <div className="space-y-2">
-        {AI_STEPS.map((step, index) => (
-          <div
-            key={step.id}
-            className={`flex items-center gap-3 p-3 rounded-lg border transition-colors ${completedSteps.has(step.id)
-              ? "border-green-500 bg-green-50"
-              : index === currentStep && !isProcessing
-                ? "border-(--accent-soft) bg-(--accent-light)"
-                : "border-(--line-soft) hover:bg-(--muted)"
-              }`}
-          >
-            <div className="flex h-6 w-6 items-center justify-center rounded-full text-xs font-medium">
-              {completedSteps.has(step.id) ? (
-                <Check className="h-4 w-4 text-green-500" />
-              ) : isProcessing && index === currentStep ? (
-                <div className="w-4 h-4 border-2 border-(--accent-soft) border-t-transparent rounded-full animate-spin" />
+      <div className="border-t border-(--line-soft) pt-4">
+        <p className="text-sm font-medium text-foreground mb-3">处理工具</p>
+        <div className="space-y-2">
+          {AI_STEPS.map((step, index) => (
+            <div
+              key={step.id}
+              className={`flex items-center gap-3 p-3 rounded-lg border transition-colors ${completedSteps.has(step.id)
+                ? "border-green-500 bg-green-50"
+                : index === currentStep && !isProcessing
+                  ? "border-(--accent-soft) bg-(--accent-light)"
+                  : "border-(--line-soft) hover:bg-(--muted)"
+                }`}
+            >
+              <div className="flex h-6 w-6 items-center justify-center rounded-full text-xs font-medium">
+                {completedSteps.has(step.id) ? (
+                  <Check className="h-4 w-4 text-green-500" />
+                ) : isProcessing && index === currentStep ? (
+                  <div className="w-4 h-4 border-2 border-(--accent-soft) border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  index + 1
+                )}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm text-foreground">{step.label}</p>
+                <p className="text-xs text-(--text-subtle) truncate">{step.desc}</p>
+              </div>
+              {step.id === "structure" ? (
+                <span className="text-xs text-(--text-faint)">已选择: {adaptType === "long" ? "影视作品" : "电影剧本"}</span>
+              ) : completedSteps.has(step.id) ? (
+                <span className="text-xs text-green-500">完成</span>
+              ) : index === currentStep && !isProcessing ? (
+                <button
+                  type="button"
+                  onClick={() => processStep(step.id)}
+                  className="px-3 py-1 rounded-md bg-(--accent-soft) text-white text-xs"
+                >
+                  执行
+                </button>
               ) : (
-                index + 1
+                <span className="text-xs text-(--text-faint)">等待</span>
               )}
             </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm text-foreground">{step.label}</p>
-              <p className="text-xs text-(--text-subtle) truncate">{step.desc}</p>
-            </div>
-            {step.id === "structure" ? (
-              <span className="text-xs text-(--text-faint)">已选择: {adaptType === "long" ? "影视作品" : "电影剧本"}</span>
-            ) : completedSteps.has(step.id) ? (
-              <span className="text-xs text-green-500">完成</span>
-            ) : index === currentStep && !isProcessing ? (
-              <button
-                type="button"
-                onClick={() => processStep(step.id)}
-                className="px-3 py-1 rounded-md bg-(--accent-soft) text-white text-xs"
-              >
-                执行
-              </button>
-            ) : (
-              <span className="text-xs text-(--text-faint)">等待</span>
-            )}
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
 
-      <div className="mt-4 flex gap-3">
-        <button
-          type="button"
-          onClick={() => {
-            setCurrentStep(0);
-            setProcessedText("");
-            setCompletedSteps(new Set());
-          }}
-          className="flex-1 px-4 py-2 rounded-lg border border-(--line-soft) text-sm text-(--text-subtle) hover:bg-(--muted) transition-colors"
-        >
-          重置
-        </button>
-        <button
-          type="button"
-          onClick={processAll}
-          disabled={isProcessing}
-          className="flex-1 px-4 py-2 rounded-lg bg-(--accent-soft) text-white text-sm hover:bg-(--accent-soft)/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          {isProcessing ? "处理中..." : "一键转换全部"}
-        </button>
+        <div className="mt-4 flex gap-3">
+          <button
+            type="button"
+            onClick={() => {
+              setCurrentStep(0);
+              setProcessedText("");
+              setCompletedSteps(new Set());
+            }}
+            className="flex-1 px-4 py-2 rounded-lg border border-(--line-soft) text-sm text-(--text-subtle) hover:bg-(--muted) transition-colors"
+          >
+            重置
+          </button>
+          <button
+            type="button"
+            onClick={processAll}
+            disabled={isProcessing}
+            className="flex-1 px-4 py-2 rounded-lg bg-(--accent-soft) text-white text-sm hover:bg-(--accent-soft)/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isProcessing ? "处理中..." : "一键转换全部"}
+          </button>
+        </div>
       </div>
     </div>
   );
