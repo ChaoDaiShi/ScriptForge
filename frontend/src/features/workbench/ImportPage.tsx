@@ -30,6 +30,7 @@ type ImportStep = "upload" | "preview" | "configure" | "converting";
 interface ChapterPreview {
   index: number;
   title: string;
+  rawTitle?: string;
   wordCount: number;
   startPos?: number;
   endPos?: number;
@@ -167,15 +168,11 @@ export default function ImportPage() {
       const isChapter = chapterPatterns.some((pattern) => pattern.test(trimmed));
       
       if (isChapter) {
-        // 保存前一个章节的字数
-        if (currentChapter) {
-          currentChapter.wordCount = currentChapter.wordCount;
-        }
-        
         // 开始新章节
         currentChapter = {
           index: detected.length + 1,
           title: trimmed.slice(0, 60),
+          rawTitle: trimmed,
           wordCount: 0,
         };
         detected.push(currentChapter);
@@ -207,6 +204,7 @@ export default function ImportPage() {
             newChapters.push({
               index: i + 1,
               title: `第 ${i + 1} 部分（约 ${chapterParagraphs.length} 段）`,
+              rawTitle: `第 ${i + 1} 部分（约 ${chapterParagraphs.length} 段）`,
               wordCount: chapterText.length,
             });
           }
@@ -232,8 +230,16 @@ export default function ImportPage() {
       const lines = normalizedText.split("\n");
       const chapterStarts = detected
         .map((chapter) => {
+          const lookupTitle = (chapter.rawTitle ?? chapter.title).trim();
           const titleLineIndex = lines.findIndex(
-            (line) => line.trim() === chapter.title.trim(),
+            (line) => {
+              const trimmedLine = line.trim();
+              return (
+                trimmedLine === lookupTitle ||
+                trimmedLine.startsWith(lookupTitle) ||
+                lookupTitle.startsWith(trimmedLine)
+              );
+            },
           );
 
           return {
@@ -273,20 +279,51 @@ export default function ImportPage() {
       .split(/\n\s*\n+/)
       .map((paragraph) => paragraph.trim())
       .filter(Boolean);
-    const bucketSize = Math.max(1, Math.ceil(paragraphs.length / 3));
 
-    return Array.from({ length: 3 }, (_, index) => {
-      const start = index * bucketSize;
-      const end = Math.min(start + bucketSize, paragraphs.length);
-      const content = paragraphs.slice(start, end).join("\n\n").trim();
+    if (paragraphs.length >= 3) {
+      const bucketSize = Math.max(1, Math.ceil(paragraphs.length / 3));
 
-      return {
-        index: index + 1,
-        title: `第 ${index + 1} 部分`,
+      return Array.from({ length: 3 }, (_, index) => {
+        const start = index * bucketSize;
+        const end = Math.min(start + bucketSize, paragraphs.length);
+        const content = paragraphs.slice(start, end).join("\n\n").trim();
+
+        return {
+          index: index + 1,
+          title: `第 ${index + 1} 部分`,
+          content,
+          wordCount: content.length,
+        };
+      }).filter((chapter) => chapter.content.length > 0);
+    }
+
+    const trimmedText = normalizedText.trim();
+    if (!trimmedText) {
+      return [];
+    }
+
+    const targetChapterCount = Math.min(3, Math.max(1, Math.ceil(trimmedText.length / 1000)));
+    const chunkSize = Math.ceil(trimmedText.length / targetChapterCount);
+    const charChunks: StructuredChapter[] = [];
+
+    for (let index = 0; index < targetChapterCount; index += 1) {
+      const start = index * chunkSize;
+      const end = Math.min(start + chunkSize, trimmedText.length);
+      const content = trimmedText.slice(start, end).trim();
+
+      if (!content) {
+        continue;
+      }
+
+      charChunks.push({
+        index: charChunks.length + 1,
+        title: `第 ${charChunks.length + 1} 部分`,
         content,
         wordCount: content.length,
-      };
-    }).filter((chapter) => chapter.content.length > 0);
+      });
+    }
+
+    return charChunks;
   };
 
   const buildSourcePayload = (
@@ -397,6 +434,11 @@ export default function ImportPage() {
     const structured = buildStructuredChapters(text, detected);
     const textLength = text.trim().length;
     const potentialChapters = analyzeChapterPatterns(text);
+
+    if (structured.length === 0) {
+      alert("未能识别可用章节，请检查文本内容后重试。");
+      return;
+    }
 
     // 如果没有检测到 3 个章节，但文本足够长（超过 1000 字），也允许通过
     if (structured.length < 3 && textLength < 1000) {
