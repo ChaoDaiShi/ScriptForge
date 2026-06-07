@@ -8,7 +8,15 @@ export function apiUrl(path: string) {
 }
 
 export async function apiFetch(path: string, init?: RequestInit) {
-  const response = await fetch(apiUrl(path), init);
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 30000); // 30秒超时
+  
+  const response = await fetch(apiUrl(path), {
+    ...init,
+    signal: controller.signal,
+  });
+  
+  clearTimeout(timeoutId);
 
   if (!response.ok) {
     throw new Error(`API request failed: ${response.status}`);
@@ -99,7 +107,7 @@ export async function apiJson<T>(
   path: string,
   init?: RequestInit,
 ): Promise<ApiEnvelope<T>> {
-  console.log(`Calling API: ${path}`, init);
+  console.log(`Calling API: ${path}`, init ? init.method || 'GET' : 'GET');
   const response = await apiFetch(path, init);
   const json = await response.json();
   console.log(`API response for ${path}:`, json);

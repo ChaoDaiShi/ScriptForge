@@ -168,9 +168,12 @@ export default function ImportPage() {
     
     const detected: ChapterPreview[] = [];
     let currentChapter: ChapterPreview | null = null;
+    let currentCharPos = 0; // 记录当前字符位置
 
     lines.forEach((line, lineIndex) => {
       const trimmed = line.trim();
+      const lineStartPos = currentCharPos;
+      const lineEndPos = lineStartPos + line.length + 1; // +1 是换行符
       
       // 检查是否匹配任何章节模式
       const matchesPattern = chapterPatterns.some((pattern) => pattern.test(trimmed));
@@ -193,9 +196,9 @@ export default function ImportPage() {
         );
       
       if (isValidChapter) {
-        // 保存前一个章节的字数
+        // 保存前一个章节的结束位置
         if (currentChapter) {
-          currentChapter.wordCount = currentChapter.wordCount;
+          currentChapter.endPos = lineStartPos;
         }
         
         // 开始新章节
@@ -203,13 +206,21 @@ export default function ImportPage() {
           index: detected.length + 1,
           title: trimmed.slice(0, 80),
           wordCount: 0,
+          startPos: lineStartPos,
         };
         detected.push(currentChapter);
       } else if (currentChapter) {
         // 累加当前章节的字数
         currentChapter.wordCount += trimmed.length;
       }
+      
+      currentCharPos = lineEndPos;
     });
+    
+    // 设置最后一个章节的结束位置
+    if (currentChapter) {
+      currentChapter.endPos = text.length;
+    }
 
     // 如果检测到的章节不足3个且文本较长，尝试其他方式
     if (detected.length < 3 && text.trim().length > 1000) {
@@ -222,6 +233,7 @@ export default function ImportPage() {
         // 将长段落分成3个虚拟章节
         const chapterSize = Math.ceil(paragraphs.length / 3);
         const newChapters: ChapterPreview[] = [];
+        let currentPos = 0;
         
         for (let i = 0; i < 3; i++) {
           const start = i * chapterSize;
@@ -230,10 +242,16 @@ export default function ImportPage() {
           
           if (chapterParagraphs.length > 0) {
             const chapterText = chapterParagraphs.join("\n\n");
+            const chapterStartPos = text.indexOf(chapterText, currentPos);
+            const chapterEndPos = chapterStartPos + chapterText.length;
+            currentPos = chapterEndPos;
+            
             newChapters.push({
               index: i + 1,
               title: `第 ${i + 1} 部分（约 ${chapterParagraphs.length} 段）`,
               wordCount: chapterText.length,
+              startPos: chapterStartPos,
+              endPos: chapterEndPos,
             });
           }
         }
@@ -394,7 +412,15 @@ export default function ImportPage() {
     // 提取选中的章节内容
     const filteredSelectedChapterList = chapters.filter(ch => selectedChapters.has(ch.index));
     setSelectedChapterList(filteredSelectedChapterList); // 保存到状态
-    const selectedContent = filteredSelectedChapterList.map(ch => ch.title + '\n' + pasteContent).join('\n\n');
+    // 只提取选中章节的内容
+    const selectedContent = filteredSelectedChapterList
+      .map(ch => {
+        if (ch.startPos !== undefined && ch.endPos !== undefined) {
+          return pasteContent.slice(ch.startPos, ch.endPos);
+        }
+        return ch.title + '\n'; // 回退方案
+      })
+      .join('\n\n');
 
     const novelData = {
       id: novelId,
@@ -483,6 +509,15 @@ export default function ImportPage() {
           if (latestTask.progress > previousProgress) {
             setLastProgressUpdate(Date.now());
           }
+          
+          // 检查是否长时间无响应（超过2分钟）
+          const now = Date.now();
+          if (now - lastProgressUpdate > 120000) {
+            // 显示警告但不跳转
+            if (!stepMessages.includes("⚠️ 检测到长时间无响应，正在尝试重新连接...")) {
+              setStepMessages(prev => [...prev, "⚠️ 检测到长时间无响应，正在尝试重新连接..."]);
+            }
+          }
 
           // 更新当前步骤
           if (latestTask.current_step && stepNames[latestTask.current_step]) {
@@ -520,16 +555,17 @@ export default function ImportPage() {
           }
         } catch (error) {
           console.error("Polling error:", error);
-          setCurrentStep("轮询失败");
-          setStepMessages(prev => [...prev, `❌ 轮询失败: ${error instanceof Error ? error.message : "未知错误"}`]);
-          window.clearInterval(completionPoll);
-          addToast({
-            type: "error",
-            title: "轮询任务失败",
-            message: error instanceof Error ? error.message : "未知错误",
-          });
+          // 超时或网络错误时不自动跳转，只显示错误信息
+          if (error instanceof Error && error.name === "AbortError") {
+            setStepMessages(prev => [...prev, "⚠️ 请求超时，正在重试..."]);
+            // 继续轮询，不要停止
+          } else {
+            setCurrentStep("轮询失败");
+            setStepMessages(prev => [...prev, `❌ 轮询失败: ${error instanceof Error ? error.message : "未知错误"}`]);
+            // 不要自动停止轮询，保持重试
+          }
         }
-      }, 2500);
+      }, 2000);
 
       // 添加模拟进度更新机制，防止进度长时间不动
       const heartbeatInterval = window.setInterval(() => {
