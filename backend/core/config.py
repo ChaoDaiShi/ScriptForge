@@ -41,6 +41,19 @@ class Settings(BaseSettings):
         "extra": "ignore",  # Allow extra fields from .env
     }
 
+    @field_validator("debug", mode="before")
+    @classmethod
+    def normalize_debug(cls, value):
+        if isinstance(value, bool):
+            return value
+        if isinstance(value, str):
+            normalized = value.strip().lower()
+            if normalized in {"1", "true", "yes", "on", "debug", "dev"}:
+                return True
+            if normalized in {"0", "false", "no", "off", "release", "prod", "production"}:
+                return False
+        return value
+
 
 # Create settings instance
 settings = Settings()

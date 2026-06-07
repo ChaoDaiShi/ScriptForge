@@ -1,4 +1,6 @@
 """Assets API Routes."""
+from typing import Optional
+
 from fastapi import APIRouter, Query
 
 from core.utils import error_response, success_response
@@ -11,7 +13,7 @@ router = APIRouter(prefix="/api/assets", tags=["assets"])
 async def get_assets(
     page: int = Query(1, ge=1),
     size: int = Query(20, ge=1, le=100),
-    q: str | None = Query(default=None),
+    q: Optional[str] = Query(default=None),
 ):
     projects = await ProjectService.list_projects()
     filtered = [

@@ -1,3 +1,5 @@
+from typing import Optional
+
 from fastapi import APIRouter, Query
 
 from core.utils import error_response, success_response
@@ -8,7 +10,7 @@ router = APIRouter(prefix="/api/projects", tags=["projects"])
 
 
 @router.get("", summary="项目列表")
-async def list_projects(user_id: str | None = Query(default=None)):
+async def list_projects(user_id: Optional[str] = Query(default=None)):
     projects = await ProjectService.list_projects(user_id)
     return success_response(data={"projects": [project.model_dump(mode="json") for project in projects]})
 
@@ -50,7 +52,7 @@ async def list_exports(project_id: str):
 
 
 @router.post("/{project_id}/exports/{format_name}", summary="创建导出")
-async def create_export(project_id: str, format_name: str, script_id: str | None = Query(default=None)):
+async def create_export(project_id: str, format_name: str, script_id: Optional[str] = Query(default=None)):
     try:
         export_format = ExportFormat(format_name)
     except ValueError:

@@ -1,6 +1,7 @@
 """Script Processing API Routes."""
-from fastapi import APIRouter, BackgroundTasks, Query
 from typing import Optional
+
+from fastapi import APIRouter, BackgroundTasks, Query
 
 from core.utils import error_response, success_response
 from schemas.script_schema import ScriptType, ScriptCreateRequest, TaskDetailResponse
@@ -41,7 +42,7 @@ async def delete_script(script_id: str):
 
 
 @router.post("/{script_id}/process", summary="启动剧本处理流程")
-async def start_processing(script_id: str, background_tasks: BackgroundTasks, project_id: str | None = Query(default=None)):
+async def start_processing(script_id: str, background_tasks: BackgroundTasks, project_id: Optional[str] = Query(default=None)):
     try:
         script = await ScriptService.get_script(script_id)
         if not script:

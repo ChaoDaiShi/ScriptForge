@@ -1,3 +1,5 @@
+from typing import Optional
+
 from fastapi import APIRouter, Header
 
 from core.utils import error_response, success_response
@@ -26,7 +28,7 @@ async def login(request: AuthLoginRequest):
 
 
 @router.get("/me", summary="当前用户")
-async def me(x_user_id: str | None = Header(default=None, alias="X-User-Id")):
+async def me(x_user_id: Optional[str] = Header(default=None, alias="X-User-Id")):
     if not x_user_id:
         return error_response(message="缺少 X-User-Id", code=401)
     user = await AuthService.me(x_user_id)

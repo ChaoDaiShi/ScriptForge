@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from typing import Optional, List
 from uuid import uuid4
 
 from repositories import SupabaseScriptRepository
@@ -26,7 +27,7 @@ PLATFORM_DOCS = {
 
 
 class ProjectService:
-    _repository: SupabaseScriptRepository | None = None
+    _repository: Optional[SupabaseScriptRepository] = None
 
     @classmethod
     def _get_repository(cls) -> SupabaseScriptRepository:
@@ -47,15 +48,15 @@ class ProjectService:
         return cls._get_repository().create_project(project)
 
     @classmethod
-    async def list_projects(cls, user_id: str | None = None) -> list[Project]:
+    async def list_projects(cls, user_id: Optional[str] = None) -> List[Project]:
         return cls._get_repository().list_projects(user_id=user_id)
 
     @classmethod
-    async def get_project(cls, project_id: str) -> Project | None:
+    async def get_project(cls, project_id: str) -> Optional[Project]:
         return cls._get_repository().get_project(project_id)
 
     @classmethod
-    async def update_project(cls, project_id: str, request: ProjectUpdateRequest) -> Project | None:
+    async def update_project(cls, project_id: str, request: ProjectUpdateRequest) -> Optional[Project]:
         return cls._get_repository().update_project(project_id, request.model_dump(exclude_none=True))
 
     @classmethod
@@ -63,7 +64,7 @@ class ProjectService:
         return cls._get_repository().delete_project(project_id)
 
     @classmethod
-    async def create_export(cls, project_id: str, script_id: str | None, export_format: ExportFormat) -> ExportResponse:
+    async def create_export(cls, project_id: str, script_id: Optional[str], export_format: ExportFormat) -> ExportResponse:
         export_item = ProjectExport(
             id=str(uuid4()),
             project_id=project_id,
@@ -75,7 +76,7 @@ class ProjectService:
         return ExportResponse(export=export_item)
 
     @classmethod
-    async def list_exports(cls, project_id: str | None = None) -> list[ProjectExport]:
+    async def list_exports(cls, project_id: Optional[str] = None) -> List[ProjectExport]:
         return cls._get_repository().list_exports(project_id)
 
     @classmethod
@@ -103,7 +104,7 @@ class ProjectService:
         return DistributionResponse(job=job)
 
     @classmethod
-    async def distribute_job(cls, job_id: str) -> DistributionResponse | None:
+    async def distribute_job(cls, job_id: str) -> Optional[DistributionResponse]:
         job = cls._get_repository().update_distribution_job(job_id, {"status": DistributionStatus.COMPLETED})
         if not job:
             return None
@@ -111,5 +112,5 @@ class ProjectService:
         return DistributionResponse(job=job)
 
     @classmethod
-    async def list_distribution_jobs(cls, project_id: str | None = None) -> list[DistributionJob]:
+    async def list_distribution_jobs(cls, project_id: Optional[str] = None) -> List[DistributionJob]:
         return cls._get_repository().list_distribution_jobs(project_id)

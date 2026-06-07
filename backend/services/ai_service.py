@@ -7,7 +7,10 @@ import re
 import uuid
 import os
 from dotenv import load_dotenv
-from openai import AsyncOpenAI
+try:
+    from openai import AsyncOpenAI
+except ImportError:
+    AsyncOpenAI = None
 
 # Load environment variables
 load_dotenv()
@@ -16,15 +19,17 @@ class AIService:
     """AI服务封装 - 使用DeepSeek API"""
     
     def __init__(self):
-        self.client = AsyncOpenAI(
-            api_key=os.getenv("DEEPSEEK_API_KEY"),
-            base_url=os.getenv("DEEPSEEK_API_BASE_URL", "https://api.deepseek.com/v1")
-        )
+        self.client = None
+        if AsyncOpenAI and os.getenv("DEEPSEEK_API_KEY"):
+            self.client = AsyncOpenAI(
+                api_key=os.getenv("DEEPSEEK_API_KEY"),
+                base_url=os.getenv("DEEPSEEK_API_BASE_URL", "https://api.deepseek.com/v1")
+            )
         self.model = os.getenv("DEEPSEEK_V4_FLASH_MODEL", "deepseek-v4-flash")
     
     async def extract_dialogues(self, text: str) -> List[Dict[str, Any]]:
         """提取对话（步骤1）"""
-        if not os.getenv("DEEPSEEK_API_KEY"):
+        if not os.getenv("DEEPSEEK_API_KEY") or self.client is None:
             return self._extract_dialogues_local(text)
         
         prompt = f"""从以下文本中提取所有对话内容，并以JSON格式返回：
@@ -74,7 +79,7 @@ class AIService:
     
     async def extract_characters(self, text: str) -> Dict[str, Any]:
         """提取人物和描写类型（步骤2）"""
-        if not os.getenv("DEEPSEEK_API_KEY"):
+        if not os.getenv("DEEPSEEK_API_KEY") or self.client is None:
             return self._extract_characters_local(text)
         
         prompt = f"""从以下小说文本中提取人物角色和描写类型：
@@ -151,7 +156,7 @@ class AIService:
     
     async def extract_main_plot(self, text: str) -> str:
         """提取主线（步骤3）"""
-        if not os.getenv("DEEPSEEK_API_KEY"):
+        if not os.getenv("DEEPSEEK_API_KEY") or self.client is None:
             return self._extract_main_plot_local(text)
         
         prompt = f"""请用简洁的语言概括以下小说文本的主线剧情：
@@ -179,7 +184,7 @@ class AIService:
     
     async def tag_dialogue_speakers(self, text: str, characters: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """标记对话主体（步骤4）"""
-        if not os.getenv("DEEPSEEK_API_KEY"):
+        if not os.getenv("DEEPSEEK_API_KEY") or self.client is None:
             return self._tag_dialogue_speakers_local(text, characters)
         
         character_names = ", ".join([c["name"] for c in characters])
@@ -230,7 +235,7 @@ class AIService:
     
     async def analyze_scene(self, description: str, scene_number: int) -> Dict[str, Any]:
         """分析场景（步骤6）"""
-        if not os.getenv("DEEPSEEK_API_KEY"):
+        if not os.getenv("DEEPSEEK_API_KEY") or self.client is None:
             return self._analyze_scene_local(description, scene_number)
         
         prompt = f"""分析以下场景描述：
@@ -283,7 +288,7 @@ class AIService:
     
     async def convert_psychology(self, psychology_text: str, character_name: str) -> str:
         """转化心理描写（步骤7）"""
-        if not os.getenv("DEEPSEEK_API_KEY"):
+        if not os.getenv("DEEPSEEK_API_KEY") or self.client is None:
             return self._convert_psychology_local(psychology_text, character_name)
         
         prompt = f"""将以下心理描写转化为动作或神态描写：
@@ -313,7 +318,7 @@ class AIService:
     
     async def detect_useless_lines(self, text: str) -> List[int]:
         """检测无用语句（步骤9）"""
-        if not os.getenv("DEEPSEEK_API_KEY"):
+        if not os.getenv("DEEPSEEK_API_KEY") or self.client is None:
             return self._detect_useless_lines_local(text)
         
         prompt = f"""找出以下文本中无用的行号（从1开始）：
@@ -352,7 +357,7 @@ class AIService:
     
     async def polish_script(self, text: str) -> str:
         """润色剧本（步骤11）"""
-        if not os.getenv("DEEPSEEK_API_KEY"):
+        if not os.getenv("DEEPSEEK_API_KEY") or self.client is None:
             return self._polish_script_local(text)
         
         prompt = f"""请润色以下剧本文本：

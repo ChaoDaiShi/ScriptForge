@@ -6,6 +6,7 @@ import hmac
 import json
 import os
 from datetime import datetime, timezone
+from typing import Optional
 from uuid import uuid4
 
 from repositories import SupabaseScriptRepository
@@ -19,7 +20,7 @@ from schemas.script_schema import (
 
 
 class AuthService:
-    _repository: SupabaseScriptRepository | None = None
+    _repository: Optional[SupabaseScriptRepository] = None
 
     @classmethod
     def _get_repository(cls) -> SupabaseScriptRepository:
@@ -74,7 +75,7 @@ class AuthService:
         return AuthResponse(token=cls._generate_token(user_public), user=user_public)
 
     @classmethod
-    async def me(cls, user_id: str) -> UserPublic | None:
+    async def me(cls, user_id: str) -> Optional[UserPublic]:
         user = cls._get_repository().get_user(user_id)
         if not user:
             return None
