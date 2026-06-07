@@ -397,7 +397,6 @@ episode:
         </div>
       </div>
 
-      {/* 3-Panel Grid */}
       <div className="flex min-h-0 flex-1 gap-px bg-(--line-soft)">
         {/* ===== Left Panel - Context ===== */}
         <div className="flex w-72 flex-col overflow-y-auto bg-white p-4">
@@ -670,148 +669,150 @@ episode:
           </div>
 
           {/* AI Convert Panel or Import Panel */}
-          {hasData && !showEditor ? (
-            <AIConvertPanel processedText={processedText} setProcessedText={setProcessedText} setYamlOutput={setYamlOutput} setAnalysisText={setAnalysisText} />
-          ) : showEditor ? (
-            <div className="flex-1 flex items-center justify-center rounded-xl border-2 border-dashed border-(--line-soft) p-8">
-              <div className="text-center">
-                <p className="text-sm text-(--text-subtle)">切换到「AI转换」模式开始处理文本</p>
+          <div className="flex-1 min-h-0 flex flex-col">
+            {hasData && !showEditor ? (
+              <AIConvertPanel processedText={processedText} setProcessedText={setProcessedText} setYamlOutput={setYamlOutput} setAnalysisText={setAnalysisText} />
+            ) : showEditor ? (
+              <div className="flex-1 flex items-center justify-center rounded-xl border-2 border-dashed border-(--line-soft) p-8">
+                <div className="text-center">
+                  <p className="text-sm text-(--text-subtle)">切换到「AI转换」模式开始处理文本</p>
+                </div>
               </div>
-            </div>
-          ) : showImportPanel ? (
-            <div className="flex flex-1 flex-col overflow-hidden rounded-xl border-2 border-(--accent-soft)/50 bg-white p-4 animate-scale-in">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="font-serif text-lg text-foreground">导入小说文本</h3>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowImportPanel(false);
-                    setImportText("");
+            ) : showImportPanel ? (
+              <div className="flex flex-1 flex-col overflow-hidden rounded-xl border-2 border-(--accent-soft)/50 bg-white p-4 animate-scale-in">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="font-serif text-lg text-foreground">导入小说文本</h3>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowImportPanel(false);
+                      setImportText("");
+                    }}
+                    className="rounded-md p-1 text-(--text-faint) hover:text-foreground hover:bg-(--muted) transition-colors"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+
+                {/* 上传区域 */}
+                <div
+                  className={`flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed p-6 transition-all ${dragOver
+                    ? "border-(--accent-soft) bg-(--accent-light)"
+                    : "border-(--line-medium) hover:border-(--accent-soft)/50 hover:bg-(--accent-light)"
+                    }`}
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    setDragOver(true);
                   }}
-                  className="rounded-md p-1 text-(--text-faint) hover:text-foreground hover:bg-(--muted) transition-colors"
+                  onDragLeave={() => setDragOver(false)}
+                  onDrop={handleDrop}
+                  onClick={() => fileInputRef.current?.click()}
                 >
-                  <X className="h-4 w-4" />
-                </button>
-              </div>
-
-              {/* 上传区域 */}
-              <div
-                className={`flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed p-6 transition-all ${dragOver
-                  ? "border-(--accent-soft) bg-(--accent-light)"
-                  : "border-(--line-medium) hover:border-(--accent-soft)/50 hover:bg-(--accent-light)"
-                  }`}
-                onDragOver={(e) => {
-                  e.preventDefault();
-                  setDragOver(true);
-                }}
-                onDragLeave={() => setDragOver(false)}
-                onDrop={handleDrop}
-                onClick={() => fileInputRef.current?.click()}
-              >
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept=".txt,.md,.doc,.docx"
-                  className="hidden"
-                  onChange={handleFileUpload}
-                />
-                <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-(--accent-light) text-(--accent-soft)">
-                  <Upload className="h-5 w-5" />
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept=".txt,.md,.doc,.docx"
+                    className="hidden"
+                    onChange={handleFileUpload}
+                  />
+                  <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-(--accent-light) text-(--accent-soft)">
+                    <Upload className="h-5 w-5" />
+                  </div>
+                  <p className="text-sm text-foreground">点击上传或拖拽文件</p>
+                  <p className="mt-1 text-xs text-(--text-subtle)">支持 TXT、MD、DOC、DOCX 格式</p>
                 </div>
-                <p className="text-sm text-foreground">点击上传或拖拽文件</p>
-                <p className="mt-1 text-xs text-(--text-subtle)">支持 TXT、MD、DOC、DOCX 格式</p>
-              </div>
 
-              <div className="relative my-4">
-                <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t border-(--line-soft)" />
-                </div>
-                <div className="relative flex justify-center">
-                  <span className="bg-white px-3 text-xs text-(--text-subtle)">或者</span>
-                </div>
-              </div>
-
-              {/* 文本输入区域 */}
-              <div className="flex-1 flex flex-col min-h-0">
-                <textarea
-                  value={importText}
-                  onChange={(e) => setImportText(e.target.value)}
-                  className="flex-1 resize-none rounded-xl border border-(--line-medium) bg-white p-4 text-sm text-foreground placeholder:text-(--text-subtle) focus:outline-none focus:ring-2 focus:ring-(--accent-soft)/30 focus:border-(--accent-soft)"
-                  placeholder="将你的小说文本粘贴到这里..."
-                />
-                <div className="mt-3 flex items-center justify-between">
-                  <span className="flex items-center gap-1.5 text-xs text-(--text-subtle)">
-                    <FileText className="h-3.5 w-3.5" />
-                    共 {importText.length} 字
-                  </span>
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setShowImportPanel(false);
-                        setImportText("");
-                      }}
-                      className="rounded-lg border border-(--line-medium) px-4 py-2 text-sm text-foreground hover:bg-(--muted) transition-colors"
-                    >
-                      取消
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleCreateFromImport}
-                      disabled={!importText.trim()}
-                      className="inline-flex items-center gap-1.5 rounded-lg bg-(--accent-soft) px-4 py-2 text-sm font-medium text-white hover:bg-(--accent-soft)/90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                    >
-                      开始创作
-                      <ArrowRight className="h-4 w-4" />
-                    </button>
+                <div className="relative my-4">
+                  <div className="absolute inset-0 flex items-center">
+                    <div className="w-full border-t border-(--line-soft)" />
+                  </div>
+                  <div className="relative flex justify-center">
+                    <span className="bg-white px-3 text-xs text-(--text-subtle)">或者</span>
                   </div>
                 </div>
-              </div>
-            </div>
-          ) : (
-            <div className="flex flex-1 items-center justify-center rounded-xl border-2 border-dashed border-(--line-soft) p-8">
-              <div className="text-center max-w-md">
-                <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-(--accent-light)">
-                  <FileText className="h-8 w-8 text-(--accent-soft)" />
-                </div>
-                <h3 className="font-serif text-xl text-foreground mb-2">
-                  导入小说源文本
-                </h3>
-                <p className="text-sm text-(--text-subtle) mb-6">
-                  上传小说文件或直接粘贴文本内容，开始你的剧本创作之旅
-                </p>
-                <div className="flex gap-3 justify-center">
-                  <button
-                    type="button"
-                    onClick={() => navigate("/import")}
-                    className="inline-flex items-center gap-1.5 rounded-lg border border-(--line-medium) px-4 py-2 text-sm text-foreground hover:bg-(--muted) transition-colors"
-                  >
-                    <Upload className="h-4 w-4" />
-                    高级导入
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setShowImportPanel(true)}
-                    className="inline-flex items-center gap-1.5 rounded-lg bg-(--accent-soft) px-4 py-2 text-sm font-medium text-white hover:bg-(--accent-soft)/90 transition-colors"
-                  >
-                    <FileText className="h-4 w-4" />
-                    快速输入
-                  </button>
-                </div>
-                <div className="mt-6 rounded-xl border border-(--line-soft) bg-(--muted) p-4">
-                  <div className="flex items-start gap-3">
-                    <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-(--accent-soft)" />
-                    <div className="text-left">
-                      <p className="text-xs font-medium text-foreground">格式要求</p>
-                      <p className="mt-1 text-xs text-(--text-subtle) leading-5">
-                        支持 TXT、MD、DOC、DOCX 文件格式，或直接粘贴文本内容。系统将自动识别章节结构。
-                      </p>
+
+                {/* 文本输入区域 */}
+                <div className="flex-1 flex flex-col min-h-0">
+                  <textarea
+                    value={importText}
+                    onChange={(e) => setImportText(e.target.value)}
+                    className="flex-1 resize-none rounded-xl border border-(--line-medium) bg-white p-4 text-sm text-foreground placeholder:text-(--text-subtle) focus:outline-none focus:ring-2 focus:ring-(--accent-soft)/30 focus:border-(--accent-soft)"
+                    placeholder="将你的小说文本粘贴到这里..."
+                  />
+                  <div className="mt-3 flex items-center justify-between">
+                    <span className="flex items-center gap-1.5 text-xs text-(--text-subtle)">
+                      <FileText className="h-3.5 w-3.5" />
+                      共 {importText.length} 字
+                    </span>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowImportPanel(false);
+                          setImportText("");
+                        }}
+                        className="rounded-lg border border-(--line-medium) px-4 py-2 text-sm text-foreground hover:bg-(--muted) transition-colors"
+                      >
+                        取消
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleCreateFromImport}
+                        disabled={!importText.trim()}
+                        className="inline-flex items-center gap-1.5 rounded-lg bg-(--accent-soft) px-4 py-2 text-sm font-medium text-white hover:bg-(--accent-soft)/90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                      >
+                        开始创作
+                        <ArrowRight className="h-4 w-4" />
+                      </button>
                     </div>
                   </div>
                 </div>
               </div>
-            </div>
-          )}
+            ) : (
+              <div className="flex flex-1 items-center justify-center rounded-xl border-2 border-dashed border-(--line-soft) p-8">
+                <div className="text-center max-w-md">
+                  <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-(--accent-light)">
+                    <FileText className="h-8 w-8 text-(--accent-soft)" />
+                  </div>
+                  <h3 className="font-serif text-xl text-foreground mb-2">
+                    导入小说源文本
+                  </h3>
+                  <p className="text-sm text-(--text-subtle) mb-6">
+                    上传小说文件或直接粘贴文本内容，开始你的剧本创作之旅
+                  </p>
+                  <div className="flex gap-3 justify-center">
+                    <button
+                      type="button"
+                      onClick={() => navigate("/import")}
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-(--line-medium) px-4 py-2 text-sm text-foreground hover:bg-(--muted) transition-colors"
+                    >
+                      <Upload className="h-4 w-4" />
+                      高级导入
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowImportPanel(true)}
+                      className="inline-flex items-center gap-1.5 rounded-lg bg-(--accent-soft) px-4 py-2 text-sm font-medium text-white hover:bg-(--accent-soft)/90 transition-colors"
+                    >
+                      <FileText className="h-4 w-4" />
+                      快速输入
+                    </button>
+                  </div>
+                  <div className="mt-6 rounded-xl border border-(--line-soft) bg-(--muted) p-4">
+                    <div className="flex items-start gap-3">
+                      <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-(--accent-soft)" />
+                      <div className="text-left">
+                        <p className="text-xs font-medium text-foreground">格式要求</p>
+                        <p className="mt-1 text-xs text-(--text-subtle) leading-5">
+                          支持 TXT、MD、DOC、DOCX 文件格式，或直接粘贴文本内容。系统将自动识别章节结构。
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* ===== Right Panel - Assistant ===== */}
@@ -1149,6 +1150,7 @@ function AIConvertPanel({ processedText, setProcessedText, setYamlOutput, setAna
   const [adaptType, setAdaptType] = useState<"short" | "long">("long");
   const [completedSteps, setCompletedSteps] = useState<Set<string>>(new Set());
   const [isComplete, setIsComplete] = useState(false);
+  const [scenePage, setScenePage] = useState(0);
   const novels = useNovelStore((s) => s.novels);
   const currentNovelId = useNovelStore((s) => s.currentNovelId);
   const currentNovel = novels.find(n => n.id === currentNovelId);
@@ -1325,9 +1327,11 @@ function AIConvertPanel({ processedText, setProcessedText, setYamlOutput, setAna
 
     setIsProcessing(true);
     setCurrentStep(1);
+    setProcessedText(""); // 清空旧内容，等待流式输出
+    setScenePage(0);
 
     try {
-      const response = await fetch(`${apiBase}/api/workbench/process/all`, {
+      const response = await fetch(`${apiBase}/api/workbench/process/all/stream`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -1336,29 +1340,93 @@ function AIConvertPanel({ processedText, setProcessedText, setYamlOutput, setAna
           title: currentNovel?.title || "未命名剧本",
         }),
       });
-      const data = await response.json();
-      console.log("Process all response:", data);
 
-      if (data.status === "success" && data.data) {
-        // 剧本正文
-        setProcessedText(data.data.text);
-        if (data.data.yaml) {
-          setYamlOutput(data.data.yaml);
-        }
-        // AI 分析结果（人物分析 + 场景拆分）
-        if (data.data.analysis) {
-          setAnalysisText(data.data.analysis);
-        }
-        // 标记所有步骤为完成
-        const allDone = new Set(AI_STEPS.filter(s => s.id !== "structure").map(s => s.id));
-        setCompletedSteps(allDone);
-        setCurrentStep(AI_STEPS.length);
-        setIsComplete(true);
-        saveScript(data.data.text);
-        addToast({ type: "success", title: "AI 5步转换完成，已生成结构化剧本" });
-      } else {
-        addToast({ type: "error", title: "转换失败", message: data.message || "后端返回异常" });
+      if (!response.ok || !response.body) {
+        throw new Error(`后端错误: ${response.status}`);
       }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let scriptText = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+
+        // 按 \n\n 分割 SSE 事件
+        const lines = buffer.split("\n\n");
+        buffer = lines.pop() || ""; // 最后一个片段可能不完整，保留
+
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed.startsWith("data: ")) continue;
+
+          const dataStr = trimmed.slice(6); // 去掉 "data: " 前缀
+          if (!dataStr) continue;
+
+          try {
+            const event: {
+              type: string;
+              phase?: string;
+              message?: string;
+              token?: string;
+              text?: string;
+              analysis?: string;
+              yaml?: string;
+              fallback?: boolean;
+            } = JSON.parse(dataStr);
+
+            switch (event.type) {
+              case "phase":
+                if (event.phase === "analysis") {
+                  setCurrentStep(0);
+                } else if (event.phase === "script") {
+                  setCurrentStep(1);
+                } else if (event.phase === "yaml") {
+                  setCurrentStep(2);
+                } else if (event.phase === "done") {
+                  const allDone = new Set(AI_STEPS.filter(s => s.id !== "structure").map(s => s.id));
+                  setCompletedSteps(allDone);
+                  setCurrentStep(AI_STEPS.length);
+                  setIsComplete(true);
+                }
+                break;
+
+              case "token":
+                scriptText += event.token || "";
+                setProcessedText(scriptText);
+                break;
+
+              case "result":
+                if (event.phase === "analysis" && event.analysis) {
+                  setAnalysisText(event.analysis);
+                } else if (event.phase === "script" && event.text) {
+                  scriptText = event.text;
+                  setProcessedText(scriptText);
+                } else if (event.phase === "yaml" && event.yaml) {
+                  setYamlOutput(event.yaml);
+                }
+                break;
+
+              case "error":
+                console.error("Stream error:", event.message);
+                addToast({ type: "error", title: "流式处理出错", message: event.message || "" });
+                break;
+            }
+          } catch (parseErr) {
+            // 忽略无法解析的行
+          }
+        }
+      }
+
+      // 流式结束后保存剧本
+      if (scriptText) {
+        saveScript(scriptText);
+      }
+      addToast({ type: "success", title: "AI 5步转换完成，已生成结构化剧本" });
     } catch (error) {
       console.error("Process all failed:", error);
       addToast({ type: "error", title: "转换失败", message: "无法连接后端服务" });
@@ -1452,6 +1520,7 @@ function AIConvertPanel({ processedText, setProcessedText, setYamlOutput, setAna
                 setAnalysisText("");
                 setCompletedSteps(new Set());
                 setIsComplete(false);
+                setScenePage(0);
               }}
               className="px-3 py-1.5 rounded-lg border border-(--line-soft) text-xs text-(--text-subtle) hover:bg-(--muted) transition-colors"
             >
@@ -1467,72 +1536,96 @@ function AIConvertPanel({ processedText, setProcessedText, setYamlOutput, setAna
           </div>
         </div>
 
-        {sceneCards.map((scene) => (
-          <div
-            key={scene.index}
-            className="rounded-xl border border-(--line-soft) bg-white overflow-hidden shadow-sm"
-          >
-            {/* 场景头 */}
-            <div className="flex items-center gap-3 px-4 py-3 bg-(--muted) border-b border-(--line-soft)">
-              <span className="flex h-7 w-7 items-center justify-center rounded-full bg-(--accent-soft) text-xs font-bold text-white">
-                {scene.index}
-              </span>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 flex-wrap">
-                  {scene.location && (
-                    <span className="text-sm font-medium text-foreground">
-                      {scene.location}
-                    </span>
-                  )}
-                  {scene.timeOfDay && (
-                    <span className="text-xs px-1.5 py-0.5 rounded bg-(--accent-light) text-(--accent-soft)">
-                      {scene.timeOfDay}
-                    </span>
+        {/* 场景导航 */}
+        {sceneCards.length > 1 && (
+          <div className="flex items-center justify-center gap-3">
+            <button
+              type="button"
+              disabled={scenePage <= 0}
+              onClick={() => setScenePage(p => Math.max(0, p - 1))}
+              className="px-3 py-1.5 rounded-lg border border-(--line-soft) text-xs text-(--text-subtle) hover:bg-(--muted) transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+            >
+              ← 上一场
+            </button>
+            <span className="text-sm text-(--text-subtle)">
+              {scenePage + 1} / {sceneCards.length}
+            </span>
+            <button
+              type="button"
+              disabled={scenePage >= sceneCards.length - 1}
+              onClick={() => setScenePage(p => Math.min(sceneCards.length - 1, p + 1))}
+              className="px-3 py-1.5 rounded-lg border border-(--line-soft) text-xs text-(--text-subtle) hover:bg-(--muted) transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+            >
+              下一场 →
+            </button>
+          </div>
+        )}
+
+        {/* 当前场景卡片 */}
+        {(() => {
+          const scene = sceneCards[scenePage];
+          if (!scene) return null;
+          return (
+            <div className="flex-1 min-h-0 overflow-y-auto rounded-xl border border-(--line-soft) bg-white shadow-sm">
+              {/* 场景头 */}
+              <div className="sticky top-0 flex items-center gap-3 px-4 py-3 bg-(--muted) border-b border-(--line-soft)">
+                <span className="flex h-7 w-7 items-center justify-center rounded-full bg-(--accent-soft) text-xs font-bold text-white">
+                  {scene.index}
+                </span>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {scene.location && (
+                      <span className="text-sm font-medium text-foreground">
+                        {scene.location}
+                      </span>
+                    )}
+                    {scene.timeOfDay && (
+                      <span className="text-xs px-1.5 py-0.5 rounded bg-(--accent-light) text-(--accent-soft)">
+                        {scene.timeOfDay}
+                      </span>
+                    )}
+                  </div>
+                  {scene.characters.length > 0 && (
+                    <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                      {scene.characters.map((char) => (
+                        <span key={char} className="text-xs text-(--text-subtle)">
+                          {char}
+                        </span>
+                      ))}
+                    </div>
                   )}
                 </div>
-                {scene.characters.length > 0 && (
-                  <div className="flex items-center gap-1.5 mt-1 flex-wrap">
-                    {scene.characters.map((char) => (
-                      <span
-                        key={char}
-                        className="text-xs text-(--text-subtle)"
-                      >
-                        {char}
-                      </span>
-                    ))}
-                  </div>
-                )}
               </div>
-            </div>
 
-            {/* 场景内容 */}
-            <div className="px-4 py-3 space-y-2">
-              {scene.lines.map((line, li) => {
-                if (line.type === "empty") return <div key={li} className="h-2" />;
-                if (line.type === "action") {
-                  return (
-                    <p key={li} className="text-sm text-(--text-subtle) leading-relaxed">
-                      {line.text}
-                    </p>
-                  );
-                }
-                if (line.type === "dialogue") {
-                  return (
-                    <div key={li} className="flex gap-3 items-start">
-                      <span className="shrink-0 mt-0.5 text-xs font-semibold text-(--accent-soft) bg-(--accent-light) px-2 py-0.5 rounded">
-                        {line.speaker}
-                      </span>
-                      <p className="text-sm text-foreground leading-relaxed">
+              {/* 场景内容 - 独立滚动 */}
+              <div className="px-4 py-3 space-y-2">
+                {scene.lines.map((line, li) => {
+                  if (line.type === "empty") return <div key={li} className="h-2" />;
+                  if (line.type === "action") {
+                    return (
+                      <p key={li} className="text-sm text-(--text-subtle) leading-relaxed">
                         {line.text}
                       </p>
-                    </div>
-                  );
-                }
-                return null;
-              })}
+                    );
+                  }
+                  if (line.type === "dialogue") {
+                    return (
+                      <div key={li} className="flex gap-3 items-start">
+                        <span className="shrink-0 mt-0.5 text-xs font-semibold text-(--accent-soft) bg-(--accent-light) px-2 py-0.5 rounded">
+                          {line.speaker}
+                        </span>
+                        <p className="text-sm text-foreground leading-relaxed">
+                          {line.text}
+                        </p>
+                      </div>
+                    );
+                  }
+                  return null;
+                })}
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })()}
 
         {/* 底栏操作 */}
         <div className="flex gap-3 pt-2">
@@ -1545,6 +1638,7 @@ function AIConvertPanel({ processedText, setProcessedText, setYamlOutput, setAna
               setAnalysisText("");
               setCompletedSteps(new Set());
               setIsComplete(false);
+              setScenePage(0);
             }}
             className="flex-1 px-4 py-2 rounded-lg border border-(--line-soft) text-sm text-(--text-subtle) hover:bg-(--muted) transition-colors"
           >
@@ -1679,5 +1773,5 @@ function AIConvertPanel({ processedText, setProcessedText, setYamlOutput, setAna
         </div>
       </div>
     </div>
-  );
+);
 }

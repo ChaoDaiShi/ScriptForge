@@ -697,7 +697,91 @@ script:
             if "maximum context length" in str(e) or "context_length" in str(e).lower():
                 print("文本过长，将使用本地规则处理")
             return ""
-    
+
+    async def _call_ai_stream(self, prompt: str, max_tokens: int = 4000):
+        """流式调用 DeepSeek API，逐 token 产出"""
+        try:
+            max_prompt_length = 15000
+            if len(prompt) > max_prompt_length:
+                prompt = prompt[:max_prompt_length] + "\n\n（文本过长，已截断）"
+
+            stream = await self.client.chat.completions.create(
+                model=self.model,
+                messages=[
+                    {"role": "system", "content": "你是一个专业的剧本创作助手，擅长处理小说文本的分析和转换。你输出的剧本格式专业、对话生动、镜头感强。"},
+                    {"role": "user", "content": prompt}
+                ],
+                temperature=0.7,
+                max_tokens=max_tokens,
+                stream=True,
+            )
+
+            async for chunk in stream:
+                if chunk.choices and chunk.choices[0].delta.content:
+                    yield chunk.choices[0].delta.content
+        except Exception as e:
+            print(f"AI流式调用失败: {str(e)}")
+            yield ""
+
+    async def convert_to_script_stream(self, text: str, script_type: str = "long"):
+        """流式版小说转剧本（第3-5步），逐 token 产出"""
+        if not os.getenv("DEEPSEEK_API_KEY"):
+            yield self._convert_local(text)
+            return
+
+        if script_type == "short":
+            style_extra = """
+【短剧专属要求】
+- 每15-25秒一个小冲突，全程无废话
+- 开头3秒抓眼球，结尾留钩子、悬念、反转
+- 台词简短、犀利、有张力
+- 动作细节更夸张，情绪更饱满，适合竖屏拍摄
+- 精简人物，精简场景，降低拍摄难度"""
+        else:
+            style_extra = ""
+
+        prompt = f"""你是资深影视编剧，擅长小说改短剧剧本。请将以下小说片段，完整改编为专业影视短剧剧本。
+
+严格遵守以下规则：
+
+1. 剧本格式（严格遵守，不得使用 markdown 格式）：
+   每一场开头必须用下面这行格式：
+   【场次】INT./EXT. 地点 - 时间（日/夜）｜出场：角色1、角色2
+   
+   紧接着是该场的动作描写和台词。示例：
+   【场景1】INT. 咖啡厅 - 日｜出场：张三、李四
+   ...
+   
+   对话格式（必须严格使用）：
+   ***角色名***
+       台词内容
+
+2. 把小说的心理活动、叙述文字，全部转化为：
+   - 人物表情（微笑、皱眉、眼神变化）
+   - 微动作（握拳、后退、转头）
+   - 语气标记（低沉地、冷冷地、颤抖地）
+   - 行为细节（推门、坐下、起身）
+
+3. 核心禁忌（必须遵守）：
+   - 不要大段保留小说旁白，能演就不说
+   - 不要保留大量心理描写，全部转动作、眼神、语气
+   - 不要书面化台词，全部改成日常口语对话
+   - 不要平铺直叙，每场必须有情绪推进/冲突/变化
+   - 禁止大段旁白，能用动作和台词表达的，绝不旁白
+   - 禁止使用 markdown 格式（* 加粗 / - 列表 等）
+   - 角色名只能用原文出现的名字，不要编造
+
+4. 环境描写精简，只写拍摄需要的画面
+5. 节奏紧凑，适合实拍，镜头感强
+6. 保留全部核心爽点、虐点、反转、情绪冲突
+{style_extra}
+
+以下是原文：
+{text[:8000]}
+"""
+        async for token in self._call_ai_stream(prompt):
+            yield token
+
     def _parse_json_response(self, response: str) -> Any:
         """解析JSON响应"""
         import json

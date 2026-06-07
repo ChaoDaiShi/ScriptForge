@@ -2,8 +2,11 @@
 Workbench API Routes.
 Handles episode and scene management for script writing.
 """
+import json
+import asyncio
 from fastapi import APIRouter, UploadFile, File, HTTPException, Query, Body
-from typing import List, Optional, Dict, Any
+from fastapi.responses import StreamingResponse
+from typing import List, Optional, Dict, Any, AsyncGenerator
 from core.utils import success_response, error_response
 from services.ai_service import AIService
 from services.script_converter import script_converter
@@ -353,6 +356,78 @@ async def process_all(
             })
         except:
             return error_response(message=f"处理失败: {str(e)}")
+
+
+@router.post("/process/all/stream", summary="AI 5步小说转剧本（流式）")
+async def process_all_stream(
+    text: str = Body(..., embed=True, description="待处理文本"),
+    script_type: str = Body("long", embed=True, description="剧本类型：long/short"),
+    title: str = Body("未命名剧本", embed=True, description="剧本标题"),
+):
+    """
+    AI 驱动的小说转剧本 5 步流程（流式输出版本）：
+    通过 Server-Sent Events (SSE) 逐步推送分析结果和剧本内容。
+    
+    SSE 事件类型：
+    - phase: 当前阶段提示 ("analysis" / "script" / "yaml" / "done")
+    - token: 剧本内容的增量文本（仅 script 阶段）
+    - result: 阶段性完整结果
+    - error: 错误信息
+    """
+    async def event_stream() -> AsyncGenerator[str, None]:
+        try:
+            # Phase 1: AI 分析拆解
+            yield f"data: {json.dumps({'type': 'phase', 'phase': 'analysis', 'message': '正在分析人物与场景...'})}\n\n"
+            
+            analysis = await ai_service.analyze_novel(text, title)
+            yield f"data: {json.dumps({'type': 'result', 'phase': 'analysis', 'analysis': analysis})}\n\n"
+
+            # Phase 2: 剧本转化（流式）
+            yield f"data: {json.dumps({'type': 'phase', 'phase': 'script', 'message': '正在生成剧本...'})}\n\n"
+            
+            script_buffer = ""
+            async for token in ai_service.convert_to_script_stream(text, script_type):
+                script_buffer += token
+                yield f"data: {json.dumps({'type': 'token', 'token': token})}\n\n"
+            
+            yield f"data: {json.dumps({'type': 'result', 'phase': 'script', 'text': script_buffer})}\n\n"
+
+            # Phase 3: YAML 结构化
+            yield f"data: {json.dumps({'type': 'phase', 'phase': 'yaml', 'message': '正在生成 YAML 结构...'})}\n\n"
+            
+            yaml_output = await ai_service.generate_yaml_ai(script_buffer, title)
+            yield f"data: {json.dumps({'type': 'result', 'phase': 'yaml', 'yaml': yaml_output})}\n\n"
+
+            # 完成
+            yield f"data: {json.dumps({'type': 'phase', 'phase': 'done'})}\n\n"
+
+        except Exception as e:
+            yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
+            # 回退到本地规则转换器
+            try:
+                result = script_converter.convert(text, title)
+                fallback_text = result["script_text"]
+                # 模拟流式输出
+                chunk_size = 50
+                for i in range(0, len(fallback_text), chunk_size):
+                    chunk = fallback_text[i:i + chunk_size]
+                    yield f"data: {json.dumps({'type': 'token', 'token': chunk})}\n\n"
+                    await asyncio.sleep(0.01)
+                yield f"data: {json.dumps({'type': 'result', 'phase': 'script', 'text': fallback_text, 'fallback': True})}\n\n"
+                yield f"data: {json.dumps({'type': 'result', 'phase': 'yaml', 'yaml': result['yaml'], 'fallback': True})}\n\n"
+                yield f"data: {json.dumps({'type': 'phase', 'phase': 'done', 'fallback': True})}\n\n"
+            except Exception as fallback_error:
+                yield f"data: {json.dumps({'type': 'error', 'message': f'回退也失败: {str(fallback_error)}'})}\n\n"
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        }
+    )
 
 
 @router.post("/process/convert", summary="直接转换（纯本地规则）")
