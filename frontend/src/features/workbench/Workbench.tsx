@@ -85,6 +85,8 @@ export default function Workbench() {
   const [dragOver, setDragOver] = useState(false);
   // 提升到 Workbench 以便左侧"原始文本"面板也能实时看到处理结果
   const [processedText, setProcessedText] = useState("");
+  // AI 分析结果（人物分析 + 场景拆分），独立于剧本正文
+  const [analysisText, setAnalysisText] = useState("");
   // 动态生成的 YAML
   const [yamlOutput, setYamlOutput] = useState("");
   const chatEndRef = useRef<HTMLDivElement>(null);
@@ -445,10 +447,12 @@ episode:
               </div>
             ) : hasData ? (
               <div className="text-sm leading-6 text-(--text-subtle)">
-                <p className="text-foreground mb-2 font-medium">原著选段</p>
-                <p>
-                  "深海勘探站收到一组异常的声纳信号，频率模式不在任何已知数据库中。林深盯着屏幕，眉头紧锁。"
-                </p>
+                <p className="text-foreground mb-2 font-medium">导入文本</p>
+                <div className="rounded-lg border border-(--line-soft) p-3 bg-white">
+                  <pre className="text-xs text-(--text-subtle) leading-6 whitespace-pre-wrap max-h-[200px] overflow-y-auto">
+                    {currentScript?.sourceText || "暂无内容"}
+                  </pre>
+                </div>
               </div>
             ) : (
               <p className="text-sm leading-6 text-(--text-subtle)">
@@ -495,7 +499,9 @@ episode:
                     </p>
                     <div className="rounded-lg border border-(--line-soft) p-3 bg-white">
                       <pre className="text-xs text-(--text-subtle) leading-6 whitespace-pre-wrap max-h-[350px] overflow-y-auto">
-                        {currentScript.sourceText}
+                        {hasNovelData
+                          ? currentNovel.fullText || "暂无内容"
+                          : currentScript.sourceText}
                       </pre>
                     </div>
                   </div>
@@ -512,25 +518,62 @@ episode:
             title="人物档案"
             icon={<Users className="h-3 w-3" />}
           >
-            {hasNovelData && currentNovel?.chapters && currentNovel.chapters.length > 0 ? (
-              <div className="space-y-2">
-                {currentNovel.chapters.slice(0, 5).map((chapter, index) => (
-                  <div
-                    key={chapter.index}
-                    className="flex items-center gap-2 rounded-lg border border-(--line-soft) px-3 py-2 text-sm"
-                  >
-                    <div className="flex h-6 w-6 items-center justify-center rounded-full bg-(--accent-light) text-xs text-(--accent-soft)">
-                      {index + 1}
-                    </div>
-                    <span className="text-xs text-foreground truncate">{chapter.title}</span>
+            {(() => {
+              // 多渠道提取角色
+              let chars: string[] = [];
+
+              // 1. 从剧本正文提取 ***角色名*** 模式
+              const scriptMatches = processedText.match(/\*\*\*(.+?)\*\*\*/g);
+              if (scriptMatches) {
+                chars = [...new Set(scriptMatches.map(c => c.replace(/\*\*\*/g, "").trim()))]
+                  .filter(c => c.length > 0 && c.length < 10 && !/^角色[甲乙丙丁]$/.test(c));
+              }
+
+              // 2. 从场景 intent（出场人员）提取
+              if (chars.length === 0 && currentScript?.episodes[0]?.scenes) {
+                const sceneChars = currentScript.episodes[0].scenes
+                  .flatMap(s => {
+                    const m = s.intent?.match(/出场[:：](.+)/);
+                    return m ? m[1].split(/[,，、]/).map(c => c.trim()).filter(Boolean) : [];
+                  });
+                chars = [...new Set(sceneChars)].filter(c => c.length < 10);
+              }
+
+              // 3. 从 AI 分析文本提取
+              if (chars.length === 0 && analysisText) {
+                const charSection = analysisText.match(/人物[分析|角色|提取][\s\S]*?(?=##|\n\n|$)/);
+                if (charSection) {
+                  const names = charSection[0].match(/[（(][^)）]+[)）]|[-–—]\s*([^\s：:]+)[：:]/g);
+                  if (names) {
+                    chars = [...new Set(names.map(n => n.replace(/[（()）[-–—]/g, "").replace(/[：:].*/, "").trim()))]
+                      .filter(c => c.length > 0 && c.length < 10);
+                  }
+                }
+              }
+
+              if (chars.length > 0) {
+                return (
+                  <div className="space-y-1.5">
+                    {chars.slice(0, 10).map((char, i) => (
+                      <div
+                        key={char}
+                        className="flex items-center gap-2 rounded-lg border border-(--line-soft) px-3 py-2 text-sm"
+                      >
+                        <div className="flex h-6 w-6 items-center justify-center rounded-full bg-(--accent-light) text-xs text-(--accent-soft)">
+                          {i + 1}
+                        </div>
+                        <span className="text-xs text-foreground">{char}</span>
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-sm leading-6 text-(--text-subtle)">
-                AI 将从文本中自动提取人物角色及其关系。
-              </p>
-            )}
+                );
+              }
+              return (
+                <p className="text-sm leading-6 text-(--text-subtle)">
+                  AI 将从文本中自动提取人物角色及其关系。
+                </p>
+              );
+            })()}
           </CollapsibleSection>
 
           <CollapsibleSection
@@ -538,41 +581,78 @@ episode:
             icon={<ListTree className="h-3 w-3" />}
           >
             <div className="space-y-3">
-              {hasScenes && currentScript?.episodes[0]?.scenes && currentScript.episodes[0].scenes.length > 0 ? (
-                currentScript.episodes[0].scenes.slice(0, 4).map((scene, i) => (
-                  <div key={scene.id} className="flex gap-3">
+              {(() => {
+                // 优先从 processedText 解析场景，回退到 store
+                const sceneParts = processedText.split(/(?=【场景\d+】)/).filter(p => p.trim());
+                const parsedScenes = sceneParts.map(part => {
+                  const hm = part.match(/【场景(\d+)】(.+)/);
+                  const hi = hm ? hm[2] : "";
+                  const lm = hi.match(/(INT\.|EXT\.)\s*(.+?)\s*-\s*(日|夜|白天|夜晚|晨|黄昏|傍晚)/);
+                  return {
+                    title: `场景 ${hm?.[1] || "?"}`,
+                    location: lm ? `${lm[1]} ${lm[2].trim()}` : "",
+                    timeOfDay: lm ? lm[3] : "",
+                    chars: hi.match(/出场[:：](.+)/)?.[1]?.trim() || "",
+                  };
+                });
+
+                if (parsedScenes.length > 0 && parsedScenes.some(s => s.location || s.chars)) {
+                  return parsedScenes.slice(0, 4).map((scene, i) => (
+                    <div key={i} className="flex gap-3">
+                      <div className="flex flex-col items-center">
+                        <span className={`mt-1 h-2.5 w-2.5 rounded-full ${i === 0 ? "bg-(--accent-soft)" : "bg-(--line-medium)"}`} />
+                        {i < Math.min(parsedScenes.length - 1, 3) && (
+                          <span className="mt-1.5 h-8 w-px bg-(--line-soft)" />
+                        )}
+                      </div>
+                      <div>
+                        <p className="text-sm text-foreground">{scene.title}</p>
+                        <p className="text-xs text-(--text-subtle)">
+                          {scene.location || scene.timeOfDay
+                            ? `${scene.location}${scene.location && scene.timeOfDay ? " · " : ""}${scene.timeOfDay}`
+                            : scene.chars || "等待详情"}
+                        </p>
+                      </div>
+                    </div>
+                  ));
+                }
+
+                // 回退到 store 场景
+                if (hasScenes && currentScript?.episodes[0]?.scenes?.length > 0) {
+                  return currentScript.episodes[0].scenes.slice(0, 4).map((scene, i) => (
+                    <div key={scene.id} className="flex gap-3">
+                      <div className="flex flex-col items-center">
+                        <span className={`mt-1 h-2.5 w-2.5 rounded-full ${i === 0 ? "bg-(--accent-soft)" : "bg-(--line-medium)"}`} />
+                        {i < Math.min(currentScript.episodes[0].scenes.length - 1, 3) && (
+                          <span className="mt-1.5 h-8 w-px bg-(--line-soft)" />
+                        )}
+                      </div>
+                      <div>
+                        <p className="text-sm text-foreground">{scene.title}</p>
+                        <p className="text-xs text-(--text-subtle)">
+                          {scene.location || scene.timeOfDay
+                            ? `${scene.location}${scene.location && scene.timeOfDay ? " · " : ""}${scene.timeOfDay}`
+                            : scene.intent || "等待详情"}
+                        </p>
+                      </div>
+                    </div>
+                  ));
+                }
+
+                return (
+                  <div className="flex gap-3">
                     <div className="flex flex-col items-center">
-                      <span
-                        className={`mt-1 h-2.5 w-2.5 rounded-full ${i === 0
-                          ? "bg-(--accent-soft)"
-                          : "bg-(--line-medium)"
-                          }`}
-                      />
-                      {i < Math.min(currentScript.episodes[0].scenes.length - 1, 3) && (
-                        <span className="mt-1.5 h-8 w-px bg-(--line-soft)" />
-                      )}
+                      <span className="mt-1 h-2.5 w-2.5 rounded-full bg-(--line-medium)" />
                     </div>
                     <div>
-                      <p className="text-sm text-foreground">{scene.title}</p>
+                      <p className="text-sm text-foreground">等待分析</p>
                       <p className="text-xs text-(--text-subtle)">
-                        {scene.beats.length} 节拍
+                        {hasData ? "等待 AI 分析生成故事结构" : "请先导入文本"}
                       </p>
                     </div>
                   </div>
-                ))
-              ) : (
-                <div className="flex gap-3">
-                  <div className="flex flex-col items-center">
-                    <span className="mt-1 h-2.5 w-2.5 rounded-full bg-(--line-medium)" />
-                  </div>
-                  <div>
-                    <p className="text-sm text-foreground">等待分析</p>
-                    <p className="text-xs text-(--text-subtle)">
-                      {hasData ? "等待 AI 分析生成故事结构" : "请先导入文本"}
-                    </p>
-                  </div>
-                </div>
-              )}
+                );
+              })()}
             </div>
           </CollapsibleSection>
         </div>
@@ -583,85 +663,15 @@ episode:
             <p className="text-xs uppercase tracking-[0.22em] text-(--text-faint) mb-1">
               Visual Editor
             </p>
-            <h2 className="font-serif text-xl text-foreground">可视化编剧台</h2>
-            <p className="mt-0.5 text-sm text-(--text-subtle)">
+            <h2 className="font-serif text-base text-foreground">可视化编剧台</h2>
+            <p className="mt-0.5 text-xs text-(--text-subtle)">
               以剧本原子化结构编辑集、场景与节拍。
             </p>
           </div>
 
-          {/* Episode Cards */}
-          {hasData && currentScript?.episodes && currentScript.episodes.length > 0 ? (
-            <div className="space-y-4">
-              {currentScript.episodes.map((episode, epIdx) => (
-                <div key={episode.id} className="card">
-                  <div className="flex items-center justify-between mb-3">
-                    <div>
-                      <p className="text-xs uppercase tracking-[0.22em] text-(--text-faint)">
-                        Episode {epIdx + 1}
-                      </p>
-                      <p className="mt-1 text-sm text-foreground">
-                        {episode.title || `剧集 ${epIdx + 1}`}
-                      </p>
-                    </div>
-                    <span className={`badge ${episode.scenes.some(s => s.status !== "draft") ? "badge-primary" : "badge-muted"}`}>
-                      {episode.scenes.length} 场景
-                    </span>
-                  </div>
-                  {showEditor && episode.scenes.length > 0 && (
-                    <div className="space-y-2 mt-3">
-                      {episode.scenes.map((scene, i) => (
-                        <div
-                          key={scene.id}
-                          className="group flex items-start gap-3 rounded-xl border border-(--line-soft) px-4 py-3 hover:bg-(--muted) transition-colors cursor-pointer"
-                        >
-                          <span className="mt-1 flex h-5 w-5 shrink-0 items-center justify-center rounded bg-(--accent-light) text-xs text-(--accent-soft)">
-                            {i + 1}
-                          </span>
-                          <div className="min-w-0 flex-1">
-                            <p className="text-sm text-foreground">{scene.title}</p>
-                            <p className="mt-0.5 text-xs text-(--text-subtle)">
-                              {scene.location || "等待分析"} · {scene.beats.length} 节拍
-                            </p>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              ))}
-              <div className="flex items-center gap-2 mt-2">
-                <button
-                  type="button"
-                  onClick={() => setShowEditor(!showEditor)}
-                  className="px-3 py-1 rounded-md text-xs bg-(--accent-soft) text-white hover:bg-(--accent-soft)/90 transition-colors"
-                >
-                  {showEditor ? "收起详情" : "展开详情"}
-                </button>
-                <span className={`badge ${hasData ? "badge-primary" : "badge-muted"}`}>
-                  {currentScript.episodes.length} 集
-                </span>
-              </div>
-            </div>
-          ) : (
-            <div className="card mb-4">
-              <div className="flex items-center justify-between mb-3">
-                <div>
-                  <p className="text-xs uppercase tracking-[0.22em] text-(--text-faint)">
-                    Episode Container
-                  </p>
-                  <p className="mt-1 text-sm text-foreground">暂无活跃项目</p>
-                </div>
-                <span className="badge badge-muted">等待导入</span>
-              </div>
-              <p className="text-sm text-(--text-subtle) leading-6">
-                完成文本导入和 AI 转换后，场景结构将在此展示。
-              </p>
-            </div>
-          )}
-
           {/* AI Convert Panel or Import Panel */}
           {hasData && !showEditor ? (
-            <AIConvertPanel processedText={processedText} setProcessedText={setProcessedText} setYamlOutput={setYamlOutput} />
+            <AIConvertPanel processedText={processedText} setProcessedText={setProcessedText} setYamlOutput={setYamlOutput} setAnalysisText={setAnalysisText} />
           ) : showEditor ? (
             <div className="flex-1 flex items-center justify-center rounded-xl border-2 border-dashed border-(--line-soft) p-8">
               <div className="text-center">
@@ -1084,14 +1094,16 @@ interface AIConvertPanelProps {
   processedText: string;
   setProcessedText: (text: string) => void;
   setYamlOutput: (yaml: string) => void;
+  setAnalysisText: (text: string) => void;
 }
 
-function AIConvertPanel({ processedText, setProcessedText, setYamlOutput }: AIConvertPanelProps) {
+function AIConvertPanel({ processedText, setProcessedText, setYamlOutput, setAnalysisText }: AIConvertPanelProps) {
   const [currentStep, setCurrentStep] = useState(0);
   const [isProcessing, setIsProcessing] = useState(false);
   const [adaptType, setAdaptType] = useState<"short" | "long">("long");
   const [completedSteps, setCompletedSteps] = useState<Set<string>>(new Set());
   const [isComplete, setIsComplete] = useState(false);
+  const [showTextPanel, setShowTextPanel] = useState(true);
   const novels = useNovelStore((s) => s.novels);
   const currentNovelId = useNovelStore((s) => s.currentNovelId);
   const currentNovel = novels.find(n => n.id === currentNovelId);
@@ -1184,17 +1196,61 @@ function AIConvertPanel({ processedText, setProcessedText, setYamlOutput }: AICo
   const saveScript = (scriptText: string) => {
     if (!currentScript || !currentScriptId) return;
 
-    const scenes = scriptText.split("###").filter(s => s.trim()).map((sceneContent, i) => ({
-      id: `scene_${Date.now()}_${i}`,
-      title: `场景 ${i + 1}`,
-      location: "",
-      timeOfDay: "",
-      intent: "",
-      beats: [],
-      content: sceneContent.trim(),
-      code: "",
-      status: "draft" as const,
-    }));
+    // 解析场景：优先按【场景N】分割，回退到 ###
+    let scenes: Array<{
+      id: string;
+      title: string;
+      location: string;
+      timeOfDay: string;
+      intent: string;
+      beats: Array<unknown>;
+      content: string;
+      code: string;
+      status: "draft";
+    }> = [];
+
+    const sceneHeaderRegex = /【场景(\d+)】(.+)/g;
+    const parts = scriptText.split(/(?=【场景\d+】)/);
+
+    if (parts.length > 1) {
+      // AI 输出格式：按【场景N】分割
+      parts.forEach((part, i) => {
+        const headerMatch = part.match(/【场景(\d+)】(.+)/);
+        if (headerMatch) {
+          const headerInfo = headerMatch[2];
+          // 解析：EXT./INT. 地点 - 时间｜出场：角色
+          const locMatch = headerInfo.match(/(INT\.|EXT\.)\s*(.+?)\s*-\s*(日|夜|白天|夜晚|晨|黄昏|傍晚)/);
+          const charsMatch = headerInfo.match(/出场[:：](.+)/);
+
+          let body = part.replace(/【场景\d+】.*(?:\r?\n|$)/, "").trim();
+
+          scenes.push({
+            id: `scene_${Date.now()}_${i}`,
+            title: `场景 ${headerMatch[1]}`,
+            location: locMatch ? `${locMatch[1]} ${locMatch[2].trim()}` : "",
+            timeOfDay: locMatch ? locMatch[3] : "",
+            intent: charsMatch ? `出场：${charsMatch[1].trim()}` : "",
+            beats: [],
+            content: body,
+            code: "",
+            status: "draft",
+          });
+        }
+      });
+    } else {
+      // 回退：按 ### 分割
+      scenes = scriptText.split("###").filter(s => s.trim()).map((sceneContent, i) => ({
+        id: `scene_${Date.now()}_${i}`,
+        title: `场景 ${i + 1}`,
+        location: "",
+        timeOfDay: "",
+        intent: "",
+        beats: [],
+        content: sceneContent.trim(),
+        code: "",
+        status: "draft" as const,
+      }));
+    }
 
     const updatedScript = {
       ...currentScript,
@@ -1246,9 +1302,7 @@ function AIConvertPanel({ processedText, setProcessedText, setYamlOutput }: AICo
         }
         // AI 分析结果（人物分析 + 场景拆分）
         if (data.data.analysis) {
-          // 在剧本正文前附加 AI 分析（可折叠查看）
-          const fullOutput = data.data.analysis + "\n\n---\n\n" + data.data.text;
-          setProcessedText(fullOutput);
+          setAnalysisText(data.data.analysis);
         }
         // 标记所有步骤为完成
         const allDone = new Set(AI_STEPS.filter(s => s.id !== "structure").map(s => s.id));
@@ -1293,53 +1347,171 @@ function AIConvertPanel({ processedText, setProcessedText, setYamlOutput }: AICo
   const processingStep = isProcessing ? AI_STEPS[currentStep] : null;
 
   if (isComplete && processedText) {
+    // 解析场景卡片
+    const sceneParts = processedText.split(/(?=【场景\d+】)/).filter(p => p.trim());
+    const sceneCards = sceneParts.map((part, idx) => {
+      const headerMatch = part.match(/【场景(\d+)】(.+)/);
+      const headerInfo = headerMatch ? headerMatch[2] : "";
+      const locMatch = headerInfo.match(/(INT\.|EXT\.)\s*(.+?)\s*-\s*(日|夜|白天|夜晚|晨|黄昏|傍晚)/);
+      const charsMatch = headerInfo.match(/出场[:：](.+)/);
+      const body = part.replace(/【场景\d+】.*(?:\r?\n|$)/, "").trim();
+
+      // 解析对话行：***角色名***\n    台词
+      const lines = body.split("\n");
+      const formattedLines: Array<{ type: "dialogue" | "action" | "empty"; speaker?: string; text: string }> = [];
+      let lineIdx = 0;
+      while (lineIdx < lines.length) {
+        const line = lines[lineIdx];
+        const speakerMatch = line.match(/^\*\*\*(.+?)\*\*\*$/);
+        if (speakerMatch) {
+          const nextLine = lines[lineIdx + 1] || "";
+          formattedLines.push({
+            type: "dialogue",
+            speaker: speakerMatch[1].trim(),
+            text: nextLine.trim(),
+          });
+          lineIdx += 2;
+        } else if (line.trim()) {
+          formattedLines.push({ type: "action", text: line });
+          lineIdx += 1;
+        } else {
+          formattedLines.push({ type: "empty", text: "" });
+          lineIdx += 1;
+        }
+      }
+
+      return {
+        index: headerMatch ? parseInt(headerMatch[1]) : idx + 1,
+        location: locMatch ? `${locMatch[1]} ${locMatch[2].trim()}` : "",
+        timeOfDay: locMatch ? locMatch[3] : "",
+        characters: charsMatch ? charsMatch[1].trim().split(/[,，、]/).map(c => c.trim()).filter(Boolean) : [],
+        lines: formattedLines,
+        rawHeader: headerInfo,
+      };
+    });
+
     return (
-      <div className="flex-1 flex p-4 gap-4">
-        <div className="w-1/3 flex flex-col">
-          <div className="mb-3">
-            <h4 className="font-serif text-sm text-(--text-subtle) mb-1">📄 原始文本</h4>
-            <p className="text-xs text-(--text-faint)">已归档</p>
+      <div className="flex-1 flex flex-col p-4 gap-4 overflow-y-auto">
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="font-serif text-lg text-foreground">剧本内容</h3>
+            <p className="text-sm text-(--text-subtle)">AI 转换完成 · 共 {sceneCards.length} 场</p>
           </div>
-          <div className="flex-1 bg-(--muted) rounded-xl p-3 overflow-auto">
-            <div className="font-mono text-xs text-(--text-subtle) whitespace-pre-wrap">
-              {originalText}
-            </div>
-          </div>
-        </div>
-
-        <div className="flex-1 flex flex-col">
-          <div className="mb-3">
-            <h3 className="font-serif text-lg text-foreground mb-1">🎬 剧本内容</h3>
-            <p className="text-sm text-(--text-subtle)">AI 转换完成</p>
-          </div>
-          <div className="flex-1 bg-white rounded-xl border border-(--line-soft) p-4 overflow-auto">
-            <div className="font-mono text-sm text-foreground whitespace-pre-wrap">
-              {processedText}
-            </div>
-          </div>
-
-          <div className="mt-4 flex gap-3">
+          <div className="flex gap-2">
             <button
               type="button"
               onClick={() => {
                 setCurrentStep(0);
                 setProcessedText("");
                 setYamlOutput("");
+                setAnalysisText("");
                 setCompletedSteps(new Set());
                 setIsComplete(false);
               }}
-              className="flex-1 px-4 py-2 rounded-lg border border-(--line-soft) text-sm text-(--text-subtle) hover:bg-(--muted) transition-colors"
+              className="px-3 py-1.5 rounded-lg border border-(--line-soft) text-xs text-(--text-subtle) hover:bg-(--muted) transition-colors"
             >
               重新转换
             </button>
             <button
               type="button"
               onClick={() => exportScript(processedText)}
-              className="flex-1 px-4 py-2 rounded-lg bg-(--accent-soft) text-white text-sm hover:bg-(--accent-soft)/90 transition-colors"
+              className="px-3 py-1.5 rounded-lg bg-(--accent-soft) text-white text-xs hover:bg-(--accent-soft)/90 transition-colors"
             >
               导出剧本
             </button>
           </div>
+        </div>
+
+        {sceneCards.map((scene) => (
+          <div
+            key={scene.index}
+            className="rounded-xl border border-(--line-soft) bg-white overflow-hidden shadow-sm"
+          >
+            {/* 场景头 */}
+            <div className="flex items-center gap-3 px-4 py-3 bg-(--muted) border-b border-(--line-soft)">
+              <span className="flex h-7 w-7 items-center justify-center rounded-full bg-(--accent-soft) text-xs font-bold text-white">
+                {scene.index}
+              </span>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  {scene.location && (
+                    <span className="text-sm font-medium text-foreground">
+                      {scene.location}
+                    </span>
+                  )}
+                  {scene.timeOfDay && (
+                    <span className="text-xs px-1.5 py-0.5 rounded bg-(--accent-light) text-(--accent-soft)">
+                      {scene.timeOfDay}
+                    </span>
+                  )}
+                </div>
+                {scene.characters.length > 0 && (
+                  <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                    {scene.characters.map((char) => (
+                      <span
+                        key={char}
+                        className="text-xs text-(--text-subtle)"
+                      >
+                        {char}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* 场景内容 */}
+            <div className="px-4 py-3 space-y-2">
+              {scene.lines.map((line, li) => {
+                if (line.type === "empty") return <div key={li} className="h-2" />;
+                if (line.type === "action") {
+                  return (
+                    <p key={li} className="text-sm text-(--text-subtle) leading-relaxed">
+                      {line.text}
+                    </p>
+                  );
+                }
+                if (line.type === "dialogue") {
+                  return (
+                    <div key={li} className="flex gap-3 items-start">
+                      <span className="shrink-0 mt-0.5 text-xs font-semibold text-(--accent-soft) bg-(--accent-light) px-2 py-0.5 rounded">
+                        {line.speaker}
+                      </span>
+                      <p className="text-sm text-foreground leading-relaxed">
+                        {line.text}
+                      </p>
+                    </div>
+                  );
+                }
+                return null;
+              })}
+            </div>
+          </div>
+        ))}
+
+        {/* 底栏操作 */}
+        <div className="flex gap-3 pt-2">
+          <button
+            type="button"
+            onClick={() => {
+              setCurrentStep(0);
+              setProcessedText("");
+              setYamlOutput("");
+              setAnalysisText("");
+              setCompletedSteps(new Set());
+              setIsComplete(false);
+            }}
+            className="flex-1 px-4 py-2 rounded-lg border border-(--line-soft) text-sm text-(--text-subtle) hover:bg-(--muted) transition-colors"
+          >
+            重新转换
+          </button>
+          <button
+            type="button"
+            onClick={() => exportScript(processedText)}
+            className="flex-1 px-4 py-2 rounded-lg bg-(--accent-soft) text-white text-sm hover:bg-(--accent-soft)/90 transition-colors"
+          >
+            导出剧本
+          </button>
         </div>
       </div>
     );
@@ -1410,68 +1582,80 @@ function AIConvertPanel({ processedText, setProcessedText, setYamlOutput }: AICo
               "原始文本"
             )}
           </span>
-          <span className="text-xs text-(--text-faint)">
-            {displayText.length} 字符
-          </span>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-(--text-faint)">
+              {displayText.length} 字符
+            </span>
+            <button
+              type="button"
+              onClick={() => setShowTextPanel(!showTextPanel)}
+              className="flex items-center gap-1 px-2 py-1 rounded text-xs text-(--text-subtle) hover:text-foreground hover:bg-(--muted) transition-colors"
+            >
+              {showTextPanel ? (
+                <>
+                  <ChevronDown className="h-3 w-3" />
+                  收起文本
+                </>
+              ) : (
+                <>
+                  <ChevronRight className="h-3 w-3" />
+                  展开文本
+                </>
+              )}
+            </button>
+          </div>
         </div>
-        <div className="bg-(--muted) rounded-xl p-4 min-h-[400px] font-mono text-sm text-foreground whitespace-pre-wrap overflow-auto">
-          {displayText || "等待导入文本..."}
-        </div>
+        {showTextPanel && (
+          <div className="bg-(--muted) rounded-xl p-4 min-h-[400px] font-mono text-sm text-foreground whitespace-pre-wrap overflow-auto">
+            {displayText || "等待导入文本..."}
+          </div>
+        )}
       </div>
 
       <div className="border-t border-(--line-soft) pt-4">
-        <p className="text-sm font-medium text-foreground mb-3">处理工具</p>
-        <div className="space-y-2">
-          {AI_STEPS.map((step, index) => (
-            <div
+        <div className="flex items-center justify-between mb-3">
+          <p className="text-sm font-medium text-foreground">处理进度</p>
+          <span className="text-xs text-(--text-subtle)">
+            {completedSteps.size} / {AI_STEPS.length - 1} 步骤完成
+          </span>
+        </div>
+
+        <div className="relative h-2 bg-(--muted) rounded-full overflow-hidden mb-4">
+          <div
+            className="absolute left-0 top-0 h-full bg-(--accent-soft) rounded-full transition-all duration-300"
+            style={{ width: `${((completedSteps.size) / (AI_STEPS.length - 1)) * 100}%` }}
+          />
+          {isProcessing && (
+            <div className="absolute left-0 top-0 h-full bg-(--accent-soft)/50 rounded-full animate-pulse" />
+          )}
+        </div>
+
+        <div className="flex flex-wrap gap-1.5 mb-4">
+          {AI_STEPS.filter(s => s.id !== "structure").map((step, index) => (
+            <span
               key={step.id}
-              className={`flex items-center gap-3 p-3 rounded-lg border transition-colors ${completedSteps.has(step.id)
-                ? "border-green-500 bg-green-50"
-                : index === currentStep && !isProcessing
-                  ? "border-(--accent-soft) bg-(--accent-light)"
-                  : "border-(--line-soft) hover:bg-(--muted)"
+              className={`px-2 py-1 rounded text-xs ${completedSteps.has(step.id)
+                ? "bg-green-100 text-green-700"
+                : isProcessing && index === currentStep
+                  ? "bg-(--accent-light) text-(--accent-soft)"
+                  : "bg-(--muted) text-(--text-subtle)"
                 }`}
             >
-              <div className="flex h-6 w-6 items-center justify-center rounded-full text-xs font-medium">
-                {completedSteps.has(step.id) ? (
-                  <Check className="h-4 w-4 text-green-500" />
-                ) : isProcessing && index === currentStep ? (
-                  <div className="w-4 h-4 border-2 border-(--accent-soft) border-t-transparent rounded-full animate-spin" />
-                ) : (
-                  index + 1
-                )}
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm text-foreground">{step.label}</p>
-                <p className="text-xs text-(--text-subtle) truncate">{step.desc}</p>
-              </div>
-              {step.id === "structure" ? (
-                <span className="text-xs text-(--text-faint)">已选择: {adaptType === "long" ? "影视作品" : "电影剧本"}</span>
-              ) : completedSteps.has(step.id) ? (
-                <span className="text-xs text-green-500">完成</span>
-              ) : index === currentStep && !isProcessing ? (
-                <button
-                  type="button"
-                  onClick={() => processStep(step.id)}
-                  className="px-3 py-1 rounded-md bg-(--accent-soft) text-white text-xs"
-                >
-                  执行
-                </button>
-              ) : (
-                <span className="text-xs text-(--text-faint)">等待</span>
-              )}
-            </div>
+              {step.label}
+            </span>
           ))}
         </div>
 
-        <div className="mt-4 flex gap-3">
+        <div className="flex gap-3">
           <button
             type="button"
             onClick={() => {
               setCurrentStep(0);
               setProcessedText("");
               setYamlOutput("");
+              setAnalysisText("");
               setCompletedSteps(new Set());
+              setIsComplete(false);
             }}
             className="flex-1 px-4 py-2 rounded-lg border border-(--line-soft) text-sm text-(--text-subtle) hover:bg-(--muted) transition-colors"
           >

@@ -6,6 +6,7 @@ from typing import List, Dict, Any, Optional
 import re
 import uuid
 import os
+import httpx
 from dotenv import load_dotenv
 from openai import AsyncOpenAI
 
@@ -16,11 +17,14 @@ class AIService:
     """AI服务封装 - 使用DeepSeek API，5步小说转剧本流程"""
     
     def __init__(self):
+        # 设置 120 秒超时，防止 API 调用卡死
+        timeout = httpx.Timeout(120.0, connect=30.0)
         self.client = AsyncOpenAI(
             api_key=os.getenv("DEEPSEEK_API_KEY"),
-            base_url=os.getenv("DEEPSEEK_API_BASE_URL", "https://api.deepseek.com/v1")
+            base_url=os.getenv("DEEPSEEK_API_BASE_URL", "https://api.deepseek.com"),
+            http_client=httpx.AsyncClient(timeout=timeout)
         )
-        self.model = os.getenv("DEEPSEEK_V4_FLASH_MODEL", "deepseek-v4-flash")
+        self.model = os.getenv("DEEPSEEK_V4_FLASH_MODEL", "deepseek-chat")
 
     # ================================================================
     # 小说转剧本 5 步流程
