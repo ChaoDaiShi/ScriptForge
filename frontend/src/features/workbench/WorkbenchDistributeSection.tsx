@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+﻿import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   AlertCircle,
@@ -192,7 +192,7 @@ function StepIndicator({ current }: { current: DistributeStep }) {
                   isDone
                     ? "bg-green-100 text-green-600"
                     : isActive
-                      ? "bg-[rgba(123,184,232,0.12)] text-[#7bb8e8] ring-2 ring-[rgba(123,184,232,0.2)]"
+                      ? "bg-[oklch(from var(--accent-soft) l c h / 0.12)] text-[var(--accent-soft)] ring-2 ring-[oklch(from var(--accent-soft) l c h / 0.2)]"
                       : "bg-[var(--muted)] text-[var(--text-faint)]"
                 }`}
               >
@@ -327,7 +327,7 @@ function SelectStep({
             </button>
           }
         >
-          <div className="mb-5 rounded-2xl border border-[var(--line-soft)] bg-[linear-gradient(135deg,rgba(123,184,232,0.10),rgba(255,255,255,0.95))] p-4">
+          <div className="mb-5 rounded-2xl border border-[var(--line-soft)] bg-[linear-gradient(135deg,oklch(from var(--accent-soft) l c h / 0.10),rgba(255,255,255,0.95))] p-4">
             <div className="flex items-start justify-between gap-4">
               <div>
                 <p className="text-xs uppercase tracking-[0.2em] text-[var(--text-faint)]">
@@ -363,7 +363,7 @@ function SelectStep({
                     setConfig({ ...config, title: event.target.value })
                   }
                   placeholder="输入最终交付片名"
-                  className="w-full rounded-xl border border-[var(--line-medium)] bg-white px-4 py-2.5 text-sm outline-none transition-all focus:border-[#7bb8e8] focus:ring-2 focus:ring-[rgba(123,184,232,0.12)]"
+                  className="w-full rounded-xl border border-[var(--line-medium)] bg-white px-4 py-2.5 text-sm outline-none transition-all focus:border-[var(--accent-soft)] focus:ring-2 focus:ring-[oklch(from var(--accent-soft) l c h / 0.12)]"
                 />
               </div>
               <div>
@@ -381,7 +381,7 @@ function SelectStep({
                       duration: parseInt(event.target.value, 10) || 60,
                     })
                   }
-                  className="w-full rounded-xl border border-[var(--line-medium)] bg-white px-4 py-2.5 text-sm outline-none transition-all focus:border-[#7bb8e8] focus:ring-2 focus:ring-[rgba(123,184,232,0.12)]"
+                  className="w-full rounded-xl border border-[var(--line-medium)] bg-white px-4 py-2.5 text-sm outline-none transition-all focus:border-[var(--accent-soft)] focus:ring-2 focus:ring-[oklch(from var(--accent-soft) l c h / 0.12)]"
                 />
               </div>
               <div className="md:col-span-2">
@@ -395,7 +395,7 @@ function SelectStep({
                     setConfig({ ...config, description: event.target.value })
                   }
                   placeholder="填写给平台运营、外部协作方或 AI 生成链路的备注说明"
-                  className="w-full rounded-xl border border-[var(--line-medium)] bg-white px-4 py-2.5 text-sm outline-none transition-all focus:border-[#7bb8e8] focus:ring-2 focus:ring-[rgba(123,184,232,0.12)]"
+                  className="w-full rounded-xl border border-[var(--line-medium)] bg-white px-4 py-2.5 text-sm outline-none transition-all focus:border-[var(--accent-soft)] focus:ring-2 focus:ring-[oklch(from var(--accent-soft) l c h / 0.12)]"
                 />
               </div>
               <div>
@@ -412,7 +412,7 @@ function SelectStep({
                       }
                       className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition-all ${
                         config.resolution === option.value
-                          ? "border-[#7bb8e8] bg-[rgba(123,184,232,0.08)] text-[#7bb8e8]"
+                          ? "border-[var(--accent-soft)] bg-[oklch(from var(--accent-soft) l c h / 0.08)] text-[var(--accent-soft)]"
                           : "border-[var(--line-soft)] text-[var(--text-subtle)] hover:border-[var(--line-medium)] hover:text-[hsl(var(--foreground))]"
                       }`}
                     >
@@ -435,7 +435,7 @@ function SelectStep({
                       }
                       className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition-all ${
                         config.ratio === option.value
-                          ? "border-[#7bb8e8] bg-[rgba(123,184,232,0.08)] text-[#7bb8e8]"
+                          ? "border-[var(--accent-soft)] bg-[oklch(from var(--accent-soft) l c h / 0.08)] text-[var(--accent-soft)]"
                           : "border-[var(--line-soft)] text-[var(--text-subtle)] hover:border-[var(--line-medium)] hover:text-[hsl(var(--foreground))]"
                       }`}
                     >
@@ -451,7 +451,7 @@ function SelectStep({
                   onChange={(event) =>
                     setConfig({ ...config, watermark: event.target.checked })
                   }
-                  className="h-4 w-4 rounded border-[var(--line-medium)] text-[#7bb8e8]"
+                  className="h-4 w-4 rounded border-[var(--line-medium)] text-[var(--accent-soft)]"
                 />
                 添加专属水印
               </label>
@@ -465,7 +465,7 @@ function SelectStep({
                       generateAudio: event.target.checked,
                     })
                   }
-                  className="h-4 w-4 rounded border-[var(--line-medium)] text-[#7bb8e8]"
+                  className="h-4 w-4 rounded border-[var(--line-medium)] text-[var(--accent-soft)]"
                 />
                 <Music className="h-4 w-4" />
                 生成同步音频
@@ -489,7 +489,7 @@ function SelectStep({
                       onClick={() => togglePlatform(platform.key)}
                       className={`flex w-full items-start gap-3 rounded-2xl border p-3 text-left transition-all ${
                         selected
-                          ? "border-[#7bb8e8] bg-white shadow-[var(--shadow-card)]"
+                          ? "border-[var(--accent-soft)] bg-white shadow-[var(--shadow-card)]"
                           : "border-transparent bg-white/70 hover:border-[var(--line-medium)]"
                       }`}
                     >
@@ -506,7 +506,7 @@ function SelectStep({
                             {platform.name}
                           </p>
                           {selected ? (
-                            <CheckCircle2 className="h-4 w-4 text-[#7bb8e8]" />
+                            <CheckCircle2 className="h-4 w-4 text-[var(--accent-soft)]" />
                           ) : (
                             <Circle className="h-4 w-4 text-[var(--text-faint)]" />
                           )}
@@ -536,7 +536,7 @@ function SelectStep({
                       onClick={() => toggleAsset(asset.key)}
                       className={`flex w-full items-start gap-3 rounded-2xl border p-3 text-left transition-all ${
                         selected
-                          ? "border-[#7bb8e8] bg-white shadow-[var(--shadow-card)]"
+                          ? "border-[var(--accent-soft)] bg-white shadow-[var(--shadow-card)]"
                           : "border-transparent bg-white/70 hover:border-[var(--line-medium)]"
                       }`}
                     >
@@ -549,7 +549,7 @@ function SelectStep({
                             {asset.label}
                           </p>
                           {selected ? (
-                            <CheckCircle2 className="h-4 w-4 text-[#7bb8e8]" />
+                            <CheckCircle2 className="h-4 w-4 text-[var(--accent-soft)]" />
                           ) : (
                             <Circle className="h-4 w-4 text-[var(--text-faint)]" />
                           )}
@@ -602,7 +602,7 @@ function SelectStep({
             </p>
             <div className="mt-3 space-y-2 text-sm text-[var(--text-subtle)]">
               <div className="flex items-start gap-2">
-                <WandSparkles className="mt-0.5 h-4 w-4 text-[#7bb8e8]" />
+                <WandSparkles className="mt-0.5 h-4 w-4 text-[var(--accent-soft)]" />
                 Seedance 生成视频，并保留可回放的任务记录。
               </div>
               <div className="flex items-start gap-2">
@@ -620,7 +620,7 @@ function SelectStep({
             type="button"
             onClick={onStart}
             disabled={!canStart}
-            className="mt-5 inline-flex w-full items-center justify-center gap-2.5 rounded-2xl bg-[#7bb8e8] px-6 py-3.5 text-sm font-medium text-white shadow-lg shadow-[rgba(123,184,232,0.25)] transition-all hover:bg-[#6aadd8] disabled:cursor-not-allowed disabled:opacity-40"
+            className="mt-5 inline-flex w-full items-center justify-center gap-2.5 rounded-2xl bg-[var(--accent-soft)] px-6 py-3.5 text-sm font-medium text-white shadow-lg shadow-[oklch(from var(--accent-soft) l c h / 0.25)] transition-all hover:bg-[var(--accent-soft)] disabled:cursor-not-allowed disabled:opacity-40"
           >
             <Sparkles className="h-5 w-5" />
             开始生成并准备分发
@@ -653,20 +653,20 @@ function GenerateStep({
               className={`absolute inset-0 rounded-full transition-all duration-700 ${
                 isComplete
                   ? "scale-100 bg-green-50"
-                  : "animate-pulse bg-[rgba(123,184,232,0.08)]"
+                  : "animate-pulse bg-[oklch(from var(--accent-soft) l c h / 0.08)]"
               }`}
             />
             <div
               className={`relative flex h-16 w-16 items-center justify-center rounded-full ${
-                isComplete ? "bg-green-100" : "bg-[rgba(123,184,232,0.12)]"
+                isComplete ? "bg-green-100" : "bg-[oklch(from var(--accent-soft) l c h / 0.12)]"
               }`}
             >
               {generating ? (
-                <Loader2 className="h-8 w-8 animate-spin text-[#7bb8e8]" />
+                <Loader2 className="h-8 w-8 animate-spin text-[var(--accent-soft)]" />
               ) : isComplete ? (
                 <Check className="h-8 w-8 text-green-500" />
               ) : (
-                <Film className="h-8 w-8 text-[#7bb8e8]" />
+                <Film className="h-8 w-8 text-[var(--accent-soft)]" />
               )}
             </div>
           </div>
@@ -689,7 +689,7 @@ function GenerateStep({
             </div>
             <div className="h-3 overflow-hidden rounded-full bg-[var(--muted)]">
               <div
-                className="h-full rounded-full bg-linear-to-r from-[#7bb8e8] via-sky-400 to-emerald-400 transition-all duration-700 ease-out"
+                className="h-full rounded-full bg-linear-to-r from-[var(--accent-soft)] via-sky-400 to-emerald-400 transition-all duration-700 ease-out"
                 style={{ width: `${Math.min(generateProgress, 100)}%` }}
               />
             </div>
@@ -781,10 +781,10 @@ function DistributeStepView({
           title="主片与平台分发"
           description="先确认生成结果，再并行把同一主片推送到目标平台。"
         >
-          <div className="mb-5 rounded-[28px] border border-[var(--line-soft)] bg-[linear-gradient(135deg,rgba(123,184,232,0.10),rgba(255,255,255,1))] p-5">
+          <div className="mb-5 rounded-[28px] border border-[var(--line-soft)] bg-[linear-gradient(135deg,oklch(from var(--accent-soft) l c h / 0.10),rgba(255,255,255,1))] p-5">
             <div className="flex flex-col gap-4 md:flex-row md:items-center">
               <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-white shadow-[var(--shadow-card)]">
-                <MonitorPlay className="h-8 w-8 text-[#7bb8e8]" />
+                <MonitorPlay className="h-8 w-8 text-[var(--accent-soft)]" />
               </div>
               <div className="min-w-0 flex-1">
                 <p className="text-lg font-medium text-[hsl(var(--foreground))]">
@@ -806,7 +806,7 @@ function DistributeStepView({
                 rel="noreferrer"
                 className={`inline-flex items-center justify-center gap-2 rounded-2xl border px-4 py-2.5 text-sm font-medium transition-colors ${
                   videoUrl
-                    ? "border-[var(--line-medium)] text-[hsl(var(--foreground))] hover:border-[#7bb8e8] hover:text-[#7bb8e8]"
+                    ? "border-[var(--line-medium)] text-[hsl(var(--foreground))] hover:border-[var(--accent-soft)] hover:text-[var(--accent-soft)]"
                     : "cursor-not-allowed border-[var(--line-soft)] text-[var(--text-faint)]"
                 }`}
               >
@@ -832,7 +832,7 @@ function DistributeStepView({
                       : failed
                         ? "border-rose-200 bg-rose-50/50"
                         : running
-                          ? "border-[#7bb8e8]/30 bg-[rgba(123,184,232,0.04)]"
+                          ? "border-[var(--accent-soft)]/30 bg-[oklch(from var(--accent-soft) l c h / 0.04)]"
                           : "border-[var(--line-soft)] bg-white"
                   }`}
                 >
@@ -888,7 +888,7 @@ function DistributeStepView({
                           ? "#e11d48"
                           : running
                             ? "var(--text-subtle)"
-                            : "#7bb8e8",
+                            : "var(--accent-soft)",
                     }}
                   >
                     {status === "idle" && (
@@ -930,7 +930,7 @@ function DistributeStepView({
                 (platform) => platformStatus[platform.key] === "running",
               )
             }
-            className="mt-5 inline-flex w-full items-center justify-center gap-2.5 rounded-2xl bg-[#7bb8e8] px-6 py-3.5 text-sm font-medium text-white shadow-lg shadow-[rgba(123,184,232,0.25)] transition-all hover:bg-[#6aadd8] disabled:cursor-not-allowed disabled:opacity-40"
+            className="mt-5 inline-flex w-full items-center justify-center gap-2.5 rounded-2xl bg-[var(--accent-soft)] px-6 py-3.5 text-sm font-medium text-white shadow-lg shadow-[oklch(from var(--accent-soft) l c h / 0.25)] transition-all hover:bg-[var(--accent-soft)] disabled:cursor-not-allowed disabled:opacity-40"
           >
             <Video className="h-5 w-5" />
             一键并行分发到全部平台
@@ -969,7 +969,7 @@ function DistributeStepView({
                         type="button"
                         onClick={() => onExportAsset(asset.key)}
                         disabled={status === "running" || status === "success"}
-                        className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl border border-[var(--line-soft)] bg-white px-4 py-2.5 text-sm font-medium text-[hsl(var(--foreground))] transition-colors hover:border-[#7bb8e8] hover:text-[#7bb8e8] disabled:cursor-not-allowed disabled:opacity-60"
+                        className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl border border-[var(--line-soft)] bg-white px-4 py-2.5 text-sm font-medium text-[hsl(var(--foreground))] transition-colors hover:border-[var(--accent-soft)] hover:text-[var(--accent-soft)] disabled:cursor-not-allowed disabled:opacity-60"
                       >
                         {status === "idle" && "生成交付物"}
                         {status === "running" && (
@@ -1096,7 +1096,7 @@ function CompleteStep({
 
           <div className="mx-auto mt-8 grid max-w-2xl gap-4 sm:grid-cols-3">
             <div className="rounded-2xl border border-[var(--line-soft)] bg-[var(--muted)]/40 p-5">
-              <Video className="mx-auto h-6 w-6 text-[#7bb8e8]" />
+              <Video className="mx-auto h-6 w-6 text-[var(--accent-soft)]" />
               <p className="mt-2 text-2xl font-semibold text-[hsl(var(--foreground))]">
                 {selectedPlatforms.length}
               </p>
@@ -1122,21 +1122,21 @@ function CompleteStep({
             <button
               type="button"
               onClick={onOpenTasks}
-              className="inline-flex items-center justify-center gap-2 rounded-2xl border border-[var(--line-medium)] px-5 py-3 text-sm font-medium text-[hsl(var(--foreground))] transition-colors hover:border-[#7bb8e8] hover:text-[#7bb8e8]"
+              className="inline-flex items-center justify-center gap-2 rounded-2xl border border-[var(--line-medium)] px-5 py-3 text-sm font-medium text-[hsl(var(--foreground))] transition-colors hover:border-[var(--accent-soft)] hover:text-[var(--accent-soft)]"
             >
               查看任务中心
             </button>
             <button
               type="button"
               onClick={onOpenAssets}
-              className="inline-flex items-center justify-center gap-2 rounded-2xl border border-[var(--line-medium)] px-5 py-3 text-sm font-medium text-[hsl(var(--foreground))] transition-colors hover:border-[#7bb8e8] hover:text-[#7bb8e8]"
+              className="inline-flex items-center justify-center gap-2 rounded-2xl border border-[var(--line-medium)] px-5 py-3 text-sm font-medium text-[hsl(var(--foreground))] transition-colors hover:border-[var(--accent-soft)] hover:text-[var(--accent-soft)]"
             >
               前往资产页
             </button>
             <button
               type="button"
               onClick={onReset}
-              className="inline-flex items-center justify-center gap-2 rounded-2xl bg-[#7bb8e8] px-5 py-3 text-sm font-medium text-white transition-colors hover:bg-[#6aadd8]"
+              className="inline-flex items-center justify-center gap-2 rounded-2xl bg-[var(--accent-soft)] px-5 py-3 text-sm font-medium text-white transition-colors hover:bg-[var(--accent-soft)]"
             >
               <RefreshCw className="h-4 w-4" />
               继续分发下一部
@@ -1400,12 +1400,12 @@ export default function WorkbenchDistributeSection() {
 
   return (
     <div className="flex h-full flex-col overflow-y-auto p-6">
-      <div className="mb-6 rounded-[32px] border border-[var(--line-soft)] bg-[linear-gradient(135deg,rgba(123,184,232,0.13),rgba(255,255,255,0.95))] p-6">
+      <div className="mb-6 rounded-[32px] border border-[var(--line-soft)] bg-[linear-gradient(135deg,oklch(from var(--accent-soft) l c h / 0.13),rgba(255,255,255,0.95))] p-6">
         <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
           <div>
             <p className="text-xs uppercase tracking-[0.24em] text-[var(--text-faint)]">
               <span className="inline-flex items-center gap-1.5">
-                <Video className="h-3.5 w-3.5 text-[#7bb8e8]" />
+                <Video className="h-3.5 w-3.5 text-[var(--accent-soft)]" />
                 一键分发
               </span>
             </p>

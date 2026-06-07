@@ -1,4 +1,4 @@
-import { useState } from "react";
+﻿import { useState } from "react";
 import { useAuthStore } from "@/store/useAuthStore";
 import {
   Zap,
@@ -83,7 +83,7 @@ function RedeemSection() {
           value={code}
           onChange={(e) => setCode(e.target.value)}
           placeholder="输入兑换码"
-          className="flex-1 rounded-xl border border-[var(--line-medium)] bg-white px-4 py-2.5 text-sm text-[hsl(var(--foreground))] placeholder:text-[var(--text-subtle)] outline-none transition-all focus:border-[#7bb8e8] focus:ring-2 focus:ring-[rgba(123,184,232,0.12)]"
+          className="flex-1 rounded-xl border border-[var(--line-medium)] bg-white px-4 py-2.5 text-sm text-[hsl(var(--foreground))] placeholder:text-[var(--text-subtle)] outline-none transition-all focus:border-[var(--accent-soft)] focus:ring-2 focus:ring-[oklch(from var(--accent-soft) l c h / 0.12)]"
         />
         <button
           type="button"
@@ -166,7 +166,7 @@ export default function RechargePage() {
             key={i}
             className={`relative flex flex-col rounded-2xl border bg-white p-5 transition-all duration-300 hover:shadow-[var(--shadow-surface)] hover:-translate-y-0.5 ${
               plan.popular
-                ? "border-[#7bb8e8] shadow-[var(--shadow-surface)]"
+                ? "border-[var(--accent-soft)] shadow-[var(--shadow-surface)]"
                 : "border-[var(--line-soft)] hover:border-[var(--line-medium)]"
             }`}
           >
@@ -174,7 +174,7 @@ export default function RechargePage() {
               <span
                 className={`absolute -top-2.5 left-4 inline-flex items-center gap-1 rounded-full px-3 py-0.5 text-xs font-medium ${
                   plan.popular
-                    ? "bg-[#7bb8e8] text-white"
+                    ? "bg-[var(--accent-soft)] text-white"
                     : "bg-[var(--muted)] text-[var(--text-subtle)]"
                 }`}
               >
@@ -216,7 +216,7 @@ export default function RechargePage() {
             <button
               type="button"
               onClick={() => handleCopyContact(i)}
-              className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#7bb8e8] px-4 py-2.5 text-sm font-medium text-white transition-all hover:bg-[#6aadd8]"
+              className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[var(--accent-soft)] px-4 py-2.5 text-sm font-medium text-white transition-all hover:bg-[var(--accent-soft)]"
             >
               {copiedIndex === i ? (
                 <>
@@ -240,12 +240,12 @@ export default function RechargePage() {
       {/* Info */}
       <div className="mt-6 rounded-2xl border border-[var(--line-soft)] bg-white p-5">
         <div className="flex items-start gap-3">
-          <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-[#7bb8e8]" />
+          <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-[var(--accent-soft)]" />
           <div className="text-xs text-[var(--text-subtle)] leading-6">
             <p>
               充值后次数即时到账，永久有效。企业用户可联系
               <span
-                className="cursor-pointer text-[#7bb8e8] hover:underline"
+                className="cursor-pointer text-[var(--accent-soft)] hover:underline"
                 onClick={() => {
                   navigator.clipboard.writeText("contact@scriptforge.ai");
                   addToast({ type: "success", title: "邮箱已复制" });

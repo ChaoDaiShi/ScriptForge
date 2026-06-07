@@ -59,7 +59,7 @@ function CollapsibleSection({
           {title}
         </span>
       </button>
-      {open && children}
+      {open ? <div>{children}</div> : null}
     </div>
   );
 }
@@ -454,9 +454,9 @@ episode:
                 </div>
               </div>
             ) : (
-              <p className="text-sm leading-6 text-(--text-subtle)">
+              <div className="text-sm leading-6 text-(--text-subtle)">
                 导入小说源文本后，此处将显示原始章节内容。
-              </p>
+              </div>
             )}
           </CollapsibleSection>
 
@@ -507,9 +507,9 @@ episode:
                 )}
               </div>
             ) : (
-              <p className="text-sm leading-6 text-(--text-subtle)">
+              <div className="text-sm leading-6 text-(--text-subtle)">
                 暂无原始文本，请先导入文本。
-              </p>
+              </div>
             )}
           </CollapsibleSection>
 
@@ -568,9 +568,9 @@ episode:
                 );
               }
               return (
-                <p className="text-sm leading-6 text-(--text-subtle)">
+                <div className="text-sm leading-6 text-(--text-subtle)">
                   AI 将从文本中自动提取人物角色及其关系。
-                </p>
+                </div>
               );
             })()}
           </CollapsibleSection>
@@ -1469,21 +1469,34 @@ function AIConvertPanel({ processedText, setProcessedText, setYamlOutput, setAna
       const charsMatch = headerInfo.match(/出场[:：](.+)/);
       const body = part.replace(/【场景\d+】.*(?:\r?\n|$)/, "").trim();
 
-      // 解析对话行：***角色名***\n    台词
+      // 解析对话行：***角色名***\n（神态）\n    台词
       const lines = body.split("\n");
-      const formattedLines: Array<{ type: "dialogue" | "action" | "empty"; speaker?: string; text: string }> = [];
+      const formattedLines: Array<{ type: "dialogue" | "action" | "empty"; speaker?: string; direction?: string; text: string }> = [];
       let lineIdx = 0;
       while (lineIdx < lines.length) {
         const line = lines[lineIdx];
         const speakerMatch = line.match(/^\*\*\*(.+?)\*\*\*$/);
         if (speakerMatch) {
           const nextLine = lines[lineIdx + 1] || "";
-          formattedLines.push({
-            type: "dialogue",
-            speaker: speakerMatch[1].trim(),
-            text: nextLine.trim(),
-          });
-          lineIdx += 2;
+          const nextNextLine = lines[lineIdx + 2] || "";
+          // 检查下一行是否为神态/动作描写（括号包裹）
+          const directionMatch = nextLine.match(/^[（(].+?[）)]$/);
+          if (directionMatch) {
+            formattedLines.push({
+              type: "dialogue",
+              speaker: speakerMatch[1].trim(),
+              direction: directionMatch[0],
+              text: nextNextLine.trim(),
+            });
+            lineIdx += 3;
+          } else {
+            formattedLines.push({
+              type: "dialogue",
+              speaker: speakerMatch[1].trim(),
+              text: nextLine.trim(),
+            });
+            lineIdx += 2;
+          }
         } else if (line.trim()) {
           formattedLines.push({ type: "action", text: line });
           lineIdx += 1;
@@ -1564,7 +1577,11 @@ function AIConvertPanel({ processedText, setProcessedText, setYamlOutput, setAna
         {/* 当前场景卡片 */}
         {(() => {
           const scene = sceneCards[scenePage];
-          if (!scene) return null;
+          if (!scene) return (
+            <div className="flex-1 min-h-0 flex items-center justify-center rounded-xl border border-(--line-soft) bg-white">
+              <span className="text-sm text-(--text-subtle)">暂无场景数据</span>
+            </div>
+          );
           return (
             <div className="flex-1 min-h-0 overflow-y-auto rounded-xl border border-(--line-soft) bg-white shadow-sm">
               {/* 场景头 */}
@@ -1616,9 +1633,16 @@ function AIConvertPanel({ processedText, setProcessedText, setYamlOutput, setAna
                   if (line.type === "dialogue") {
                     return (
                       <div key={li} className="flex gap-3 items-start py-1.5 px-2 rounded-lg bg-(--accent-light)/30 hover:bg-(--accent-light)/50 transition-colors">
-                        <span className="shrink-0 mt-px text-xs font-bold text-(--accent-soft) bg-(--accent-soft)/10 border border-(--accent-soft)/20 px-2 py-0.5 rounded-md min-w-[3rem] text-center">
-                          {line.speaker}
-                        </span>
+                        <div className="shrink-0 flex flex-col gap-0.5">
+                          <span className="text-xs font-bold text-(--accent-soft) bg-(--accent-soft)/10 border border-(--accent-soft)/20 px-2 py-0.5 rounded-md min-w-[3rem] text-center">
+                            {line.speaker}
+                          </span>
+                          {line.direction && (
+                            <span className="text-[10px] text-(--text-subtle) italic text-center leading-tight">
+                              {line.direction}
+                            </span>
+                          )}
+                        </div>
                         <p className="text-sm text-foreground font-medium leading-relaxed">
                           {line.text}
                         </p>
@@ -1666,7 +1690,7 @@ function AIConvertPanel({ processedText, setProcessedText, setYamlOutput, setAna
   };
 
   return (
-    <div className="flex flex-col p-4">
+    <div className="flex-1 flex flex-col p-4 gap-4 overflow-y-auto">
       <div className="mb-4">
         <div className="flex items-center justify-between">
           <div>

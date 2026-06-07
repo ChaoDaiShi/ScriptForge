@@ -14,5 +14,25 @@
     "password_salt": "b27aae9c84b042aaad045c067928e3e5",
     "created_at": "2026-06-07T12:42:38.142042",
     "updated_at": "2026-06-07T12:42:38.142050"
+  },
+  {
+    "id": "a32acd57-d768-48be-8617-e1503b718660",
+    "email": "test@test.com",
+    "password_hash": "f74802d2bbeee695211923712cbd3daffa823ecd828ae13ad87cef82e781bb4d",
+    "password_salt": "a3761db8977d46af920364ec495013d0",
+    "credits": 0,
+    "credits_used": 0,
+    "created_at": "2026-06-07T14:04:34.245562",
+    "updated_at": "2026-06-07T14:04:34.245562"
+  },
+  {
+    "id": "9a5f67a5-7ff5-4484-b7be-17432263d646",
+    "email": "2511362177@qq.com",
+    "password_hash": "1d2bb6a8248d7b469e445fd57b99549fc1b7a763c64147d6c355702e484dc90a",
+    "password_salt": "f4f4afab39634362b6ed42c22a19a3ba",
+    "credits": 0,
+    "credits_used": 0,
+    "created_at": "2026-06-07T14:06:47.910245",
+    "updated_at": "2026-06-07T14:06:47.910245"
   }
 ]

@@ -1,4 +1,4 @@
-import { NavLink, useNavigate } from "react-router-dom";
+﻿import { NavLink, useNavigate } from "react-router-dom";
 import {
   CheckSquare,
   LayoutDashboard,
@@ -112,7 +112,7 @@ export default function Sidebar() {
         )}
         {isLoggedIn ? (
           <div className="flex items-center gap-3 px-3 py-2">
-            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[rgba(123,184,232,0.12)] text-xs font-medium text-[#7bb8e8]">
+            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[oklch(from var(--accent-soft) l c h / 0.12)] text-xs font-medium text-[var(--accent-soft)]">
               {user?.email?.charAt(0).toUpperCase() || "U"}
             </div>
             {sidebarOpen && (

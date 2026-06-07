@@ -1,4 +1,4 @@
-import { useState } from "react";
+﻿import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuthStore } from "@/store/useAuthStore";
 import {
@@ -50,14 +50,14 @@ export default function LoginPage() {
   return (
     <div className="flex min-h-screen bg-[hsl(var(--background))]">
       {/* Left Panel — Brand / Hero */}
-      <div className="relative hidden w-1/2 flex-col justify-between overflow-hidden bg-linear-to-br from-[#7bb8e8]/10 via-white to-[#7bb8e8]/5 p-12 lg:flex">
+      <div className="relative hidden w-1/2 flex-col justify-between overflow-hidden bg-linear-to-br from-[var(--accent-soft)]/10 via-white to-[var(--accent-soft)]/5 p-12 lg:flex">
         {/* Decorative elements */}
-        <div className="pointer-events-none absolute -top-24 -right-24 h-96 w-96 rounded-full bg-[#7bb8e8]/8 blur-3xl" />
-        <div className="pointer-events-none absolute -bottom-32 -left-32 h-80 w-80 rounded-full bg-[#7bb8e8]/5 blur-3xl" />
+        <div className="pointer-events-none absolute -top-24 -right-24 h-96 w-96 rounded-full bg-[var(--accent-soft)]/8 blur-3xl" />
+        <div className="pointer-events-none absolute -bottom-32 -left-32 h-80 w-80 rounded-full bg-[var(--accent-soft)]/5 blur-3xl" />
 
         <div className="relative z-10">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#7bb8e8] text-sm font-bold text-white shadow-lg shadow-[#7bb8e8]/20">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--accent-soft)] text-sm font-bold text-white shadow-lg shadow-[var(--accent-soft)]/20">
               S
             </div>
             <span className="text-xl font-semibold tracking-tight text-[hsl(var(--foreground))]">
@@ -67,7 +67,7 @@ export default function LoginPage() {
         </div>
 
         <div className="relative z-10 max-w-md">
-          <div className="mb-6 inline-flex items-center gap-1.5 rounded-full border border-[rgba(123,184,232,0.2)] bg-[rgba(123,184,232,0.08)] px-3 py-1 text-xs text-[#7bb8e8]">
+          <div className="mb-6 inline-flex items-center gap-1.5 rounded-full border border-[oklch(from var(--accent-soft) l c h / 0.2)] bg-[oklch(from var(--accent-soft) l c h / 0.08)] px-3 py-1 text-xs text-[var(--accent-soft)]">
             <Sparkles className="h-3 w-3" />
             AI 驱动的剧本创作工具
           </div>
@@ -88,8 +88,8 @@ export default function LoginPage() {
               { title: "一键视频分发", desc: "对接火山方舟、微信视频号、抖音" },
             ].map((item, i) => (
               <div key={i} className="flex items-start gap-3">
-                <div className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[rgba(123,184,232,0.12)]">
-                  <Check className="h-3.5 w-3.5 text-[#7bb8e8]" />
+                <div className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[oklch(from var(--accent-soft) l c h / 0.12)]">
+                  <Check className="h-3.5 w-3.5 text-[var(--accent-soft)]" />
                 </div>
                 <div>
                   <p className="text-sm font-medium text-[hsl(var(--foreground))]">
@@ -114,7 +114,7 @@ export default function LoginPage() {
         <div className="w-full max-w-sm">
           {/* Mobile logo */}
           <div className="mb-10 flex items-center gap-3 lg:hidden">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#7bb8e8] text-sm font-bold text-white">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--accent-soft)] text-sm font-bold text-white">
               S
             </div>
             <span className="text-lg font-semibold">ScriptForge</span>
@@ -149,7 +149,7 @@ export default function LoginPage() {
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="your@email.com"
                   required
-                  className="w-full rounded-xl border border-[var(--line-medium)] bg-white py-2.5 pl-10 pr-4 text-sm text-[hsl(var(--foreground))] placeholder:text-[var(--text-subtle)] outline-none transition-all focus:border-[#7bb8e8] focus:ring-2 focus:ring-[rgba(123,184,232,0.15)]"
+                  className="w-full rounded-xl border border-[var(--line-medium)] bg-white py-2.5 pl-10 pr-4 text-sm text-[hsl(var(--foreground))] placeholder:text-[var(--text-subtle)] outline-none transition-all focus:border-[var(--accent-soft)] focus:ring-2 focus:ring-[oklch(from var(--accent-soft) l c h / 0.15)]"
                 />
               </div>
             </div>
@@ -174,7 +174,7 @@ export default function LoginPage() {
                   }
                   required
                   minLength={6}
-                  className="w-full rounded-xl border border-[var(--line-medium)] bg-white py-2.5 pl-10 pr-10 text-sm text-[hsl(var(--foreground))] placeholder:text-[var(--text-subtle)] outline-none transition-all focus:border-[#7bb8e8] focus:ring-2 focus:ring-[rgba(123,184,232,0.15)]"
+                  className="w-full rounded-xl border border-[var(--line-medium)] bg-white py-2.5 pl-10 pr-10 text-sm text-[hsl(var(--foreground))] placeholder:text-[var(--text-subtle)] outline-none transition-all focus:border-[var(--accent-soft)] focus:ring-2 focus:ring-[oklch(from var(--accent-soft) l c h / 0.15)]"
                 />
                 <button
                   type="button"
@@ -198,15 +198,15 @@ export default function LoginPage() {
                   type="checkbox"
                   checked={agreed}
                   onChange={(e) => setAgreed(e.target.checked)}
-                  className="mt-0.5 rounded border-[var(--line-medium)] text-[#7bb8e8] focus:ring-[rgba(123,184,232,0.3)]"
+                  className="mt-0.5 rounded border-[var(--line-medium)] text-[var(--accent-soft)] focus:ring-[oklch(from var(--accent-soft) l c h / 0.3)]"
                 />
                 <span className="text-xs text-[var(--text-subtle)] leading-5">
                   我已阅读并同意{" "}
-                  <span className="text-[#7bb8e8] hover:underline cursor-pointer">
+                  <span className="text-[var(--accent-soft)] hover:underline cursor-pointer">
                     服务条款
                   </span>{" "}
                   和{" "}
-                  <span className="text-[#7bb8e8] hover:underline cursor-pointer">
+                  <span className="text-[var(--accent-soft)] hover:underline cursor-pointer">
                     隐私政策
                   </span>
                 </span>
@@ -225,7 +225,7 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={loading || (mode === "register" && !agreed)}
-              className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#7bb8e8] px-6 py-3 text-sm font-medium text-white shadow-lg shadow-[rgba(123,184,232,0.25)] transition-all hover:bg-[#6aadd8] hover:shadow-xl hover:shadow-[rgba(123,184,232,0.3)] disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:shadow-lg"
+              className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[var(--accent-soft)] px-6 py-3 text-sm font-medium text-white shadow-lg shadow-[oklch(from var(--accent-soft) l c h / 0.25)] transition-all hover:bg-[var(--accent-soft)] hover:shadow-xl hover:shadow-[oklch(from var(--accent-soft) l c h / 0.3)] disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:shadow-lg"
             >
               {loading ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -269,7 +269,7 @@ export default function LoginPage() {
             <button
               type="button"
               onClick={toggleMode}
-              className="ml-1 font-medium text-[#7bb8e8] hover:underline"
+              className="ml-1 font-medium text-[var(--accent-soft)] hover:underline"
             >
               {mode === "login" ? "注册" : "登录"}
             </button>
