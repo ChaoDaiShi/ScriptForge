@@ -299,66 +299,74 @@ export default function ImportPage() {
       }
     }
 
-    // 创建项目
-    const backendProject = await createProject({
-      title: `新项目 (${selectedChapters.size}章)`,
-      source_novel: "导入文本",
-      source_author: "未知作者",
-      chapter_count: selectedChapters.size,
-    });
-    const projectId = backendProject.id;
-    const project = {
-      id: backendProject.id,
-      title: backendProject.title,
-      sourceNovel: backendProject.source_novel,
-      sourceAuthor: backendProject.source_author,
-      chapterCount: backendProject.chapter_count,
-      status: backendProject.status === "failed" || backendProject.status === "distributing"
-        ? "idle"
-        : backendProject.status,
-      createdAt: backendProject.created_at,
-    };
-    addProject(project);
-    setCurrentProject(projectId);
+    try {
+      // 创建项目
+      const backendProject = await createProject({
+        title: `新项目 (${selectedChapters.size}章)`,
+        source_novel: "导入文本",
+        source_author: "未知作者",
+        chapter_count: selectedChapters.size,
+      });
+      const projectId = backendProject.id;
+      const project = {
+        id: backendProject.id,
+        title: backendProject.title,
+        sourceNovel: backendProject.source_novel,
+        sourceAuthor: backendProject.source_author,
+        chapterCount: backendProject.chapter_count,
+        status: backendProject.status === "failed" || backendProject.status === "distributing"
+          ? "idle"
+          : backendProject.status,
+        createdAt: backendProject.created_at,
+      };
+      addProject(project);
+      setCurrentProject(projectId);
 
-    // 创建小说数据
-    const novelId = `novel_${Date.now().toString(36)}`;
-    const novelData = {
-      id: novelId,
-      projectId,
-      title: projectTitle,
-      author: "未知作者",
-      totalChapters: selectedChapters.size,
-      totalWordCount: selectedContent.length,
-      chapters: chaptersWithContent,
-      fullText: selectedContent,
-      createdAt: new Date().toISOString(),
-    };
-    addNovel(novelData);
-    setCurrentNovel(novelId);
+      // 创建小说数据
+      const novelId = `novel_${Date.now().toString(36)}`;
+      const novelData = {
+        id: novelId,
+        projectId,
+        title: projectTitle,
+        author: "未知作者",
+        totalChapters: selectedChapters.size,
+        totalWordCount: selectedContent.length,
+        chapters: chaptersWithContent,
+        fullText: selectedContent,
+        createdAt: new Date().toISOString(),
+      };
+      addNovel(novelData);
+      setCurrentNovel(novelId);
 
-    // 创建基础剧本数据（不需要AI处理）
-    const scriptId = `script_${Date.now().toString(36)}`;
-    const initialScriptData = {
-      id: scriptId,
-      projectId,
-      title: projectTitle,
-      sourceText: selectedContent,
-      episodes: [
-        {
-          id: `${scriptId}_episode_1`,
-          title: projectTitle,
-          coldOpen: "",
-          scenes: [],
-        },
-      ],
-    };
-    upsertScript(initialScriptData);
-    setCurrentScript(scriptId);
+      // 创建基础剧本数据（不需要AI处理）
+      const scriptId = `script_${Date.now().toString(36)}`;
+      const initialScriptData = {
+        id: scriptId,
+        projectId,
+        title: projectTitle,
+        sourceText: selectedContent,
+        episodes: [
+          {
+            id: `${scriptId}_episode_1`,
+            title: projectTitle,
+            coldOpen: "",
+            scenes: [],
+          },
+        ],
+      };
+      upsertScript(initialScriptData);
+      setCurrentScript(scriptId);
 
-    // 跳转到工作台
-    navigate("/workbench");
-    addToast({ type: "success", title: "已进入工作台" });
+      // 跳转到工作台
+      navigate("/workbench");
+      addToast({ type: "success", title: "已进入工作台" });
+    } catch (err) {
+      addToast({
+        type: "error",
+        title: "创建项目失败",
+        message: err instanceof Error ? err.message : "无法连接到服务器，请确认后端已启动",
+      });
+    }
   };
 
   const handleStartConvert = async () => {
@@ -376,220 +384,230 @@ export default function ImportPage() {
     setStep("converting");
     setConvertProgress(0);
 
-    const backendProject = await createProject({
-      title: `新项目 (${selectedChapters.size}章)`,
-      source_novel: "导入文本",
-      source_author: "未知作者",
-      chapter_count: selectedChapters.size,
-    });
-    const projectId = backendProject.id;
-    const novelId = `novel_${Date.now().toString(36)}`;
-    const project = {
-      id: backendProject.id,
-      title: backendProject.title,
-      sourceNovel: backendProject.source_novel,
-      sourceAuthor: backendProject.source_author,
-      chapterCount: backendProject.chapter_count,
-      status: "converting" as const,
-      createdAt: backendProject.created_at,
-    };
-    addProject(project);
-    setCurrentProject(projectId);
-
-    // 提取选中的章节内容
-    const filteredSelectedChapterList = chapters.filter(ch => selectedChapters.has(ch.index));
-    setSelectedChapterList(filteredSelectedChapterList); // 保存到状态
-    // 只提取选中章节的内容
-    const selectedContent = filteredSelectedChapterList
-      .map(ch => {
-        if (ch.startPos !== undefined && ch.endPos !== undefined) {
-          return pasteContent.slice(ch.startPos, ch.endPos);
-        }
-        return ch.title + '\n'; // 回退方案
-      })
-      .join('\n\n');
-
-    const novelData = {
-      id: novelId,
-      projectId,
-      title: project.title,
-      author: "未知作者",
-      totalChapters: selectedChapters.size,
-      totalWordCount: selectedContent.length,
-      chapters: filteredSelectedChapterList.map((ch, idx) => ({
-        index: idx + 1,
-        title: ch.title,
-        wordCount: ch.wordCount,
-        originalIndex: ch.index,
-      })),
-      fullText: selectedContent,
-      createdAt: new Date().toISOString(),
-    };
-    addNovel(novelData);
-    setCurrentNovel(novelId);
-
     try {
-      setStepMessages(["正在创建剧本..."]);
-      setCurrentStep("创建剧本");
-
-      console.log("Step 1: Creating script...");
-      const script = await createScript({
-        title: project.title,
-        type: adaptType === "short" ? "short_film" : "feature_film",
-        text: selectedContent.trim(),
-        project_id: projectId,
+      const backendProject = await createProject({
+        title: `新项目 (${selectedChapters.size}章)`,
+        source_novel: "导入文本",
+        source_author: "未知作者",
+        chapter_count: selectedChapters.size,
       });
-      console.log("Script created:", script);
-      setStepMessages(prev => [...prev, "✅ 剧本创建完成"]);
-
-      // 立即保存基础剧本数据到 store，即使任务还在处理中
-      const initialScriptData = mapBackendScriptToWorkbench(script, projectId);
-      upsertScript(initialScriptData);
-      setCurrentScript(script.id);
-
-      setCurrentStep("启动处理任务");
-      setStepMessages(prev => [...prev, "正在启动处理任务..."]);
-
-      console.log("Step 2: Starting script processing...");
-      const processingTask = await startScriptProcessing(script.id, projectId);
-      console.log("Processing task:", processingTask);
-      setStepMessages(prev => [...prev, "✅ 处理任务启动成功"]);
-
-      setCurrentStep("获取任务状态");
-      setStepMessages(prev => [...prev, "正在获取任务状态..."]);
-
-      console.log("Step 3: Fetching live task...");
-      const liveTask = await fetchTask(processingTask.id);
-      console.log("Live task:", liveTask);
-      setStepMessages(prev => [...prev, "✅ 任务状态获取成功"]);
-
-      updateProject(projectId, {
-        scriptId: script.id,
-        taskId: liveTask.id,
-      });
-
-      addTask(liveTask);
-      upsertScript(mapBackendScriptToWorkbench(script, projectId));
-      setCurrentScript(script.id);
-      setConvertProgress(Math.max(10, liveTask.progress));
-
-      const stepNames: Record<string, string> = {
-        dialogue_extraction: "步骤1: 提取对话",
-        character_extraction: "步骤2: 提取人物和描写",
-        main_plot_extraction: "步骤3: 提取主线",
-        dialogue_speaker_tagging: "步骤4: 标记对话主体",
-        scene_analysis: "步骤6: 分析场景头",
-        psychology_conversion: "步骤7: 转换心理描写",
-        scene_packaging: "步骤8: 打包场景",
-        useless_line_detection: "步骤9: 检测无用语句",
-        useless_line_removal: "步骤10: 移除无用语句",
-        polishing: "步骤11: 润色处理",
-        export: "步骤12: 导出剧本",
+      const projectId = backendProject.id;
+      const novelId = `novel_${Date.now().toString(36)}`;
+      const project = {
+        id: backendProject.id,
+        title: backendProject.title,
+        sourceNovel: backendProject.source_novel,
+        sourceAuthor: backendProject.source_author,
+        chapterCount: backendProject.chapter_count,
+        status: "converting" as const,
+        createdAt: backendProject.created_at,
       };
+      addProject(project);
+      setCurrentProject(projectId);
 
-      const completionPoll = window.setInterval(async () => {
-        try {
-          console.log("Polling task:", liveTask.id);
-          const latestTask = await fetchTask(liveTask.id);
-          console.log("Latest task:", latestTask);
-
-          updateTask(latestTask.id, latestTask);
-
-          // 检查进度是否有变化
-          const previousProgress = convertProgress;
-          setConvertProgress(latestTask.progress);
-
-          if (latestTask.progress > previousProgress) {
-            setLastProgressUpdate(Date.now());
+      // 提取选中的章节内容
+      const filteredSelectedChapterList = chapters.filter(ch => selectedChapters.has(ch.index));
+      setSelectedChapterList(filteredSelectedChapterList); // 保存到状态
+      // 只提取选中章节的内容
+      const selectedContent = filteredSelectedChapterList
+        .map(ch => {
+          if (ch.startPos !== undefined && ch.endPos !== undefined) {
+            return pasteContent.slice(ch.startPos, ch.endPos);
           }
+          return ch.title + '\n'; // 回退方案
+        })
+        .join('\n\n');
 
-          // 检查是否长时间无响应（超过2分钟）
+      const novelData = {
+        id: novelId,
+        projectId,
+        title: project.title,
+        author: "未知作者",
+        totalChapters: selectedChapters.size,
+        totalWordCount: selectedContent.length,
+        chapters: filteredSelectedChapterList.map((ch, idx) => ({
+          index: idx + 1,
+          title: ch.title,
+          wordCount: ch.wordCount,
+          originalIndex: ch.index,
+        })),
+        fullText: selectedContent,
+        createdAt: new Date().toISOString(),
+      };
+      addNovel(novelData);
+      setCurrentNovel(novelId);
+
+      try {
+        setStepMessages(["正在创建剧本..."]);
+        setCurrentStep("创建剧本");
+
+        console.log("Step 1: Creating script...");
+        const script = await createScript({
+          title: project.title,
+          type: adaptType === "short" ? "short_film" : "feature_film",
+          text: selectedContent.trim(),
+          project_id: projectId,
+        });
+        console.log("Script created:", script);
+        setStepMessages(prev => [...prev, "✅ 剧本创建完成"]);
+
+        // 立即保存基础剧本数据到 store，即使任务还在处理中
+        const initialScriptData = mapBackendScriptToWorkbench(script, projectId);
+        upsertScript(initialScriptData);
+        setCurrentScript(script.id);
+
+        setCurrentStep("启动处理任务");
+        setStepMessages(prev => [...prev, "正在启动处理任务..."]);
+
+        console.log("Step 2: Starting script processing...");
+        const processingTask = await startScriptProcessing(script.id, projectId);
+        console.log("Processing task:", processingTask);
+        setStepMessages(prev => [...prev, "✅ 处理任务启动成功"]);
+
+        setCurrentStep("获取任务状态");
+        setStepMessages(prev => [...prev, "正在获取任务状态..."]);
+
+        console.log("Step 3: Fetching live task...");
+        const liveTask = await fetchTask(processingTask.id);
+        console.log("Live task:", liveTask);
+        setStepMessages(prev => [...prev, "✅ 任务状态获取成功"]);
+
+        updateProject(projectId, {
+          scriptId: script.id,
+          taskId: liveTask.id,
+        });
+
+        addTask(liveTask);
+        upsertScript(mapBackendScriptToWorkbench(script, projectId));
+        setCurrentScript(script.id);
+        setConvertProgress(Math.max(10, liveTask.progress));
+
+        const stepNames: Record<string, string> = {
+          dialogue_extraction: "步骤1: 提取对话",
+          character_extraction: "步骤2: 提取人物和描写",
+          main_plot_extraction: "步骤3: 提取主线",
+          dialogue_speaker_tagging: "步骤4: 标记对话主体",
+          scene_analysis: "步骤6: 分析场景头",
+          psychology_conversion: "步骤7: 转换心理描写",
+          scene_packaging: "步骤8: 打包场景",
+          useless_line_detection: "步骤9: 检测无用语句",
+          useless_line_removal: "步骤10: 移除无用语句",
+          polishing: "步骤11: 润色处理",
+          export: "步骤12: 导出剧本",
+        };
+
+        const completionPoll = window.setInterval(async () => {
+          try {
+            console.log("Polling task:", liveTask.id);
+            const latestTask = await fetchTask(liveTask.id);
+            console.log("Latest task:", latestTask);
+
+            updateTask(latestTask.id, latestTask);
+
+            // 检查进度是否有变化
+            const previousProgress = convertProgress;
+            setConvertProgress(latestTask.progress);
+
+            if (latestTask.progress > previousProgress) {
+              setLastProgressUpdate(Date.now());
+            }
+
+            // 检查是否长时间无响应（超过2分钟）
+            const now = Date.now();
+            if (now - lastProgressUpdate > 120000) {
+              // 显示警告但不跳转
+              if (!stepMessages.includes("⚠️ 检测到长时间无响应，正在尝试重新连接...")) {
+                setStepMessages(prev => [...prev, "⚠️ 检测到长时间无响应，正在尝试重新连接..."]);
+              }
+            }
+
+            // 更新当前步骤
+            if (latestTask.current_step && stepNames[latestTask.current_step]) {
+              const stepName = stepNames[latestTask.current_step];
+              if (currentStep !== stepName) {
+                setCurrentStep(stepName);
+                setStepMessages(prev => [...prev, `🔄 ${stepName}...`]);
+              }
+            }
+
+            if (latestTask.status === "done") {
+              window.clearInterval(heartbeatInterval);
+              setCurrentStep("完成");
+              setStepMessages(prev => [...prev, "🎉 剧本转换完成！"]);
+              const scriptDetail = await fetchScript(script.id);
+              upsertScript(mapBackendScriptToWorkbench(scriptDetail, projectId));
+              updateProject(projectId, { status: "ready" });
+              setCurrentScript(script.id);
+              window.clearInterval(completionPoll);
+              setTimeout(() => {
+                addToast({ type: "success", title: "剧本转换完成" });
+                navigate("/workbench");
+              }, 1000);
+            } else if (latestTask.status === "failed") {
+              window.clearInterval(heartbeatInterval);
+              setCurrentStep("失败");
+              setStepMessages(prev => [...prev, `❌ 转换失败: ${latestTask.error_message ?? "未知错误"}`]);
+              updateProject(projectId, { status: "idle" });
+              window.clearInterval(completionPoll);
+              setTimeout(() => {
+                addToast({
+                  type: "error",
+                  title: "转换失败",
+                  message: latestTask.error_message ?? "后端处理失败",
+                });
+              }, 500);
+            }
+          } catch (error) {
+            console.error("Polling error:", error);
+            // 超时或网络错误时不自动跳转，只显示错误信息
+            if (error instanceof Error && error.name === "AbortError") {
+              setStepMessages(prev => [...prev, "⚠️ 请求超时，正在重试..."]);
+              // 继续轮询，不要停止
+            } else {
+              setCurrentStep("轮询失败");
+              setStepMessages(prev => [...prev, `❌ 轮询失败: ${error instanceof Error ? error.message : "未知错误"}`]);
+              // 不要自动停止轮询，保持重试
+            }
+          }
+        }, 2000);
+
+        // 添加模拟进度更新机制，防止进度长时间不动
+        const heartbeatInterval = window.setInterval(() => {
           const now = Date.now();
-          if (now - lastProgressUpdate > 120000) {
-            // 显示警告但不跳转
-            if (!stepMessages.includes("⚠️ 检测到长时间无响应，正在尝试重新连接...")) {
-              setStepMessages(prev => [...prev, "⚠️ 检测到长时间无响应，正在尝试重新连接..."]);
-            }
+          const timeSinceLastUpdate = now - lastProgressUpdate;
+
+          // 如果超过5秒没有进度更新，添加心跳消息
+          if (timeSinceLastUpdate > 5000 && convertProgress < 100) {
+            setStepMessages(prev => {
+              const lastMsg = prev[prev.length - 1];
+              if (!lastMsg?.includes("处理中")) {
+                return [...prev, "⏳ AI正在处理中..."];
+              }
+              return prev;
+            });
           }
+        }, 8000);
 
-          // 更新当前步骤
-          if (latestTask.current_step && stepNames[latestTask.current_step]) {
-            const stepName = stepNames[latestTask.current_step];
-            if (currentStep !== stepName) {
-              setCurrentStep(stepName);
-              setStepMessages(prev => [...prev, `🔄 ${stepName}...`]);
-            }
-          }
-
-          if (latestTask.status === "done") {
-            window.clearInterval(heartbeatInterval);
-            setCurrentStep("完成");
-            setStepMessages(prev => [...prev, "🎉 剧本转换完成！"]);
-            const scriptDetail = await fetchScript(script.id);
-            upsertScript(mapBackendScriptToWorkbench(scriptDetail, projectId));
-            updateProject(projectId, { status: "ready" });
-            setCurrentScript(script.id);
-            window.clearInterval(completionPoll);
-            setTimeout(() => {
-              addToast({ type: "success", title: "剧本转换完成" });
-              navigate("/workbench");
-            }, 1000);
-          } else if (latestTask.status === "failed") {
-            window.clearInterval(heartbeatInterval);
-            setCurrentStep("失败");
-            setStepMessages(prev => [...prev, `❌ 转换失败: ${latestTask.error_message ?? "未知错误"}`]);
-            updateProject(projectId, { status: "idle" });
-            window.clearInterval(completionPoll);
-            setTimeout(() => {
-              addToast({
-                type: "error",
-                title: "转换失败",
-                message: latestTask.error_message ?? "后端处理失败",
-              });
-            }, 500);
-          }
-        } catch (error) {
-          console.error("Polling error:", error);
-          // 超时或网络错误时不自动跳转，只显示错误信息
-          if (error instanceof Error && error.name === "AbortError") {
-            setStepMessages(prev => [...prev, "⚠️ 请求超时，正在重试..."]);
-            // 继续轮询，不要停止
-          } else {
-            setCurrentStep("轮询失败");
-            setStepMessages(prev => [...prev, `❌ 轮询失败: ${error instanceof Error ? error.message : "未知错误"}`]);
-            // 不要自动停止轮询，保持重试
-          }
-        }
-      }, 2000);
-
-      // 添加模拟进度更新机制，防止进度长时间不动
-      const heartbeatInterval = window.setInterval(() => {
-        const now = Date.now();
-        const timeSinceLastUpdate = now - lastProgressUpdate;
-
-        // 如果超过5秒没有进度更新，添加心跳消息
-        if (timeSinceLastUpdate > 5000 && convertProgress < 100) {
-          setStepMessages(prev => {
-            const lastMsg = prev[prev.length - 1];
-            if (!lastMsg?.includes("处理中")) {
-              return [...prev, "⏳ AI正在处理中..."];
-            }
-            return prev;
-          });
-        }
-      }, 8000);
-
-    } catch (error) {
-      // 只有在创建脚本或启动任务阶段失败才跳转回配置页
-      // 轮询过程中的错误由轮询内部处理
-      console.error("Initial setup error:", error);
+      } catch (error) {
+        // 只有在创建脚本或启动任务阶段失败才跳转回配置页
+        // 轮询过程中的错误由轮询内部处理
+        console.error("Initial setup error:", error);
+        addToast({
+          type: "error",
+          title: "提交失败",
+          message: error instanceof Error ? error.message : "无法连接后端服务",
+        });
+      } finally {
+        setIsSubmitting(false);
+      }
+    } catch (err) {
       addToast({
         type: "error",
-        title: "提交失败",
-        message: error instanceof Error ? error.message : "无法连接后端服务",
+        title: "创建项目失败",
+        message: err instanceof Error ? err.message : "无法连接到服务器，请确认后端已启动",
       });
-    } finally {
       setIsSubmitting(false);
+      setStep("configure");
     }
   };
 
@@ -1163,9 +1181,11 @@ export default function ImportPage() {
                         msg.includes("失败") ? "bg-red-100 text-red-600" :
                           "bg-(--accent-light) text-(--accent-soft)"
                         }`}>
-                        {msg.includes("完成") ? <Check className="h-3 w-3" /> :
-                          msg.includes("失败") ? <AlertCircle className="h-3 w-3" /> :
-                            <span className="text-xs">{idx + 1}</span>}
+                        <span className="inline-flex items-center justify-center">
+                          {msg.includes("完成") ? <Check className="h-3 w-3" /> :
+                            msg.includes("失败") ? <AlertCircle className="h-3 w-3" /> :
+                              <span className="text-xs">{idx + 1}</span>}
+                        </span>
                       </div>
                       <span className={msg.includes("失败") ? "text-red-500" : "text-foreground"}>
                         {msg}
@@ -1230,7 +1250,9 @@ export default function ImportPage() {
                     >
                       <div className={`flex h-4 w-4 items-center justify-center rounded-full ${done ? "bg-green-500" : "bg-(--line-soft)"
                         }`}>
-                        {done ? <Check className="h-2.5 w-2.5 text-white" /> : null}
+                        <span className="inline-flex">
+                          {done ? <Check className="h-2.5 w-2.5 text-white" /> : null}
+                        </span>
                       </div>
                       <span className="truncate">{ch.title}</span>
                     </div>

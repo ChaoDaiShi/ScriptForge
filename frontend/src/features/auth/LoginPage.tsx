@@ -1,4 +1,4 @@
-﻿import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuthStore } from "@/store/useAuthStore";
 import {
@@ -17,7 +17,7 @@ type AuthMode = "login" | "register";
 
 export default function LoginPage() {
   const navigate = useNavigate();
-  const { login, register, skipAuth, loading, error, clearError } =
+  const { login, register, skipAuth, isLoggedIn, loading, error, clearError } =
     useAuthStore();
 
   const [mode, setMode] = useState<AuthMode>("login");
@@ -25,16 +25,28 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [agreed, setAgreed] = useState(false);
+  const loginAttempted = useRef(false);
+
+  // 监听 isLoggedIn 变化，登录成功后自动跳转（延迟到下一个宏任务，避免与 loading→false 的图标切换产生 DOM 竞态）
+  useEffect(() => {
+    if (isLoggedIn && loginAttempted.current) {
+      const timer = setTimeout(() => {
+        navigate("/workbench", { replace: true });
+        loginAttempted.current = false;
+      }, 0);
+      return () => clearTimeout(timer);
+    }
+  }, [isLoggedIn, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    loginAttempted.current = true;
     if (mode === "login") {
       await login(email, password);
     } else {
       if (!agreed) return;
       await register(email, password);
     }
-    navigate("/workbench");
   };
 
   const toggleMode = () => {
@@ -182,11 +194,13 @@ export default function LoginPage() {
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text-faint)] hover:text-[var(--text-subtle)] transition-colors"
                   tabIndex={-1}
                 >
-                  {showPassword ? (
-                    <EyeOff className="h-4 w-4" />
-                  ) : (
-                    <Eye className="h-4 w-4" />
-                  )}
+                  <span className="inline-flex">
+                    {showPassword ? (
+                      <EyeOff className="h-4 w-4" />
+                    ) : (
+                      <Eye className="h-4 w-4" />
+                    )}
+                  </span>
                 </button>
               </div>
             </div>
@@ -227,18 +241,22 @@ export default function LoginPage() {
               disabled={loading || (mode === "register" && !agreed)}
               className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[var(--accent-soft)] px-6 py-3 text-sm font-medium text-white shadow-lg shadow-[oklch(from var(--accent-soft) l c h / 0.25)] transition-all hover:bg-[var(--accent-soft)] hover:shadow-xl hover:shadow-[oklch(from var(--accent-soft) l c h / 0.3)] disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:shadow-lg"
             >
-              {loading ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <ArrowRight className="h-4 w-4" />
-              )}
-              {loading
-                ? mode === "login"
-                  ? "登录中..."
-                  : "注册中..."
-                : mode === "login"
-                  ? "登录"
-                  : "创建账号"}
+              <span className="inline-flex shrink-0 items-center">
+                {loading ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <ArrowRight className="h-4 w-4" />
+                )}
+              </span>
+              <span className="shrink-0">
+                {loading
+                  ? mode === "login"
+                    ? "登录中..."
+                    : "注册中..."
+                  : mode === "login"
+                    ? "登录"
+                    : "创建账号"}
+              </span>
             </button>
           </form>
 

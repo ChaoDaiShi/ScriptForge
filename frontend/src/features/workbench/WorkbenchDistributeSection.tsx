@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   AlertCircle,
@@ -661,13 +661,15 @@ function GenerateStep({
                 isComplete ? "bg-green-100" : "bg-[oklch(from var(--accent-soft) l c h / 0.12)]"
               }`}
             >
-              {generating ? (
-                <Loader2 className="h-8 w-8 animate-spin text-[var(--accent-soft)]" />
-              ) : isComplete ? (
-                <Check className="h-8 w-8 text-green-500" />
-              ) : (
-                <Film className="h-8 w-8 text-[var(--accent-soft)]" />
-              )}
+              <span className="inline-flex">
+                {generating ? (
+                  <Loader2 className="h-8 w-8 animate-spin text-[var(--accent-soft)]" />
+                ) : isComplete ? (
+                  <Check className="h-8 w-8 text-green-500" />
+                ) : (
+                  <Film className="h-8 w-8 text-[var(--accent-soft)]" />
+                )}
+              </span>
             </div>
           </div>
 
@@ -719,7 +721,7 @@ function GenerateStep({
                         : "bg-white text-[var(--text-faint)]"
                     }`}
                   >
-                    {done ? <Check className="h-4 w-4" /> : index + 1}
+                    {done ? <Check className="h-4 w-4" /> : <span>{index + 1}</span>}
                   </div>
                   <span className="text-sm text-[var(--text-subtle)]">
                     {item}

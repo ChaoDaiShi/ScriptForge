@@ -483,16 +483,22 @@ class SupabaseScriptRepository:
         return DistributionJob.model_validate(row)
 
     @staticmethod
-    def _is_missing_users_table(error: Exception) -> bool:
+    def _is_missing_table(error: Exception, table_name: Optional[str] = None) -> bool:
         message = str(error)
-        return "PGRST205" in message and "public.users" in message
+        has_pgrst = "PGRST205" in message
+        if table_name:
+            return has_pgrst and f"public.{table_name}" in message
+        return has_pgrst
 
     @classmethod
     def _should_use_local_fallback(cls, error: Exception, entity: Optional[str] = None) -> bool:
         message = str(error)
         if isinstance(error, SupabaseConfigError):
             return True
-        if entity == "users" and cls._is_missing_users_table(error):
+        # 任意表的缺表错误 → 本地回退
+        if "PGRST205" in message:
+            return True
+        if entity and cls._is_missing_table(error, entity):
             return True
         fallback_markers = (
             "ConnectError",

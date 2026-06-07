@@ -60,10 +60,12 @@ function ToastItem({ toast }: { toast: Toast }) {
 export default function ToastContainer() {
   const toasts = useToastStore((s) => s.toasts);
 
-  if (toasts.length === 0) return null;
-
   return (
-    <div className="fixed bottom-4 right-4 z-50 flex w-80 flex-col gap-2">
+    <div
+      className={`fixed bottom-4 right-4 z-50 flex w-80 flex-col gap-2 transition-opacity ${
+        toasts.length === 0 ? "pointer-events-none opacity-0" : ""
+      }`}
+    >
       {toasts.map((toast) => (
         <ToastItem key={toast.id} toast={toast} />
       ))}
