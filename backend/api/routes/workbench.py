@@ -5,8 +5,11 @@ Handles episode and scene management for script writing.
 from fastapi import APIRouter, UploadFile, File, HTTPException, Query, Body
 from typing import List, Optional, Dict, Any
 from core.utils import success_response, error_response
+from services.ai_service import AIService
 
 router = APIRouter(prefix="/api/workbench", tags=["workbench"])
+
+ai_service = AIService()
 
 
 @router.get("/episodes", summary="获取剧集列表")
@@ -176,3 +179,159 @@ async def upload_source(episode_id: str, file: UploadFile = File(...)):
         raise HTTPException(status_code=400, detail="文件名不能为空")
     
     return success_response(data={"file_id": ""}, message="文件上传成功")
+
+
+@router.post("/process/dialog", summary="提取对话")
+async def process_dialog(text: str = Body(..., embed=True, description="待处理文本")):
+    """
+    提取文本中的对话内容
+    前端调用场景：步骤1 - 对话标记
+    """
+    dialogues = await ai_service.extract_dialogues(text)
+    result_text = text
+    for dialogue in dialogues:
+        result_text = result_text[:dialogue["end_pos"]] + f"|{dialogue['id']}|" + result_text[dialogue["end_pos"]:]
+    
+    return success_response(data={"text": result_text, "dialogues": dialogues})
+
+
+@router.post("/process/character", summary="提取人物")
+async def process_character(text: str = Body(..., embed=True, description="待处理文本")):
+    """
+    提取人物和描写类型
+    前端调用场景：步骤2 - 人物提取
+    """
+    result = await ai_service.extract_characters(text)
+    
+    marked_text = text
+    for desc in result["descriptions"]:
+        desc_type = {
+            "scenery": "景物描写",
+            "psychology": "心理描写",
+            "portrait": "肖像描写",
+            "action": "动作描写"
+        }.get(desc["type"], "其他描写")
+        marked_text = marked_text.replace(desc["content"], f"***{desc_type}***\n{desc['content']}\n")
+    
+    return success_response(data={"text": marked_text, "characters": result})
+
+
+@router.post("/process/plot", summary="提取主线")
+async def process_plot(text: str = Body(..., embed=True, description="待处理文本")):
+    """
+    提取故事主线
+    前端调用场景：步骤3 - 主线提取
+    """
+    plot = await ai_service.extract_main_plot(text)
+    return success_response(data={"text": text, "plot": plot})
+
+
+@router.post("/process/speaker", summary="标记对话主体")
+async def process_speaker(text: str = Body(..., embed=True, description="待处理文本")):
+    """
+    标记对话的说话主体
+    前端调用场景：步骤4 - 对话主体标记
+    """
+    characters = await ai_service.extract_characters(text)
+    all_characters = characters["main_characters"] + characters["supporting_characters"]
+    tagged = await ai_service.tag_dialogue_speakers(text, all_characters)
+    
+    result_text = text
+    for dialogue in tagged:
+        if dialogue["speaker_name"]:
+            result_text = result_text.replace(
+                f'"{dialogue["content"]}"',
+                f'***{dialogue["speaker_name"]}***："{dialogue["content"]}"'
+            )
+    
+    return success_response(data={"text": result_text, "speakers": tagged})
+
+
+@router.post("/process/scene-header", summary="生成场景头")
+async def process_scene_header(text: str = Body(..., embed=True, description="待处理文本")):
+    """
+    分析景物描写生成场景头
+    前端调用场景：步骤6 - 场景头生成
+    """
+    characters = await ai_service.extract_characters(text)
+    scenery_descriptions = [d for d in characters["descriptions"] if d["type"] == "scenery"]
+    
+    result_text = text
+    scene_number = 1
+    for desc in scenery_descriptions[:3]:
+        scene_info = await ai_service.analyze_scene(desc["content"], scene_number)
+        location_type = "INT." if scene_info["is_interior"] else "EXT."
+        scene_header = f"{location_type} {scene_info['location']} - {scene_info['time_of_day']}"
+        result_text = result_text.replace(desc["content"], f"{scene_header}\n{desc['content']}")
+        scene_number += 1
+    
+    return success_response(data={"text": result_text})
+
+
+@router.post("/process/psychology", summary="转换心理描写")
+async def process_psychology(text: str = Body(..., embed=True, description="待处理文本")):
+    """
+    将心理描写转换为动作或神态描写
+    前端调用场景：步骤7 - 心理转换
+    """
+    characters = await ai_service.extract_characters(text)
+    all_characters = characters["main_characters"] + characters["supporting_characters"]
+    
+    result_text = text
+    for desc in characters["descriptions"]:
+        if desc["type"] == "psychology":
+            char_name = all_characters[0]["name"] if all_characters else "未知人物"
+            converted = await ai_service.convert_psychology(desc["content"], char_name)
+            result_text = result_text.replace(desc["content"], converted)
+    
+    return success_response(data={"text": result_text})
+
+
+@router.post("/process/cleanup", summary="去除无用语句")
+async def process_cleanup(text: str = Body(..., embed=True, description="待处理文本")):
+    """
+    去除无用语句
+    前端调用场景：步骤10 - 无用语句去除
+    """
+    useless_lines = await ai_service.detect_useless_lines(text)
+    lines = text.split('\n')
+    cleaned_lines = [line for i, line in enumerate(lines) if (i + 1) not in useless_lines]
+    result_text = '\n'.join(cleaned_lines)
+    
+    return success_response(data={"text": result_text, "removed_lines": useless_lines})
+
+
+@router.post("/process/polish", summary="润色剧本")
+async def process_polish(text: str = Body(..., embed=True, description="待处理文本")):
+    """
+    润色剧本文本
+    前端调用场景：步骤11 - AI润色
+    """
+    polished = await ai_service.polish_script(text)
+    return success_response(data={"text": polished})
+
+
+@router.post("/process/all", summary="一键处理全部")
+async def process_all(
+    text: str = Body(..., embed=True, description="待处理文本"),
+    script_type: str = Body("long", embed=True, description="剧本类型：long/short")
+):
+    """
+    一键处理全部步骤
+    前端调用场景：一键转换全部
+    """
+    try:
+        result = text
+        
+        result = (await process_dialog(result))["data"]["text"]
+        result = (await process_character(result))["data"]["text"]
+        result = (await process_plot(result))["data"]["text"]
+        result = (await process_speaker(result))["data"]["text"]
+        result = (await process_scene_header(result))["data"]["text"]
+        result = (await process_psychology(result))["data"]["text"]
+        result = (await process_cleanup(result))["data"]["text"]
+        result = (await process_polish(result))["data"]["text"]
+        
+        return success_response(data={"text": result, "script_type": script_type})
+    except Exception as e:
+        return error_response(message=f"处理失败: {str(e)}")
