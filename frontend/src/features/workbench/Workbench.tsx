@@ -477,21 +477,17 @@ episode:
             title="人物档案"
             icon={<Users className="h-3 w-3" />}
           >
-            {hasData ? (
+            {hasNovelData && currentNovel?.chapters && currentNovel.chapters.length > 0 ? (
               <div className="space-y-2">
-                {[
-                  "林深 · 海洋声呐工程师",
-                  "苏晚晴 · 深海生物学家",
-                  "陈默 · 勘探站站长",
-                ].map((name) => (
+                {currentNovel.chapters.slice(0, 5).map((chapter, index) => (
                   <div
-                    key={name}
+                    key={chapter.index}
                     className="flex items-center gap-2 rounded-lg border border-(--line-soft) px-3 py-2 text-sm"
                   >
                     <div className="flex h-6 w-6 items-center justify-center rounded-full bg-(--accent-light) text-xs text-(--accent-soft)">
-                      {name[0]}
+                      {index + 1}
                     </div>
-                    <span className="text-xs text-foreground">{name}</span>
+                    <span className="text-xs text-foreground truncate">{chapter.title}</span>
                   </div>
                 ))}
               </div>
@@ -507,27 +503,41 @@ episode:
             icon={<ListTree className="h-3 w-3" />}
           >
             <div className="space-y-3">
-              {["Cold Open", "Act 1", "Act 2", "Act 3"].map((step, i) => (
-                <div key={step} className="flex gap-3">
+              {hasData && currentScript?.episodes[0]?.scenes && currentScript.episodes[0].scenes.length > 0 ? (
+                currentScript.episodes[0].scenes.slice(0, 4).map((scene, i) => (
+                  <div key={scene.id} className="flex gap-3">
+                    <div className="flex flex-col items-center">
+                      <span
+                        className={`mt-1 h-2.5 w-2.5 rounded-full ${i === 0
+                          ? "bg-(--accent-soft)"
+                          : "bg-(--line-medium)"
+                          }`}
+                      />
+                      {i < Math.min(currentScript.episodes[0].scenes.length - 1, 3) && (
+                        <span className="mt-1.5 h-8 w-px bg-(--line-soft)" />
+                      )}
+                    </div>
+                    <div>
+                      <p className="text-sm text-foreground">{scene.title}</p>
+                      <p className="text-xs text-(--text-subtle)">
+                        {scene.beats.length} 节拍
+                      </p>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="flex gap-3">
                   <div className="flex flex-col items-center">
-                    <span
-                      className={`mt-1 h-2.5 w-2.5 rounded-full ${i === 0 && hasData
-                        ? "bg-(--accent-soft)"
-                        : "bg-(--line-medium)"
-                        }`}
-                    />
-                    {i < 3 && (
-                      <span className="mt-1.5 h-8 w-px bg-(--line-soft)" />
-                    )}
+                    <span className="mt-1 h-2.5 w-2.5 rounded-full bg-(--line-medium)" />
                   </div>
                   <div>
-                    <p className="text-sm text-foreground">{step}</p>
+                    <p className="text-sm text-foreground">等待分析</p>
                     <p className="text-xs text-(--text-subtle)">
-                      {hasData && i === 0 ? "3 场景" : "等待 AI 分析"}
+                      {hasData ? "等待 AI 分析生成故事结构" : "请先导入文本"}
                     </p>
                   </div>
                 </div>
-              ))}
+              )}
             </div>
           </CollapsibleSection>
         </div>
@@ -552,7 +562,9 @@ episode:
                   Episode Container
                 </p>
                 <p className="mt-1 text-sm text-foreground">
-                  {hasData ? "冷开场 · 让危险先于答案出现" : "暂无活跃项目"}
+                  {hasData && currentScript?.episodes[0]?.title
+                    ? currentScript.episodes[0].title
+                    : "暂无活跃项目"}
                 </p>
               </div>
               <span
@@ -562,33 +574,35 @@ episode:
               </span>
             </div>
 
-            {hasData ? (
+            {hasData && currentScript?.episodes[0]?.scenes && currentScript.episodes[0].scenes.length > 0 ? (
               <div className="space-y-3 mt-4">
-                {["监控室异常信号", "深海取样遭遇", "通信中断危机"].map(
-                  (scene, i) => (
-                    <div
-                      key={scene}
-                      className="group flex items-start gap-3 rounded-xl border border-(--line-soft) px-4 py-3 hover:bg-(--muted) transition-colors cursor-pointer"
-                    >
-                      <span className="mt-1 flex h-5 w-5 shrink-0 items-center justify-center rounded bg-(--accent-light) text-xs text-(--accent-soft)">
-                        {i + 1}
-                      </span>
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm text-foreground">{scene}</p>
-                        <p className="mt-0.5 text-xs text-(--text-subtle)">
-                          INT. 勘探站 · 3 节拍 · {120 + i * 30}s
-                        </p>
-                      </div>
-                      <button
-                        type="button"
-                        className="mt-0.5 rounded-md p-1 text-(--text-faint) opacity-0 group-hover:opacity-100 hover:text-foreground hover:bg-white transition-all"
-                      >
-                        <Plus className="h-3.5 w-3.5" />
-                      </button>
+                {currentScript.episodes[0].scenes.map((scene, i) => (
+                  <div
+                    key={scene.id}
+                    className="group flex items-start gap-3 rounded-xl border border-(--line-soft) px-4 py-3 hover:bg-(--muted) transition-colors cursor-pointer"
+                  >
+                    <span className="mt-1 flex h-5 w-5 shrink-0 items-center justify-center rounded bg-(--accent-light) text-xs text-(--accent-soft)">
+                      {i + 1}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm text-foreground">{scene.title}</p>
+                      <p className="mt-0.5 text-xs text-(--text-subtle)">
+                        {scene.location || "等待分析"} · {scene.beats.length} 节拍
+                      </p>
                     </div>
-                  ),
-                )}
+                    <button
+                      type="button"
+                      className="mt-0.5 rounded-md p-1 text-(--text-faint) opacity-0 group-hover:opacity-100 hover:text-foreground hover:bg-white transition-all"
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                ))}
               </div>
+            ) : hasData && !currentScript?.episodes[0]?.scenes.length ? (
+              <p className="text-sm text-(--text-subtle) leading-6">
+                文本已导入，等待 AI 分析生成场景结构。
+              </p>
             ) : (
               <p className="text-sm text-(--text-subtle) leading-6">
                 完成文本导入和 AI 转换后，场景结构将在此展示。
@@ -597,18 +611,18 @@ episode:
           </div>
 
           {/* Empty or Scene Detail */}
-          {hasData ? (
+          {hasData && currentScript?.episodes[0]?.scenes && currentScript.episodes[0].scenes.length > 0 ? (
             <div className="flex-1 space-y-3">
               {/* Current Scene Detail */}
               <div className="rounded-xl border border-(--accent-soft)/30 bg-(--accent-light) px-4 py-3">
                 <div className="flex items-center gap-2 mb-2">
                   <span className="text-xs font-medium text-(--accent-soft)">
-                    INT. 深海勘探站 · 主控室
+                    {currentScript.episodes[0].scenes[0]?.location || "等待分析"}
                   </span>
                   <span className="text-xs text-(--text-faint)">夜晚</span>
                 </div>
                 <p className="text-sm text-foreground leading-6">
-                  林深盯着屏幕上跳动的波形，瞳孔微缩。这种频率...不像是已知的海洋生物。
+                  {currentScript.episodes[0].scenes[0]?.intent || currentScript.episodes[0].scenes[0]?.title || "等待 AI 分析生成场景内容"}
                 </p>
                 <div className="mt-3 flex items-center gap-2">
                   <button
@@ -628,6 +642,8 @@ episode:
                 </div>
               </div>
             </div>
+          ) : hasData ? (
+            <AIConvertPanel />
           ) : showImportPanel ? (
             <div className="flex flex-1 flex-col overflow-hidden rounded-xl border-2 border-(--accent-soft)/50 bg-white p-4 animate-scale-in">
               <div className="flex items-center justify-between mb-4">
@@ -1021,6 +1037,263 @@ export function WorkbenchOverviewCard() {
         </p>
       </div>
       <Sparkles className="hidden h-8 w-8 text-(--accent-soft) md:block" />
+    </div>
+  );
+}
+
+const AI_STEPS = [
+  { id: "dialog", label: "对话标记", desc: "识别对话语句并添加唯一标识" },
+  { id: "character", label: "人物提取", desc: "提取主要人物和次要人物" },
+  { id: "description", label: "描写分离", desc: "分离景物、心理、肖像描写" },
+  { id: "plot", label: "主线提取", desc: "提取故事主线和转场" },
+  { id: "speaker", label: "对话主体", desc: "标记对话的说话主体" },
+  { id: "structure", label: "剧本架构", desc: "选择长剧本或短剧本" },
+  { id: "scene", label: "场景头生成", desc: "分析景物描写生成场景头" },
+  { id: "psychology", label: "心理转换", desc: "将心理描写转为动作神态" },
+  { id: "packaging", label: "场景打包", desc: "按相似度分场景打包" },
+  { id: "cleanup", label: "无用语句", desc: "去除无用语句" },
+  { id: "polish", label: "AI 润色", desc: "润色剧本使其更专业" },
+  { id: "export", label: "导出剧本", desc: "生成 JSON/YAML 格式剧本" },
+];
+
+function AIConvertPanel() {
+  const [currentStep, setCurrentStep] = useState(0);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [processedText, setProcessedText] = useState("");
+  const [adaptType, setAdaptType] = useState<"short" | "long">("long");
+  const [completedSteps, setCompletedSteps] = useState<Set<string>>(new Set());
+  const novels = useNovelStore((s) => s.novels);
+  const currentNovelId = useNovelStore((s) => s.currentNovelId);
+  const currentNovel = novels.find(n => n.id === currentNovelId);
+  const { addToast } = useToastStore();
+
+  const originalText = currentNovel?.fullText || "";
+
+  const processStep = async (stepId: string) => {
+    setIsProcessing(true);
+
+    await new Promise(resolve => setTimeout(resolve, 1500));
+
+    let result = processedText || originalText;
+
+    switch (stepId) {
+      case "dialog":
+        result = markDialogs(result);
+        break;
+      case "character":
+        result = extractCharacters(result);
+        break;
+      case "description":
+        result = separateDescriptions(result);
+        break;
+      case "plot":
+        result = extractPlot(result);
+        break;
+      case "speaker":
+        result = markSpeakers(result);
+        break;
+      case "scene":
+        result = generateSceneHeaders(result);
+        break;
+      case "psychology":
+        result = convertPsychology(result);
+        break;
+      case "packaging":
+        result = packageScenes(result);
+        break;
+      case "cleanup":
+        result = removeUseless(result);
+        break;
+      case "polish":
+        result = polishText(result);
+        break;
+      case "export":
+        exportScript(result);
+        break;
+    }
+
+    setProcessedText(result);
+    setCompletedSteps(prev => new Set([...prev, stepId]));
+    setIsProcessing(false);
+    addToast({ type: "success", title: `${AI_STEPS.find(s => s.id === stepId)?.label} 完成` });
+  };
+
+  const processAll = async () => {
+    for (let i = currentStep; i < AI_STEPS.length; i++) {
+      if (AI_STEPS[i].id === "structure") {
+        continue;
+      }
+      await processStep(AI_STEPS[i].id);
+      setCurrentStep(i + 1);
+    }
+  };
+
+  const markDialogs = (text: string) => {
+    return text.replace(/(["“”「」『』]([^"“”「」『』]+)["“”「」『』])/g, (_, dialog) => {
+      const id = `|${Date.now()}-${Math.random().toString(36).substr(2, 9)}|`;
+      return `${dialog}${id}`;
+    });
+  };
+
+  const extractCharacters = (text: string) => {
+    return `=== 人物列表 ===\n***主要人物：***\n- 主角（待 AI 识别）\n- 配角（待 AI 识别）\n\n***次要人物：***\n- 路人甲（待 AI 识别）\n\n=== 原文 ===\n${text}`;
+  };
+
+  const separateDescriptions = (text: string) => {
+    return text.replace(/([。！？])\s*([^\n。！？]+?的(样子|神情|眼神|表情|外貌|相貌|面容|身材|衣着|穿着))/g, "$1\n***肖像描写***$2\n");
+  };
+
+  const extractPlot = (text: string) => {
+    return `=== 故事主线 ===\n***主线：***\n待 AI 分析...\n\n***转场：***\n待 AI 分析...\n\n=== 原文 ===\n${text}`;
+  };
+
+  const markSpeakers = (text: string) => {
+    return text.replace(/(["“”「」『』][^"“”「」『』]+["“”「」『』])/g, "***未知人物***$1");
+  };
+
+  const generateSceneHeaders = (text: string) => {
+    return `INT. 未知地点 - 白天\n\n${text}`;
+  };
+
+  const convertPsychology = (text: string) => {
+    return text.replace(/(心想|暗想|觉得|认为|想道?)\s*[：:]/g, "***主角***（内心）：");
+  };
+
+  const packageScenes = (text: string) => {
+    return `###\n${text.slice(0, Math.floor(text.length / 2))}\n###\n${text.slice(Math.floor(text.length / 2))}\n###`;
+  };
+
+  const removeUseless = (text: string) => {
+    return text.replace(/(啊啊啊|嗯嗯|啊啊|呜呜|哼哼|呵呵|哈哈)\s*/g, "");
+  };
+
+  const polishText = (text: string) => {
+    return text.replace(/。/g, "。\n").replace(/！/g, "！\n").replace(/？/g, "？\n");
+  };
+
+  const exportScript = (text: string) => {
+    const script = {
+      title: currentNovel?.title || "未命名剧本",
+      scenes: text.split("###").filter(s => s.trim()).map((scene, i) => ({
+        id: `scene_${i + 1}`,
+        content: scene.trim(),
+      })),
+      createdAt: new Date().toISOString(),
+    };
+    const blob = new Blob([JSON.stringify(script, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${script.title}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  return (
+    <div className="flex-1 flex flex-col p-4">
+      <div className="mb-6">
+        <h3 className="font-serif text-lg text-foreground mb-2">AI 剧本转换</h3>
+        <p className="text-sm text-(--text-subtle)">按照以下步骤将小说文本转换为专业剧本格式</p>
+      </div>
+
+      <div className="mb-6">
+        <div className="flex items-center justify-between mb-3">
+          <span className="text-sm text-(--text-subtle)">剧本架构</span>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => setAdaptType("long")}
+              className={`px-3 py-1.5 rounded-lg text-sm transition-colors ${adaptType === "long"
+                ? "bg-(--accent-soft) text-white"
+                : "border border-(--line-soft) text-(--text-subtle) hover:bg-(--muted)"
+                }`}
+            >
+              影视作品（长剧本）
+            </button>
+            <button
+              type="button"
+              onClick={() => setAdaptType("short")}
+              className={`px-3 py-1.5 rounded-lg text-sm transition-colors ${adaptType === "short"
+                ? "bg-(--accent-soft) text-white"
+                : "border border-(--line-soft) text-(--text-subtle) hover:bg-(--muted)"
+                }`}
+            >
+              电影剧本（短剧本）
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div className="mb-6 flex-1 overflow-auto">
+        <div className="bg-(--muted) rounded-xl p-4 min-h-[200px] font-mono text-sm text-foreground whitespace-pre-wrap overflow-auto">
+          {processedText || originalText || "等待导入文本..."}
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        {AI_STEPS.map((step, index) => (
+          <div
+            key={step.id}
+            className={`flex items-center gap-3 p-3 rounded-lg border transition-colors ${completedSteps.has(step.id)
+              ? "border-green-500 bg-green-50"
+              : index === currentStep && !isProcessing
+                ? "border-(--accent-soft) bg-(--accent-light)"
+                : "border-(--line-soft) hover:bg-(--muted)"
+              }`}
+          >
+            <div className="flex h-6 w-6 items-center justify-center rounded-full text-xs font-medium">
+              {completedSteps.has(step.id) ? (
+                <Check className="h-4 w-4 text-green-500" />
+              ) : isProcessing && index === currentStep ? (
+                <div className="w-4 h-4 border-2 border-(--accent-soft) border-t-transparent rounded-full animate-spin" />
+              ) : (
+                index + 1
+              )}
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm text-foreground">{step.label}</p>
+              <p className="text-xs text-(--text-subtle) truncate">{step.desc}</p>
+            </div>
+            {step.id === "structure" ? (
+              <span className="text-xs text-(--text-faint)">已选择: {adaptType === "long" ? "影视作品" : "电影剧本"}</span>
+            ) : completedSteps.has(step.id) ? (
+              <span className="text-xs text-green-500">完成</span>
+            ) : index === currentStep && !isProcessing ? (
+              <button
+                type="button"
+                onClick={() => processStep(step.id)}
+                className="px-3 py-1 rounded-md bg-(--accent-soft) text-white text-xs"
+              >
+                执行
+              </button>
+            ) : (
+              <span className="text-xs text-(--text-faint)">等待</span>
+            )}
+          </div>
+        ))}
+      </div>
+
+      <div className="mt-4 flex gap-3">
+        <button
+          type="button"
+          onClick={() => {
+            setCurrentStep(0);
+            setProcessedText("");
+            setCompletedSteps(new Set());
+          }}
+          className="flex-1 px-4 py-2 rounded-lg border border-(--line-soft) text-sm text-(--text-subtle) hover:bg-(--muted) transition-colors"
+        >
+          重置
+        </button>
+        <button
+          type="button"
+          onClick={processAll}
+          disabled={isProcessing}
+          className="flex-1 px-4 py-2 rounded-lg bg-(--accent-soft) text-white text-sm hover:bg-(--accent-soft)/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {isProcessing ? "处理中..." : "一键转换全部"}
+        </button>
+      </div>
     </div>
   );
 }

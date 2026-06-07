@@ -437,12 +437,24 @@ export default function ImportPage() {
 
     const selectedContent = chaptersWithContent.map(ch => ch.content).join('\n\n');
 
+    // 根据章节名生成项目标题
+    const firstChapter = filteredSelectedChapterList[0];
+    let projectTitle = `新项目 (${selectedChapters.size}章)`;
+    if (firstChapter && firstChapter.title) {
+      const chapterTitle = firstChapter.title.replace(/[第卷章回部]/g, "").trim();
+      if (chapterTitle && chapterTitle.length > 0) {
+        projectTitle = chapterTitle.length > 20 
+          ? chapterTitle.substring(0, 20) + "..." 
+          : chapterTitle;
+      }
+    }
+
     // 创建项目
     const projectId = `proj_${Date.now().toString(36)}`;
     const project = {
       id: projectId,
-      title: `新项目 (${selectedChapters.size}章)`,
-      sourceNovel: "导入文本",
+      title: projectTitle,
+      sourceNovel: firstChapter?.title || "导入文本",
       sourceAuthor: "未知作者",
       chapterCount: selectedChapters.size,
       status: "idle" as const,
@@ -456,7 +468,7 @@ export default function ImportPage() {
     const novelData = {
       id: novelId,
       projectId,
-      title: project.title,
+      title: projectTitle,
       author: "未知作者",
       totalChapters: selectedChapters.size,
       totalWordCount: selectedContent.length,
@@ -472,24 +484,14 @@ export default function ImportPage() {
     const initialScriptData = {
       id: scriptId,
       projectId,
-      title: project.title,
+      title: projectTitle,
       sourceText: selectedContent,
       episodes: [
         {
           id: `${scriptId}_episode_1`,
-          title: project.title,
-          coldOpen: "等待 AI 分析",
-          scenes: [
-            {
-              id: `${scriptId}_scene_1`,
-              code: "SC-001",
-              title: "等待处理",
-              location: "等待分析",
-              intent: "导入的原始文本尚未处理，请启动 AI 转换",
-              beats: [],
-              status: "draft" as const,
-            },
-          ],
+          title: projectTitle,
+          coldOpen: "",
+          scenes: [],
         },
       ],
     };
