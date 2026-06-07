@@ -75,6 +75,22 @@ class Script(BaseModel):
     updated_at: datetime = Field(default_factory=datetime.now, description="更新时间")
 
 
+class ScriptSourceChapter(BaseModel):
+    """前端分卷/分章后的结构化章节"""
+    index: int = Field(..., ge=1, description="章节序号")
+    title: str = Field(..., min_length=1, description="章节标题")
+    content: str = Field(..., min_length=1, description="章节正文")
+    word_count: int = Field(default=0, ge=0, description="章节字数")
+
+
+class ScriptSourcePayload(BaseModel):
+    """前端上传的结构化原著数据"""
+    mode: str = Field(default="chapter_json", description="源数据模式")
+    total_word_count: int = Field(default=0, ge=0, description="全文字数")
+    chapter_count: int = Field(default=0, ge=0, description="章节数")
+    chapters: List[ScriptSourceChapter] = Field(default_factory=list, description="章节列表")
+
+
 class ProcessingStep(str, Enum):
     """处理步骤"""
     DIALOGUE_EXTRACTION = "dialogue_extraction"
@@ -116,6 +132,10 @@ class ScriptCreateRequest(BaseModel):
     title: str = Field(..., min_length=1, max_length=255, description="剧本标题")
     type: ScriptType = Field(..., description="剧本类型")
     text: str = Field(..., min_length=1, description="原始文本")
+    source_payload: Optional[ScriptSourcePayload] = Field(
+        default=None,
+        description="前端预处理后的结构化原著 JSON",
+    )
 
 
 class TaskListItem(BaseModel):

@@ -16,6 +16,7 @@ import {
   fetchScript,
   fetchTask,
   fetchTasks,
+  type ScriptSourcePayload,
   startScriptProcessing,
 } from "@/lib/api";
 import { useProjectStore } from "@/store/useProjectStore";
@@ -34,12 +35,19 @@ interface ChapterPreview {
   endPos?: number;
 }
 
+interface StructuredChapter {
+  index: number;
+  title: string;
+  content: string;
+  wordCount: number;
+}
+
 export default function ImportPage() {
   const navigate = useNavigate();
   const [step, setStep] = useState<ImportStep>("upload");
   const [dragOver, setDragOver] = useState(false);
   const [pasteContent, setPasteContent] = useState("");
-  const [chapters, setChapters] = useState<ChapterPreview[]>([]);
+  const [structuredChapters, setStructuredChapters] = useState<StructuredChapter[]>([]);
   const [adaptType, setAdaptType] = useState<"short" | "long" | null>(null);
   const [convertProgress, setConvertProgress] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -214,6 +222,90 @@ export default function ImportPage() {
     return detected;
   };
 
+  const buildStructuredChapters = (
+    text: string,
+    detected: ChapterPreview[],
+  ): StructuredChapter[] => {
+    const normalizedText = text.replace(/\r\n/g, "\n");
+
+    if (detected.length >= 1) {
+      const lines = normalizedText.split("\n");
+      const chapterStarts = detected
+        .map((chapter) => {
+          const titleLineIndex = lines.findIndex(
+            (line) => line.trim() === chapter.title.trim(),
+          );
+
+          return {
+            ...chapter,
+            lineIndex: titleLineIndex,
+          };
+        })
+        .filter((chapter) => chapter.lineIndex >= 0)
+        .sort((a, b) => a.lineIndex - b.lineIndex);
+
+      if (chapterStarts.length >= 1) {
+        return chapterStarts
+          .map((chapter, index) => {
+            const start = chapter.lineIndex;
+            const end =
+              index < chapterStarts.length - 1
+                ? chapterStarts[index + 1].lineIndex
+                : lines.length;
+            const block = lines.slice(start, end).join("\n").trim();
+            const content = lines
+              .slice(start + 1, end)
+              .join("\n")
+              .trim();
+
+            return {
+              index: index + 1,
+              title: chapter.title,
+              content: content || block,
+              wordCount: (content || block).length,
+            };
+          })
+          .filter((chapter) => chapter.content.length > 0);
+      }
+    }
+
+    const paragraphs = normalizedText
+      .split(/\n\s*\n+/)
+      .map((paragraph) => paragraph.trim())
+      .filter(Boolean);
+    const bucketSize = Math.max(1, Math.ceil(paragraphs.length / 3));
+
+    return Array.from({ length: 3 }, (_, index) => {
+      const start = index * bucketSize;
+      const end = Math.min(start + bucketSize, paragraphs.length);
+      const content = paragraphs.slice(start, end).join("\n\n").trim();
+
+      return {
+        index: index + 1,
+        title: `第 ${index + 1} 部分`,
+        content,
+        wordCount: content.length,
+      };
+    }).filter((chapter) => chapter.content.length > 0);
+  };
+
+  const buildSourcePayload = (
+    text: string,
+    chapterItems: StructuredChapter[],
+  ): ScriptSourcePayload => ({
+    mode: "chapter_json",
+    total_word_count: text.trim().length,
+    chapter_count: chapterItems.length,
+    chapters: chapterItems.map((chapter) => ({
+      index: chapter.index,
+      title: chapter.title,
+      content: chapter.content,
+      word_count: chapter.wordCount,
+    })),
+  });
+
+  const effectiveChapterCount = structuredChapters.length;
+
   // 调试函数：分析文本中可能的章节标题
   const analyzeChapterPatterns = (text: string): string[] => {
     const lines = text.split("\n");
@@ -302,11 +394,12 @@ export default function ImportPage() {
 
   const handleTextContent = (text: string) => {
     const detected = detectChapters(text);
+    const structured = buildStructuredChapters(text, detected);
     const textLength = text.trim().length;
     const potentialChapters = analyzeChapterPatterns(text);
 
     // 如果没有检测到 3 个章节，但文本足够长（超过 1000 字），也允许通过
-    if (detected.length < 3 && textLength < 1000) {
+    if (structured.length < 3 && textLength < 1000) {
       alert(
         "至少需要 3 个章节或文本超过 1000 字才能进行转换，请补充更多内容。",
       );
@@ -321,7 +414,7 @@ export default function ImportPage() {
     }
 
     setPasteContent(text); // 确保文本内容被保存
-    setChapters(detected);
+    setStructuredChapters(structured);
     setStep("preview");
   };
 
@@ -335,10 +428,10 @@ export default function ImportPage() {
     const projectId = `proj_${Date.now().toString(36)}`;
     const project = {
       id: projectId,
-      title: `新项目 (${chapters.length}章)`,
+      title: `新项目 (${effectiveChapterCount}章)`,
       sourceNovel: "导入文本",
       sourceAuthor: "未知作者",
-      chapterCount: chapters.length,
+      chapterCount: effectiveChapterCount,
       status: "converting" as const,
       createdAt: new Date().toISOString(),
     };
@@ -350,6 +443,7 @@ export default function ImportPage() {
         title: project.title,
         type: adaptType === "short" ? "short_film" : "feature_film",
         text: pasteContent.trim(),
+        source_payload: buildSourcePayload(pasteContent, structuredChapters),
       });
       const processingTask = await startScriptProcessing(script.id);
       const liveTask = await fetchTask(processingTask.id);
@@ -570,7 +664,7 @@ export default function ImportPage() {
                 总章节数
               </p>
               <p className="text-2xl font-bold text-foreground">
-                {chapters.length}
+                {effectiveChapterCount}
               </p>
             </div>
             <div className="card p-4">
@@ -586,8 +680,8 @@ export default function ImportPage() {
                 平均每章
               </p>
               <p className="text-2xl font-bold text-foreground">
-                {chapters.length > 0
-                  ? Math.round(pasteContent.length / chapters.length).toLocaleString()
+                {effectiveChapterCount > 0
+                  ? Math.round(pasteContent.length / effectiveChapterCount).toLocaleString()
                   : 0}
               </p>
             </div>
@@ -601,13 +695,13 @@ export default function ImportPage() {
                   章节预览
                 </p>
                 <p className="mt-1 text-sm text-foreground">
-                  已识别 <strong>{chapters.length}</strong>{" "}
+                  已识别 <strong>{effectiveChapterCount}</strong>{" "}
                   个章节，请确认划分是否正确
                 </p>
               </div>
               <span className="badge badge-success">
                 <Check className="h-3 w-3" />
-                {chapters.length} 章节
+                {effectiveChapterCount} 章节
               </span>
             </div>
 
@@ -620,8 +714,8 @@ export default function ImportPage() {
             </div>
 
             <div className="space-y-2 max-h-[400px] overflow-y-auto pr-1">
-              {chapters.map((ch, idx) => {
-                const percentage = chapters.length > 0 
+              {structuredChapters.map((ch) => {
+                const percentage = effectiveChapterCount > 0
                   ? Math.round((ch.wordCount / pasteContent.length) * 100) 
                   : 0;
                 
@@ -729,7 +823,7 @@ export default function ImportPage() {
                   <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-(--accent-soft)" />
                   <div>
                     <p className="text-sm font-medium text-foreground">
-                      AI 将分析 {chapters.length} 个章节
+                      AI 将分析 {effectiveChapterCount} 个章节
                     </p>
                     <p className="mt-1 text-xs text-(--text-subtle) leading-5">
                       逐一解析章节内容，提取人物、场景和对白，按照剧本原子化规范生成结构化
@@ -797,9 +891,9 @@ export default function ImportPage() {
             </div>
 
             <div className="mt-8 space-y-2 max-w-sm mx-auto text-left">
-              {chapters.slice(0, 5).map((ch) => {
+              {structuredChapters.slice(0, 5).map((ch) => {
                 const done =
-                  convertProgress > (ch.index / chapters.length) * 100;
+                  convertProgress > (ch.index / effectiveChapterCount) * 100;
                 return (
                   <div
                     key={ch.index}
@@ -826,9 +920,9 @@ export default function ImportPage() {
                   </div>
                 );
               })}
-              {chapters.length > 5 && (
+              {effectiveChapterCount > 5 && (
                 <p className="text-xs text-(--text-faint) pl-8">
-                  还有 {chapters.length - 5} 个章节...
+                  还有 {effectiveChapterCount - 5} 个章节...
                 </p>
               )}
             </div>
