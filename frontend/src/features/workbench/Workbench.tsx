@@ -5,7 +5,6 @@ import {
   FileText,
   Users,
   ListTree,
-  WandSparkles,
   Bot,
   Code2,
   History,
@@ -13,11 +12,9 @@ import {
   ChevronDown,
   ChevronRight,
   Send,
-  Lightbulb,
   RotateCcw,
   Copy,
   Check,
-  Plus,
   Upload,
   AlertCircle,
   ArrowRight,
@@ -1201,12 +1198,20 @@ function AIConvertPanel({ processedText, setProcessedText, setYamlOutput }: AICo
 
     const updatedScript = {
       ...currentScript,
-      episodes: [
-        {
-          ...currentScript.episodes[0],
-          scenes: scenes.length > 0 ? scenes : currentScript.episodes[0].scenes,
-        },
-      ],
+      episodes: currentScript?.episodes?.map((ep, i) =>
+        i === 0
+          ? {
+            ...ep,
+            scenes: scenes.length > 0 ? scenes : ep.scenes,
+          }
+          : ep
+      ) || [
+          {
+            id: `${currentScript?.id || "script"}_episode_1`,
+            title: "第1集",
+            scenes: scenes.length > 0 ? scenes : [],
+          },
+        ],
     };
 
     upsertScript(updatedScript);

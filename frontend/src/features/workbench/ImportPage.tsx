@@ -267,7 +267,7 @@ export default function ImportPage() {
 
     // 为每个章节提取内容
     const chaptersWithContent = filteredSelectedChapterList.map((ch, idx) => {
-      let content = '';
+      let content: string;
       if (ch.startPos !== undefined && ch.endPos !== undefined) {
         content = pasteContent.slice(ch.startPos, ch.endPos);
       } else {

@@ -53,7 +53,7 @@ export function detectChapters(text: string): ChapterPreview[] {
     /^[Vv]ol\.\s*\d+/,
     // 数字开头
     /^\d+\s*[章节部回卷集]/,
-    /^\d+[\.\-\s][章节部回卷集]?/,
+    /^\d+[.\-\s][章节部回卷集]?/,
   ];
 
   const filterKeywords = [
@@ -158,7 +158,7 @@ export function extractChapterContents(
   const selectedChapters = chapters.filter((ch) => selectedIndices.has(ch.index));
 
   return selectedChapters.map((ch, idx) => {
-    let content = "";
+    let content: string;
     if (ch.startPos !== undefined && ch.endPos !== undefined) {
       content = text.slice(ch.startPos, ch.endPos);
     } else {
