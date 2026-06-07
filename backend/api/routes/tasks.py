@@ -69,7 +69,9 @@ async def delete_task(task_id: str):
     task = await ScriptService.get_task(task_id)
     if not task:
         return error_response(message="任务不存在", code=404)
-    await ScriptService.delete_script(task.script_id)
+    deleted = await ScriptService.delete_task(task_id)
+    if not deleted:
+        return error_response(message="任务不存在", code=404)
     return success_response(data={"task_id": task_id}, message="任务删除成功")
 
 

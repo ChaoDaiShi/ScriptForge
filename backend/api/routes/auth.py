@@ -1,6 +1,6 @@
 from typing import Optional
 
-from fastapi import APIRouter, Header
+from fastapi import APIRouter, Body, Header
 
 from core.utils import error_response, success_response
 from schemas.script_schema import AuthLoginRequest, AuthRegisterRequest
@@ -35,3 +35,29 @@ async def me(x_user_id: Optional[str] = Header(default=None, alias="X-User-Id"))
     if not user:
         return error_response(message="用户不存在", code=404)
     return success_response(data=user.model_dump(mode="json"))
+
+
+@router.get("/credits", summary="当前用户额度")
+async def credits(x_user_id: Optional[str] = Header(default=None, alias="X-User-Id")):
+    if not x_user_id:
+        return error_response(message="缺少 X-User-Id", code=401)
+    payload = await AuthService.credits(x_user_id)
+    if payload is None:
+        return error_response(message="用户不存在", code=404)
+    return success_response(data=payload)
+
+
+@router.post("/credits/redeem", summary="兑换额度")
+async def redeem_credits(
+    code: str = Body(..., embed=True),
+    x_user_id: Optional[str] = Header(default=None, alias="X-User-Id"),
+):
+    if not x_user_id:
+        return error_response(message="缺少 X-User-Id", code=401)
+    try:
+        payload = await AuthService.redeem_credits(x_user_id, code)
+    except ValueError as error:
+        return error_response(message=str(error), code=400)
+    if payload is None:
+        return error_response(message="用户不存在", code=404)
+    return success_response(data=payload, message="兑换成功")

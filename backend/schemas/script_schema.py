@@ -84,6 +84,8 @@ class User(BaseModel):
     email: EmailStr
     password_hash: str
     password_salt: str
+    credits: int = 0
+    credits_used: int = 0
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
 
@@ -91,6 +93,8 @@ class User(BaseModel):
 class UserPublic(BaseModel):
     id: str
     email: EmailStr
+    credits: int = 0
+    credits_used: int = 0
     created_at: datetime
 
 

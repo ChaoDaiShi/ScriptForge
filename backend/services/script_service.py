@@ -383,9 +383,20 @@ class ScriptService:
         return ScriptService._get_repository().get_task(task_id)
 
     @staticmethod
+    async def delete_task(task_id: str) -> bool:
+        return ScriptService._get_repository().delete_task(task_id)
+
+    @staticmethod
     async def list_all_tasks(status: Optional[str] = None, project_id: Optional[str] = None) -> List[TaskListItem]:
+        status_mapping = {
+            "queued": ProcessingStatus.PENDING.value,
+            "running": ProcessingStatus.PROCESSING.value,
+            "done": ProcessingStatus.COMPLETED.value,
+            "failed": ProcessingStatus.FAILED.value,
+        }
+        repository_status = status_mapping.get(status, status)
         items: List[TaskListItem] = []
-        for task in ScriptService._get_repository().list_tasks(status=status, project_id=project_id):
+        for task in ScriptService._get_repository().list_tasks(status=repository_status, project_id=project_id):
             item = await ScriptService.serialize_task(task)
             if item is not None:
                 items.append(item)
