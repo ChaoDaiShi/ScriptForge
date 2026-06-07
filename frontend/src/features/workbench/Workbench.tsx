@@ -19,7 +19,6 @@ import {
   Check,
   Plus,
   Upload,
-  Video,
   Globe,
 } from "lucide-react";
 import { useScriptStore } from "@/store/useScriptStore";
